@@ -704,15 +704,14 @@ provider leaves a clean state.
 - `Tests/PlatformTests/ActivationTests.swift` — atomic activation leaves the
   previous version intact on failure; a partially written version directory is
   discarded; concurrent installs of the same provider serialise safely.
-- `Tests/PlatformTests/PluginCatalogTests.swift` — catalog loading, the
-  bundled resource, the development override, and a malformed file.
 - `Tests/PlatformTests/PluginLayoutTests.swift` — the installed layout: the
   active symlink, a relative stored path, and the verifier seam.
 - `Tests/PlatformTests/BundledProviderTests.swift` — a provider packaged in
   the application bundle, one this build does not ship, and a remote source
   refused while nothing can verify it.
-- `Tests/PlatformTests/ShippedFileTests.swift` — the catalog and the executable
-  each plugin package builds all name the same provider the same way.
+- `Tests/PlatformTests/ShippedFileTests.swift` — the packaged tar and the
+  executable each plugin package builds all name the same provider the same
+  way.
 
 ```sh
 swift test --filter PluginManagerTests
