@@ -119,8 +119,8 @@ private enum MultiWindowFixture {
         for quota: Quota,
         in arrangement: Arrangement
     ) async throws -> [TimelinePoint] {
-        try await #require(
-            arrangement.repositories.timelines.timeline(
+        try #require(
+            await arrangement.repositories.timelines.timeline(
                 quotaID: quota.id,
                 bucketID: quota.bucketID ?? "",
                 accountLabel: accountLabel

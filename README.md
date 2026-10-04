@@ -26,7 +26,7 @@ and [CHANGELOG.md](CHANGELOG.md).
 ## Requirements
 
 - macOS 14 or later
-- Xcode 26 or later, for the Swift 6.3 toolchain
+- Xcode 26.3 or later, for the Swift 6.3 toolchain
 - Homebrew, for the formatting and linting tools
 
 ## Installing a release
