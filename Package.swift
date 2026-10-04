@@ -56,7 +56,6 @@ let package = Package(
         .testTarget(
             name: "PlatformTests",
             dependencies: ["Platform"],
-            resources: [.copy("Fixtures")],
             swiftSettings: swiftSettings
         ),
         .testTarget(
