@@ -431,12 +431,28 @@ Conceptually:
 
 ```swift
 struct UsageSnapshot {
-    let usagePercentage: Double
-    let periodStart: Date
-    let periodEnd: Date
     let updatedAt: Date
+    let buckets: [UsageBucket]
+}
+
+struct UsageBucket {
+    let id: String
+    let displayName: String
+    let usagePercentage: Double
+    let period: QuotaPeriod
 }
 ```
+
+The period belongs to a bucket, not to the snapshot. A provider may meter
+several limits that do not reset together — a five-hour allowance and a weekly
+one, say — and one window for the whole reading can only describe a provider
+whose limits share a clock.
+
+Each limit a provider reports carries its own window, and each limit a quota
+watches is read from the period of the bucket it names. A quota that names no
+bucket reads the provider's primary, as it did before; a quota whose bucket the
+provider has stopped reporting has no window to read and is reported as waiting
+for that limit rather than being given another limit's window.
 
 For example:
 
@@ -762,6 +778,41 @@ Sep 22 → 0%
 Sep 23 → 10%
 ```
 
+The daily shares are entered on a calendar of the period, one day at a time, with
+the total of the policy always visible beside the days that make it up. The
+calendar is the same one the plan is shown on, so a month looks the same wherever
+it appears.
+
+```text
+Assigned                                              100.00%
+Every percent of the allowance has a day.
+```
+
+The editor must not let a policy ask for more than the whole allowance: a
+custom policy is the user's own share of their quota, and a total above 100% could
+only be satisfied by scaling every day back down. A day is therefore held at what
+is left of the allowance after the other days:
+
+```text
+Assigned                                              100.00%
+30.00% is all this day can take.
+```
+
+A period of 30 days does not divide into a hundred whole percents, so the policy
+must be fillable in one press, and the filled figures must add up to exactly 100%
+as they are displayed:
+
+```text
+29 days → 3.33%
+1 day   → 3.43%
+        ───────
+         100.00%
+```
+
+A policy stored before this ceiling existed may hold more than 100%, and must
+remain editable rather than stuck: lowering a day is always allowed, and the way
+out of an overfilled policy is a day at a time or the one-press fill.
+
 ---
 
 # 29. Custom Allocation Validation
@@ -905,6 +956,21 @@ Sep 24   5%
 Sep 25   5%
 ```
 
+The calendar must follow the user's first day of the week: the first of a month
+appears under its own weekday, and the cells before it are empty rather than
+filled with days of the month before.
+
+The calendar must explain its own marks. A day distinguished only by a shade of
+grey asks the user to learn a colour code, so the calendar shows what each mark
+stands for:
+
+```text
+■ Today   ◻ Selected   □ Nothing planned   ▨ Outside period
+```
+
+A month the user cannot page past must not offer the arrows that would page past
+it, and the calendar must say which months it may be moved through.
+
 ---
 
 # 35. Calendar Interaction
@@ -924,6 +990,13 @@ Remaining: 2%
 Future dates display planned allocations.
 
 Past dates primarily display historical information.
+
+The selected day's figures sit directly under the calendar, in the order they are
+asked for, so the calendar stays the thing being read.
+
+Month navigation is a keyboard-reachable control, and the selected day is brought
+into view whichever month is showing: a day selected from a list below the
+calendar is not on a page the user cannot see.
 
 ---
 
@@ -953,16 +1026,24 @@ The UI must make clear whether each value represents:
 
 Quota must allow users to see how much they can use on future days.
 
-Example:
+This is shown by the calendar, on the day each share belongs to, rather than by a
+list of the coming days. A list would be a second rendering of figures the
+calendar already carries, in a fixed order, and its length would grow with the
+period: a yearly quota would list three hundred and sixty rows in front of the
+calendar that answers the same question. The calendar is paged a month at a time
+and shows every day of the period, so nothing is lost by not repeating it.
+
+Example — a month's grid, each day carrying its own share:
 
 ```text
-Today       6%
-Tomorrow    6%
-Friday      6%
-Saturday    0%
-Sunday      0%
-Monday      8%
+       M     T     W     T     F     S     S
+ 1   3.3%  3.3%  3.3%  3.3%  3.3%  3.3%  3.3%
+ 2   3.3%  3.3%  3.3%  3.3%  3.3%  0%    0%
+ 3   3.3%  3.3%  3.3%  3.3%  3.3%  0%    0%
 ```
+
+Today's share is also in the summary figures, and the selected day's in full
+beneath the grid.
 
 Future allocation is a core product feature.
 
@@ -990,21 +1071,34 @@ Quota should not silently modify the user's allocation policy because of pacing 
 
 # 39. Menu Bar
 
-Quota operates primarily as a menu bar application.
+Quota operates primarily as a menu bar application. The menu bar is the primary
+entry; a management window handles editing (providers, quotas, calendars,
+custom policies).
 
-The menu bar indicator should expose today's relevant allowance.
+The menu bar indicator should expose today's relevant allowance, as what has
+been used of it out of the day's planned allocation. The two figures are shown
+together because a percentage of a day and a percentage of a period read the
+same and are not the same claim, and they are written apart rather than as one
+fraction: at menu bar size `6%/8%` reads as a single number, which is the one
+reading both figures are there to prevent.
 
 Examples:
 
 ```text
-Quota · 8%
+Quota · 2% / 8%
 ```
 
-or:
+Where today's spending cannot be established, the used figure is a dash
+and the plan is still shown:
 
 ```text
-Quota 8%
+Quota · — / 8%
 ```
+
+The indicator shows one quota. Where a user has several, they choose which one
+the indicator speaks for, and the choice is remembered across launches. Until
+they choose, the first quota stands in. A quota that has been deleted does not
+leave the indicator blank; another quota stands in until one is chosen again.
 
 ---
 
@@ -1044,6 +1138,87 @@ On Pace
 
 Updated 2 minutes ago
 ```
+
+The popover shows every quota, not only the one the menu bar indicator speaks
+for. The chosen quota is shown in full and marked, and the others are listed
+beside it; selecting one of them makes it the one the indicator speaks for. The
+question the indicator's single number raises — *which of my quotas is that?* —
+cannot be answered from a panel that hides the rest.
+
+Example:
+
+```text
+Cursor  ●
+
+26% used
+74% remaining
+
+TODAY
+Planned       6%
+Used          2%
+Remaining     4%
+
+18 days remaining
+
+On Pace
+
+Updated 2 minutes ago
+─────────────────────────
+OTHER QUOTAS
+Claude                        71%
+OpenAI                        12%
+```
+
+---
+
+# 40a. Management Window
+
+The management window is where a quota is read and edited, and it is a window in
+its own right rather than a panel in the menu bar: a month of days cannot be
+edited usefully in a status-item panel.
+
+The window is a list of quotas beside the selected quota's detail.
+
+```text
+┌──────────────────┬──────────────────────────────────────────┐
+│ Cursor      26%  │ ALLOWANCE                                │
+│ Claude      71%  │ 26% used              74% remaining       │
+│ OpenAI      12%  │ ███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+│                  ├──────────────────────────────────────────┤
+│                  │ TODAY                                    │
+│                  │ Planned     6%      Used      2%          │
+│                  │ Remaining   4%                            │
+│                  │                                          │
+│                  │ 18 days remaining          On Pace        │
+│                  ├──────────────────────────────────────────┤
+│                  │ CALENDAR                                 │
+│                  │ September 2026                ‹     ›    │
+│                  │  M    T    W    T    F    S    S          │
+│                  │     1    2    3    4    5    6    7       │
+│                  │   3.3  3.3  3.3  3.3  3.3  3.3  3.3       │
+│                  │     8    9   10   11   12   13   14       │
+│                  │   3.3  3.3  3.3  3.3  3.3  3.3  3.3       │
+│                  ├──────────────────────────────────────────┤
+│                  │ POLICY                                   │
+│                  │ Even distribution                        │
+└──────────────────┴──────────────────────────────────────────┘
+```
+
+Each quota in the list states how much of its allowance is used, so a quota does
+not have to be opened to be known. The detail is grouped into titled sections, and
+a section's figures are the same figures the popover shows for the same instant.
+
+A day of the plan is not also listed beside the calendar: the calendar carries
+each day's share on the day itself, and a list of the same figures in a column
+would be a second rendering of it that grows with the period. The one thing about
+the plan the calendar cannot show is whether the plan adds up at all, so that —
+and only that — is stated above the grid.
+
+The window must be usable from the keyboard: adding a quota and refreshing are
+commands, not controls the pointer has to find.
+
+The selected quota is removed by a control in its own section, so a quota is
+never deleted by a stray click on the thing the user was reading.
 
 ---
 
@@ -1197,6 +1372,24 @@ Each quota has its own:
 
 Quotas are independent.
 
+A provider may back one quota per bucket. A second quota on the same provider
+and the same bucket is refused: it would read exactly the same numbers as the
+first and differ only in how they are divided, so the application would be
+showing two panels disagreeing about one set of readings with nothing to tell
+the user which is the real one. A provider that meters several pools is
+entitled to a quota per pool, and those read genuinely different numbers.
+
+A quota that names no bucket reads the provider's primary, so it stands in the
+way of every quota on that provider in either order: the application cannot know
+which identifier a provider calls primary without reading it, and the two
+records it would otherwise create describe one set of readings.
+
+A provider is closed off in the quota creation flow once every limit it meters
+has a quota, and only then: a row cannot know which limits a provider meters
+without reading it, so the last of the limits is decided by the picker, which is
+where they are in hand. A quota created outside the flow anyway is refused with
+a message naming the quota already in the way.
+
 ---
 
 # 47. Persistence
@@ -1222,7 +1415,7 @@ A possible project structure:
 ```text
 Quota/
 ├── App/
-│   ├── QuotaApp.swift
+│   ├── App.swift
 │   └── AppEnvironment.swift
 │
 ├── Domain/

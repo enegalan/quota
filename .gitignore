@@ -1,1 +1,27 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+xcuserdata/
+
+# Assembled application bundle
+Quota.app/
+
+# Tooling caches
+.swiftlint_cache
+.swiftformat.cache
+node_modules/
+
+# Editor
 .vscode/
+.DS_Store
+
+# Provider plugins are separate packages and build independently
+Plugins/*/.build/
+Plugins/*/.swiftpm/
+Plugins/*/Package.resolved

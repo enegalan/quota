@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: lint, test, plugins, bundle
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_16.2.app
+
+      - name: Install toolchain
+        run: make bootstrap
+
+      # Network is disabled in this step so a test that reaches out fails loudly
+      # rather than passing on a developer machine with connectivity.
+      - name: Test without network
+        run: |
+          set -euo pipefail
+          sudo /usr/sbin/pfctl -e
+          cleanup() { sudo /usr/sbin/pfctl -d; }
+          trap cleanup EXIT
+          make test
+
+      - name: Lint
+        run: make lint
+
+      - name: Build provider plugins
+        run: make plugins
+
+      - name: Assemble and verify the application bundle
+        run: make bundle
+
+      - name: Check the working tree is clean
+        if: always()
+        run: git diff --exit-code

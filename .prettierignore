@@ -1,0 +1,19 @@
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+Package.resolved
+Quota.app/
+.swiftlint_cache
+.swiftformat.cache
+node_modules/
+.DS_Store
+
+# The product specification is the source of truth and is not ours to reformat.
+# Its layout is preserved exactly as written.
+spec/0001-definition.md
+
+# The icon is written by Icon Composer, not by hand. Its layout is the tool's,
+# for the same reason the specification's is preserved.
+App/quota.icon/icon.json

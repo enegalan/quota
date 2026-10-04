@@ -1,0 +1,41 @@
+# SwiftFormat
+#
+# This is the formatter, so it owns whitespace, wrapping, and ordering. Anything
+# it decides must be disabled in .swiftlint.yml, or the two tools will fight over
+# the same line and the author will be asked to choose.
+#
+# Line width matches SwiftLint's line length for the same reason.
+
+--swiftversion 6.0
+
+--maxwidth 120
+--tabwidth 4
+--indent 4
+--indentstrings false
+
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--closingparen balanced
+--wrapenumcases always
+
+--commas always
+--semicolons never
+--linebreaks lf
+--trimwhitespace always
+--emptybraces no-space
+--voidtype void
+--self remove
+--stripunusedargs closure-only
+--patternlet inline
+--importgrouping testable-bottom
+--ifdef no-indent
+--header ignore
+--markcategories true
+
+# SwiftFormat enables its whole ruleset unless --rules narrows it. These two
+# rewrite `try` placement, which fights Swift's rule that `try` does not cross
+# an autoclosure: a helper that compiles becomes a test file that does not.
+--disable hoistTry
+
+--exclude .build,Plugins/.*/\.build,Package\.resolved

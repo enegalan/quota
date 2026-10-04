@@ -1,0 +1,139 @@
+name: Release
+
+# A tag is the release. Pushing `v*` builds the application from that exact
+# commit, checks it, and attaches it to the GitHub Release for the tag, so what
+# a user downloads is what that commit produced.
+on:
+  push:
+    tags: ["v*"]
+  # A tag that cannot be released, or a rebuilt asset, without cutting a new tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, for example v0.2.0"
+        required: true
+
+permissions:
+  contents: write
+
+# One release at a time. A second tag pushed while the first is still building
+# waits rather than cancelling it: a half-uploaded release is worse than a slow
+# one, and the uploads are per-asset and resumable with --clobber anyway.
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    name: Quota.app (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      # One architecture failing does not cost the other its release.
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          # Tags and history, not just the commit: the release notes are
+          # generated from what this tag added, and the version guard below
+          # compares the tag against the bundle.
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_16.2.app
+
+      - name: Install toolchain
+        run: make bootstrap
+
+      - name: Resolve the tag and check it against the bundle's own version
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${DISPATCH_TAG}" ]]; then
+            git fetch --tags --force
+            git checkout --force "${DISPATCH_TAG}"
+            tag="${DISPATCH_TAG}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' App/Info.plist)"
+          # A tag and a bundle that disagree are two versions wearing one name,
+          # and the tag is the only one a reader can check.
+          if [[ "${tag#v}" != "${version}" ]]; then
+            echo "::error::tag ${tag} does not match CFBundleShortVersionString ${version}"
+            exit 1
+          fi
+          echo "tag=${tag}" >>"${GITHUB_ENV}"
+          echo "version=${version}" >>"${GITHUB_ENV}"
+
+      - name: Lint
+        run: make lint
+
+      # The same guarantee CI makes: a test that reaches out fails here rather
+      # than passing because the runner happened to have connectivity.
+      - name: Test without network
+        run: |
+          set -euo pipefail
+          sudo /usr/sbin/pfctl -e
+          cleanup() { sudo /usr/sbin/pfctl -d; }
+          trap cleanup EXIT
+          make test
+
+      - name: Assemble and verify the release bundle
+        env:
+          SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          # No plugin step: Scripts/bundle.sh builds every provider package in
+          # the release configuration itself, and a provider that does not build
+          # fails the release rather than being left out of the bundle.
+          #
+          # The signing identity is optional. Without the secret the bundle is
+          # signed ad-hoc, which runs locally and is the honest default for a
+          # build nobody has notarised; with it, the same command signs with a
+          # Developer ID Application certificate.
+          if [[ -n "${SIGNING_IDENTITY}" ]]; then
+            make bundle BUILD_CONFIGURATION=release SIGNING_IDENTITY="${SIGNING_IDENTITY}"
+          else
+            make bundle BUILD_CONFIGURATION=release
+          fi
+
+      - name: Package the application
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          # ditto rather than zip: it is what keeps a bundle's symlinks and
+          # permissions, and a bundle that lost them does not launch.
+          asset="Quota-${VERSION}-${ARCH}.zip"
+          ditto -c -k --keepParent .build/Quota.app "${asset}"
+          # The checksum is published next to the download rather than in a
+          # commit, so it describes the file a user actually has.
+          shasum -a 256 "${asset}" >"${asset}.sha256"
+          echo "asset=${asset}" >>"${GITHUB_ENV}"
+          ls -lh "${asset}" "${asset}.sha256"
+
+      - name: Attach the bundle to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Both architectures publish to one release, so the first to arrive
+          # creates it and the other joins. Losing that race is not a failure;
+          # a release still missing after the retries is.
+          for attempt in 1 2 3 4 5; do
+            if gh release view "${TAG}" >/dev/null 2>&1; then break; fi
+            gh release create "${TAG}" --verify-tag --title "Quota ${TAG}" --generate-notes && break
+            sleep 5
+          done
+          gh release view "${TAG}" >/dev/null
+          gh release upload "${TAG}" "${ASSET}" "${ASSET}.sha256" --clobber

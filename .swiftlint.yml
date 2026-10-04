@@ -1,0 +1,112 @@
+# SwiftLint
+#
+# Only the rules that protect maintainability are enabled as errors. Style rules
+# that SwiftFormat already decides are left disabled, so the two tools never
+# disagree and the author never has to choose between them.
+
+included:
+  - Sources
+  - Tests
+  - Plugins
+
+excluded:
+  - .build
+  # A plugin is its own package. `make plugins` builds it with a scratch path
+  # outside the repository so its products never appear among ours to lint, and
+  # these two entries catch a plain `swift build` run inside one anyway.
+  - Plugins/.*/\.build
+  - Plugins/.*/\.build/.*
+
+# Formatting belongs to SwiftFormat. Listing a rule here that SwiftFormat also
+# rewrites produces a tool fight, which is worse than either tool being silent.
+disabled_rules:
+  - array_init
+  - closure_parameter_position
+  - closure_spacing
+  - colon
+  - comma
+  - control_statement
+  - empty_count
+  - empty_string
+  - file_header
+  - first_where
+  - implicit_getter
+  - last_where
+  - line_length
+  - literal_expression_end_indentation
+  - opening_brace
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - trailing_comma
+  - trailing_whitespace
+  - vertical_whitespace
+
+opt_in_rules:
+  - closure_end_indentation
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - empty_collection_literal
+  - explicit_init
+  - fallthrough
+  - force_unwrapping
+  - modifier_order
+  - operator_usage_whitespace
+  - overridden_super_call
+  - prefer_self_type_over_type_of_self
+  - toggle_bool
+  - unavailable_function
+  - unneeded_parentheses_in_closure_argument
+  - unowned_variable_capture
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+# Error-level severities, declared at the top level. A violation fails
+# `make lint` and the CI pipeline.
+force_cast: error
+force_try: error
+todo: error
+
+# A provider plugin is out-of-process code whose output must be validated rather
+# than assumed, so an implicit unwrap is a defect, not a shortcut.
+force_unwrapping: error
+
+function_body_length:
+  warning: 40
+  error: 60
+
+cyclomatic_complexity:
+  warning: 8
+  error: 12
+
+file_length:
+  warning: 400
+  error: 600
+
+type_body_length:
+  warning: 250
+  error: 350
+
+nesting:
+  type_level: 3
+  function_level: 3
+
+large_tuple:
+  warning: 2
+  error: 3
+
+identifier_name:
+  min_length:
+    warning: 3
+  # Exceptions only. Note that this is a whitelist of names that are NOT
+  # flagged, so a placeholder blacklist cannot be expressed here: a name is
+  # flagged unless it appears below or is already well formed.
+  excluded:
+    - "^id$"
+    - "^to$"
+    - "^up$"
+
+type_name:
+  min_length: 3
+  max_length: 50
