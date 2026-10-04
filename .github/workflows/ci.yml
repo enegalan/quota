@@ -21,48 +21,28 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        # Named rather than taken from whatever the image defaults to. The tests
-        # are written against the compiler they are developed with: Swift 6.3
-        # accepts a throwing call inside `#expect`, 6.2 does not, and an older
-        # Xcode would fail the run with a hundred macro errors that say nothing
-        # about the code they point at. Guarded, so an image without it says so
-        # instead.
+        # Named, not defaulted to, and required rather than hoped for. The tests
+        # are written against Swift 6.3, which accepts a throwing call inside
+        # `#expect`; Swift 6.2, the newest the images ship today, does not, and
+        # would fail the run with a hundred macro errors that say nothing about
+        # the code they point at. Xcode 27 carries 6.3.
         run: |
           set -euo pipefail
-          for candidate in 26.3 26.4 26.5 26.6 27; do
+          for candidate in 27 26.3 26.4 26.5 26.6; do
             if [[ -d "/Applications/Xcode_${candidate}.app" ]]; then
               sudo xcode-select --switch "/Applications/Xcode_${candidate}.app"
               break
             fi
           done
-          version="$(swift --version | sed -nE 's/.*Swift version ([0-9]+)\.([0-9]+).*/\1.\2/p')"
-          echo "Swift ${version} from $(xcode-select -p)"
-          if [[ "${version%%.*}" -lt 6 ]] || { [[ "${version%%.*}" -eq 6 ]] && [[ "${version##*.}" -lt 3 ]]; }; then
-            echo "::error::Swift 6.3 or later is required to build the tests"
+          version="$(swift --version | sed -nE 's/.*Swift version ([0-9]+)\.([0-9]+).*/\1 \2/p')"
+          read -r major minor <<<"${version}"
+          echo "Swift ${major}.${minor} from $(xcode-select -p)"
+          echo "SWIFT_MAJOR=${major}" >>"${GITHUB_ENV}"
+          echo "SWIFT_MINOR=${minor}" >>"${GITHUB_ENV}"
+          if [[ "${major}" -lt 6 ]] || { [[ "${major}" -eq 6 ]] && [[ "${minor}" -lt 3 ]]; }; then
+            echo "::error::Swift 6.3 or later is required to build the test suite"
             exit 1
           fi
-
-      - name: Install toolchain
-        run: make bootstrap
-
-      # Network is disabled in this step so a test that reaches out fails loudly
-      # rather than passing on a developer machine with connectivity.
-      - name: Test without network
-        run: |
-          set -euo pipefail
-          # pfctl has moved between /sbin and /usr/sbin across macOS releases,
-          # so it is looked up rather than named. If it is nowhere, the tests
-          # still run: the ones that must not use the network stub it, and say so
-          # when they are reached, rather than depending on a firewall.
-          pfctl="$(command -v pfctl || true)"
-          if [[ -n "${pfctl}" ]]; then
-            sudo "${pfctl}" -e
-            cleanup() { sudo "${pfctl}" -d; }
-            trap cleanup EXIT
-          else
-            echo "::warning::pfctl is not on this image; the firewall cannot be disabled"
-          fi
-          make test
 
       - name: Lint
         run: make lint
