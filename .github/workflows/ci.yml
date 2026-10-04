@@ -21,7 +21,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select --switch /Applications/Xcode_16.2.app
+        # The newest Xcode on the image, because the tests are written against
+        # the compiler they are developed with: Swift 6.3 accepts a throwing call
+        # inside `#expect`, and 6.0 does not, so pinning CI to an older Xcode
+        # would have CI unable to build the tests it exists to run.
+        run: |
+          set -euo pipefail
+          newest="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          sudo xcode-select --switch "${newest}"
+          swift --version
 
       - name: Install toolchain
         run: make bootstrap
