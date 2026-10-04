@@ -1,6 +1,6 @@
+import Core
 import Foundation
-@testable import Core
-@testable import PluginKit
+import PluginKit
 
 /// How a provider's failure is put to the user.
 ///

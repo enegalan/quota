@@ -1,5 +1,5 @@
+import Core
 import Foundation
-@testable import Core
 
 /// Wording for how long ago something happened.
 ///

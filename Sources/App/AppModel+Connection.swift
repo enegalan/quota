@@ -10,7 +10,7 @@ extension AppModel {
     /// Keychain and recording the account label the plugin returned.
     ///
     /// The installed-provider record is moved to `.connected` on success: the
-    /// catalog screen reads that state, and leaving it at `.installed` would make
+    /// provider screen reads that state, and leaving it at `.installed` would make
     /// a successful Connect look like nothing happened.
     func connect(providerID: String, credentials: String? = nil) async {
         await performing(for: providerID) {

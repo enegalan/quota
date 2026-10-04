@@ -3,7 +3,7 @@ import Foundation
 /// What a plugin says it is, sent in answer to `describe`.
 ///
 /// The only thing the host knows about a provider before it has run a call, and
-/// the thing the catalog is built from.
+/// the thing a build's provider list is made of.
 public struct ProviderDescriptor: Codable, Sendable, Equatable {
     /// Stable across releases and unique among installed providers. The core
     /// stores sync metadata under it, so it must not change when a provider is
@@ -13,7 +13,7 @@ public struct ProviderDescriptor: Codable, Sendable, Equatable {
     /// The name shown to a user.
     public let displayName: String
 
-    /// One line about what the provider meters, shown in a catalog.
+    /// One line about what the provider meters, shown in the provider list.
     public let description: String
 
     public let capabilities: ProviderCapabilities
@@ -49,7 +49,7 @@ public struct ProviderDescriptor: Codable, Sendable, Equatable {
 
 /// Everything the host needs to start one installed provider.
 ///
-/// Built by the host out of the catalog and the installed layout, and never read
+/// Built by the host out of the packaged list and the installed layout, and never read
 /// out of the artifact: a provider that named its own executable could talk the
 /// host into running something else, and everything the provider says about itself
 /// arrives anyway, in the descriptor, after the process is already running.

@@ -1,6 +1,6 @@
+import Core
 import Foundation
-@testable import Core
-@testable import PluginKit
+import PluginKit
 
 /// How current a reading is, as four states rather than a number.
 ///

@@ -1,6 +1,6 @@
+import Core
 import Foundation
-@testable import Core
-@testable import PluginKit
+import PluginKit
 
 /// What a usage fetch returns to the coordinator.
 ///

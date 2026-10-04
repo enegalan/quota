@@ -1,6 +1,6 @@
+import Core
 import Foundation
-@testable import Core
-@testable import PluginKit
+import PluginKit
 
 /// Reads one provider's usage.
 ///

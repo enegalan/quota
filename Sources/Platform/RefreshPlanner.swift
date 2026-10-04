@@ -1,5 +1,5 @@
+import Core
 import Foundation
-@testable import Core
 
 /// Decides which providers to read, and when, from the events going on around
 /// the app.

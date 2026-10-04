@@ -1,5 +1,5 @@
+import Core
 import Foundation
-@testable import Core
 
 /// What happens to the record of a reading once it has been accepted.
 ///

@@ -21,7 +21,7 @@ final class AppModel {
     /// Every quota the app knows about, ready to render.
     private(set) var presentations: [QuotaPresentation] = []
 
-    /// The catalog split into available, installed, and connected.
+    /// The packaged providers split into available, installed, and connected.
     private(set) var sections = ProviderSections(available: [], installed: [], connected: [])
 
     /// What the user is looking at, when something is wrong.
@@ -255,7 +255,7 @@ final class AppModel {
         policy: AllocationPolicy
     ) async -> Bool {
         do {
-            // Validated here rather than in the view: the catalog's identifier is
+            // Validated here rather than in the view: the packaged identifier is
             // the input, and a view that has to know an identifier can be
             // invalid is a view duplicating the domain's rules.
             let provider = try ProviderID(providerID)
@@ -338,7 +338,7 @@ final class AppModel {
 
     /// Puts a failure where the interface can show it, and reloads.
     ///
-    /// Every catalog action ends here so that a failure has exactly one way of
+    /// Every provider action ends here so that a failure has exactly one way of
     /// reaching the user: a caption on the row that failed, not a silently
     /// unchanged list that leaves the button looking as though it had worked.
     func perform(_ action: @escaping @Sendable () async throws -> Void) async {

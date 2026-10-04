@@ -1,5 +1,5 @@
+import Core
 import Foundation
-@testable import Core
 
 /// Tells the app when to read a provider again, and for what reason.
 ///

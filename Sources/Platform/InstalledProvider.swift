@@ -25,7 +25,7 @@ public enum ProviderState: String, Codable, Sendable, Equatable, CaseIterable {
     case authRequired
     /// Was connected, and the provider no longer accepts what it has.
     case authExpired
-    /// A newer version exists in the catalog than the one installed.
+    /// A newer version is packaged than the one installed.
     case updateAvailable
     /// Being replaced by the newer version.
     case updating
@@ -86,7 +86,7 @@ public enum ProviderState: String, Codable, Sendable, Equatable, CaseIterable {
 
 /// A provider as it exists on this machine.
 ///
-/// Not the catalog's claim about a provider and not the running plugin's
+/// Not the build's claim about a provider and not the running plugin's
 /// description of itself: this is what the installer recorded and the host acts on.
 public struct InstalledProvider: Codable, Sendable, Equatable {
     public let id: String

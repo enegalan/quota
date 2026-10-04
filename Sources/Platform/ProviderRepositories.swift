@@ -100,7 +100,7 @@ public struct InstalledProviderRepository: Sendable {
     /// The record for one installed provider.
     ///
     /// - Returns: nil when there is no record, which is the ordinary state for a
-    ///   provider the catalog offers and the user has not installed — the caller
+    ///   provider the build packages and the user has not installed — the caller
     ///   is asking before it does anything, not reporting a fault.
     public func provider(_ id: String) async throws -> InstalledProvider? {
         try await all().first { $0.id == id }

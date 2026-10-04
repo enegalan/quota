@@ -5,7 +5,7 @@ import SwiftUI
 /// Provider area: installed and available, grouped, with per-provider
 /// actions.
 ///
-/// The whole list is rendered from catalog metadata. There is no per-provider
+/// The whole list is rendered from packaged metadata. There is no per-provider
 /// conditional anywhere in this file, and there cannot be one: the app does not
 /// know which providers exist, and a branch naming one would be a branch that
 /// silently omits every provider added after it was written.
@@ -106,9 +106,9 @@ private struct PendingRemoval {
     let impact: UninstallImpact
 }
 
-/// One provider, as the catalog describes it.
+/// One provider, as the packaged metadata describes it.
 ///
-/// Every label here is either from the catalog entry or derived from the
+/// Every label here is either from the packaged entry or derived from the
 /// provider's state, which is itself derived from what the app knows. A row
 /// whose text came from anywhere else would be provider-specific logic in the
 /// view layer, which is what forbids.

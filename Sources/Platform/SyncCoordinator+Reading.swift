@@ -1,5 +1,5 @@
+import Core
 import Foundation
-@testable import Core
 
 /// What the coordinator shows, and what it knows about a provider.
 ///

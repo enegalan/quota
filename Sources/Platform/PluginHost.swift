@@ -84,7 +84,7 @@ public actor PluginHost {
                 message: "\(launch.displayName) did not describe itself."
             )
         }
-        // The catalog entry is the host's to trust; the descriptor is the
+        // The packaged name is the host's to trust; the descriptor is the
         // plugin's claim. Where they disagree the plugin is not one to trust with
         // a call — something answering to a name it was not launched under is not
         // the plugin that was installed.
@@ -121,7 +121,7 @@ public actor PluginHost {
     ///
     /// A separate name rather than a second argument, so the two
     /// checks cannot be reached in the wrong order: one is about what
-    /// the catalog promised and runs before anything is started, the
+    /// the build promised and runs before anything is started, the
     /// other is about what this process will actually speak and runs
     /// on an answer that could say anything.
     private func checkProtocolCompatibility(of described: ProviderDescriptor) throws {

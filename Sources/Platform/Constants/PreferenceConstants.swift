@@ -1,5 +1,5 @@
+import Core
 import Foundation
-@testable import Core
 
 /// Defaults for the settings a user has not chosen yet.
 ///

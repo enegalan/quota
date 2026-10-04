@@ -80,7 +80,7 @@ enum ProviderConnector {
     ///   the provider and the install record that made this host launchable come
     ///   from two repositories that can change in between.
     /// - Throws: `ProviderError.notInstalled` for each of the three ways this
-    ///   can fail — not in the catalog, no install record, no launchable
+    ///   can fail — not packaged, no install record, no launchable
     ///   layout for the version on disk. They mean the same thing to a user,
     ///   and splitting them would leak a state they cannot act on.
     private static func host(
