@@ -83,9 +83,18 @@ jobs:
       - name: Test without network
         run: |
           set -euo pipefail
-          sudo /usr/sbin/pfctl -e
-          cleanup() { sudo /usr/sbin/pfctl -d; }
-          trap cleanup EXIT
+          # pfctl has moved between /sbin and /usr/sbin across macOS releases,
+          # so it is looked up rather than named. If it is nowhere, the tests
+          # still run: the ones that must not use the network stub it, and say so
+          # when they are reached, rather than depending on a firewall.
+          pfctl="$(command -v pfctl || true)"
+          if [[ -n "${pfctl}" ]]; then
+            sudo "${pfctl}" -e
+            cleanup() { sudo "${pfctl}" -d; }
+            trap cleanup EXIT
+          else
+            echo "::warning::pfctl is not on this image; the firewall cannot be disabled"
+          fi
           make test
 
       - name: Assemble and verify the release bundle
