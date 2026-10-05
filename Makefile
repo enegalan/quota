@@ -8,7 +8,11 @@ SHELL := /usr/bin/env bash
 
 BUILD_CONFIGURATION ?= debug
 BUNDLE := .build/Quota.app
-SIGNING_IDENTITY ?= -
+# `?=` alone is not enough: a secret that is not configured reaches the job as an
+# empty string, which is defined, and `-s ""` is a keychain lookup for an identity
+# named "". Blank means ad-hoc.
+SIGNING_IDENTITY ?=
+SIGNING_IDENTITY := $(if $(strip $(SIGNING_IDENTITY)),$(SIGNING_IDENTITY),-)
 
 .PHONY: help bootstrap format format-check lint test build plugins bundle run verify clean
 

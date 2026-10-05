@@ -50,7 +50,11 @@ while [[ $# -gt 0 ]]; do
         ;;
     --sign)
         [[ $# -ge 2 ]] || fail "--sign requires an identity"
-        signing_identity="$2"
+        # An unset environment variable arrives as an empty string rather than as
+        # a missing argument, and `codesign --sign ""` is a keychain lookup for an
+        # identity named "". Empty means the default: ad-hoc.
+        signing_identity="${2:-"-"}"
+        [[ -n "${signing_identity}" ]] || signing_identity="-"
         shift 2
         ;;
     -h | --help)
