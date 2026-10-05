@@ -78,16 +78,19 @@ jobs:
             echo "::error::tag ${tag} does not match CFBundleShortVersionString ${version}"
             exit 1
           fi
-          echo "tag=${tag}" >>"${GITHUB_ENV}"
-          echo "version=${version}" >>"${GITHUB_ENV}"
+          # One convention for the steps that follow: an environment variable
+          # written here is read there, and a name that differs only in case is an
+          # unbound variable under `set -u`, not a near miss.
+          echo "TAG=${tag}" >>"${GITHUB_ENV}"
+          echo "VERSION=${version}" >>"${GITHUB_ENV}"
 
       - name: Lint
         run: make lint
 
-      # The same guarantee CI makes: a test that reaches out fails here rather
-      # than passing because the runner happened to have connectivity.
       # The same guarantee CI makes, on the architectures whose toolchain can
-      # build the suite. Where it cannot, the job says so instead of pretending.
+      # build the suite: a test that reaches out fails here rather than passing
+      # because the runner happened to have connectivity. Where the toolchain
+      # cannot build the suite, the job says so instead of pretending to.
       - name: Test without network
         if: ${{ env.SWIFT_MAJOR > 6 || (env.SWIFT_MAJOR == 6 && env.SWIFT_MINOR >= 3) }}
         run: |
@@ -137,7 +140,7 @@ jobs:
           # The checksum is published next to the download rather than in a
           # commit, so it describes the file a user actually has.
           shasum -a 256 "${asset}" >"${asset}.sha256"
-          echo "asset=${asset}" >>"${GITHUB_ENV}"
+          echo "ASSET=${asset}" >>"${GITHUB_ENV}"
           ls -lh "${asset}" "${asset}.sha256"
 
       - name: Attach the bundle to the release
