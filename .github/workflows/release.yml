@@ -34,13 +34,15 @@ jobs:
       matrix:
         include:
           # macOS 26 because its default Xcode is the one the tests are written
-          # against. The Intel image has no such Xcode yet, and that job is the
+          # against. The Intel image has no such Xcode, and that job is the
           # bundle: it proves the x86_64 build compiles, signs and verifies, while
-          # the suite runs here and in CI on the same commit.
+          # the suite runs on the Apple Silicon job and in CI on the same commit.
           - runner: macos-26
             arch: arm64
+            require_tests: true
           - runner: macos-15-intel
             arch: x86_64
+            require_tests: false
 
     steps:
       - name: Check out
@@ -52,37 +54,40 @@ jobs:
           fetch-depth: 0
 
       - name: Select Xcode
-        # Named, not defaulted to. The tests are written against Swift 6.3, which
-        # accepts a throwing call inside `#expect`; Swift 6.2, the newest the
-        # Intel image ships, does not, and would fail the run with a hundred
-        # macro errors that say nothing about the code they point at. Xcode 27
-        # carries 6.3 and is on the Apple Silicon image. An image without it
-        # still builds the application and its plugins, so the step says what it
-        # is doing rather than failing.
+        run: Scripts/ci/select-xcode.sh ${{ matrix.require_tests && '--require-tests' || '' }}
+
+      - name: Install toolchain
+        run: make bootstrap
+
+      - name: Resolve the tag and check it against the bundle's own version
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          for candidate in 27 26.3 26.4 26.5 26.6; do
-            if [[ -d "/Applications/Xcode_${candidate}.app" ]]; then
-              sudo xcode-select --switch "/Applications/Xcode_${candidate}.app"
-              break
-            fi
-          done
-          version="$(swift --version | sed -nE 's/.*Swift version ([0-9]+)\.([0-9]+).*/\1 \2/p')"
-          read -r major minor <<<"${version}"
-          echo "Swift ${major}.${minor} from $(xcode-select -p)"
-          echo "SWIFT_MAJOR=${major}" >>"${GITHUB_ENV}"
-          echo "SWIFT_MINOR=${minor}" >>"${GITHUB_ENV}"
-          if [[ "${major}" -lt 6 ]] || { [[ "${major}" -eq 6 ]] && [[ "${minor}" -lt 3 ]]; }; then
-            if [[ "${REQUIRE_TESTS:-}" == "true" ]]; then
-              echo "::error::Swift 6.3 or later is required to build the test suite"
-              exit 1
-            fi
-            echo "::warning::Swift ${major}.${minor} cannot build the test suite; this job verifies the bundle only"
+          if [[ -n "${DISPATCH_TAG}" ]]; then
+            git fetch --tags --force
+            git checkout --force "${DISPATCH_TAG}"
+            tag="${DISPATCH_TAG}"
+          else
+            tag="${GITHUB_REF_NAME}"
           fi
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' App/Info.plist)"
+          # A tag and a bundle that disagree are two versions wearing one name,
+          # and the tag is the only one a reader can check.
+          if [[ "${tag#v}" != "${version}" ]]; then
+            echo "::error::tag ${tag} does not match CFBundleShortVersionString ${version}"
+            exit 1
+          fi
+          echo "tag=${tag}" >>"${GITHUB_ENV}"
+          echo "version=${version}" >>"${GITHUB_ENV}"
 
-      # Same guarantee CI makes, on the architectures where the toolchain can
-      # build the suite. The Intel image has no Swift 6.3 yet, so that job proves
-      # the bundle compiles, signs and verifies rather than repeating CI.
+      - name: Lint
+        run: make lint
+
+      # The same guarantee CI makes: a test that reaches out fails here rather
+      # than passing because the runner happened to have connectivity.
+      # The same guarantee CI makes, on the architectures whose toolchain can
+      # build the suite. Where it cannot, the job says so instead of pretending.
       - name: Test without network
         if: ${{ env.SWIFT_MAJOR > 6 || (env.SWIFT_MAJOR == 6 && env.SWIFT_MINOR >= 3) }}
         run: |
