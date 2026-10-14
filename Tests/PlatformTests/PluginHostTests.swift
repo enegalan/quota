@@ -277,8 +277,19 @@ struct PluginHostTests {
         // This plugin holds the first two requests and answers the second one
         // first, so anything matching by order rather than by id gets them mixed
         // up. Launch and the first usage call overlap.
+        //
+        // The usage call waits for the process to be up before it asks. A usage
+        // call that reached the host first would find nothing running and return,
+        // leaving the plugin holding one request for a second that never comes —
+        // and that is a race in the test, not in the host, whose id-based
+        // correlation is the whole point of the case.
         let launchTask = Task { try await host.launch() }
-        let usageTask = Task { try await host.fetchUsage(localDate: "2026-09-25") }
+        let usageTask = Task {
+            while await !host.isRunning() {
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            return try await host.fetchUsage(localDate: "2026-09-25")
+        }
 
         let descriptor = try await launchTask.value
         let usage = try await usageTask.value
