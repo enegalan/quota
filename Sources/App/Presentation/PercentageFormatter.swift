@@ -75,16 +75,19 @@ struct PercentageFormatter: Sendable {
         return "\(decimal(value, digits: fractionDigits))%"
     }
 
-    /// A percentage without rounding, for the figures where the exact value is
-    /// the point — such as a day's planned allocation — rather than a rounded
-    /// reading. Trailing zeros are dropped, so a whole allocation reads as its
-    /// whole number rather than with a decimal tail.
+    /// A percentage shown to the precision a plan is expressed in, for the
+    /// figures where the exact value is the point — such as a day's planned
+    /// allocation — rather than a whole-point reading. Trailing zeros are
+    /// dropped, so a whole allocation reads as its whole number rather than with
+    /// a decimal tail, and a figure finer than the plan is rounded to
+    /// `maximumExactDigits` places instead of shown with digits the plan beside
+    /// it cannot hold.
     func preciseString(_ value: Double) -> String {
         guard value.isFinite else { return Self.unknown }
         guard value != 0 else { return "0%" }
         let formatter = value.formatted(
             .number
-                .precision(.fractionLength(0 ... PercentageFormatting.maximumSmallValueDigits))
+                .precision(.fractionLength(0 ... PercentageFormatting.maximumExactDigits))
                 .locale(locale)
         )
         return "\(formatter)%"

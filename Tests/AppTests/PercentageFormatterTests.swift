@@ -50,6 +50,18 @@ struct PercentageFormatterTests {
         #expect(formatter.stringWithFraction(0.26) == "0.3%")
     }
 
+    @Test("An exact figure is shown to the plan's two decimals, not the reading's")
+    func exactFiguresHoldToTwoDecimals() {
+        // A provider's reading can carry more places than a plan, which is
+        // quantized to hundredths. Printing those places beside the plan would
+        // claim a precision the plan itself does not have.
+        #expect(formatter.preciseString(3.3333) == "3.33%")
+        #expect(formatter.preciseString(11.306666) == "11.31%")
+        #expect(formatter.preciseString(2) == "2%")
+        #expect(formatter.preciseString(0.4) == "0.4%")
+        #expect(formatter.preciseString(nil) == PercentageFormatter.unknown)
+    }
+
     @Test("A figure that would round into its peer keeps a decimal instead")
     func staysDistinctFromPeer() {
         #expect(formatter.string(2.5, distinctFrom: 3) == "2.5%")

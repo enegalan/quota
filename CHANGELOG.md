@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Percentages in the menu bar label and the calendars are shown to at most two
+  decimals, the precision a plan is itself expressed in. A provider's reading
+  can carry more places than the plan it is compared against, and printing them
+  beside a two-place plan claimed a confidence neither figure has.
+
 ## [1.0.2] - 2026-10-14
 
 ### Fixed

@@ -48,6 +48,14 @@ struct MenuBarLabelTests {
         #expect(text(used: 2.5, suggested: 3) == "Quota · 2.5% / 3%")
     }
 
+    @Test("A spend finer than the plan is shown to the plan's two decimals")
+    func fineSpendHoldsToTwoDecimals() {
+        // The provider's reading carries more places than the plan, which is
+        // quantized to hundredths; the label keeps the plan's precision rather
+        // than printing the extra places beside it.
+        #expect(text(used: 4.2857, suggested: 3) == "Quota · 4.29% / 3%")
+    }
+
     private func text(used: Double?, suggested: Double) -> String {
         MenuBarLabel.text(
             for: TodayAllowance(

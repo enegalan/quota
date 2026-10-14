@@ -23,6 +23,14 @@ enum PercentageFormatting {
     /// and saying so at four decimals is more useful than a fifth would be.
     static let maximumSmallValueDigits: Int = 4
 
+    /// The most digits an exact figure is shown with.
+    ///
+    /// Two, the precision a plan is itself expressed in: shares are quantized to
+    /// hundredths, so a reading printed any finer than the plan it is compared
+    /// against claims a confidence the plan does not have. A figure that carries
+    /// more places is rounded to this many rather than shown as it came in.
+    static let maximumExactDigits: Int = 2
+
     /// The digits a value below `wholePointThreshold` is shown with at first.
     static let defaultFractionDigits: Int = 1
 
