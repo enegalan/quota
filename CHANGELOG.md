@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-14
+
+### Fixed
+
+- An unset signing identity now means ad-hoc. A signing secret that is not
+  configured reaches the bundle step as an empty string, which is defined, and
+  `codesign --sign ""` is a keychain lookup for an identity named `""` — so a
+  release with no secret failed to sign rather than signing ad-hoc.
+- The release workflow reads the tag and version it resolved. The names it wrote
+  and the names the later steps read disagreed in case, so the packaging and
+  publishing steps saw an unbound variable in place of the version and produced an
+  asset nobody could name.
+- The release job builds with the compiler the tests are written for. The
+  toolchain is chosen by one script that asks for Swift 6.3 by version and refuses
+  to downgrade, and the Apple Silicon job runs on the image whose Xcode is the one
+  the suite targets.
+- `pfctl` is looked up instead of named: it lives in different directories across
+  macOS releases, and the test job no longer fails because it could not find a
+  firewall at a path that had moved.
+- A test target no longer declares a resource directory it does not have.
+
 ## [1.0.0] - 2026-10-04
 
 ### Added
