@@ -29,17 +29,11 @@ struct QuotaListRow: View {
             UsageBar(
                 value: presentation.usagePercentage ?? 0,
                 maximum: UsageConstants.percentageScale,
-                tint: barTint
+                tint: ShareTint.color(for: presentation.usagePercentage, of: UsageConstants.percentageScale)
             )
             .padding(.top, LayoutMetrics.lineSpacing)
         }
         .padding(.vertical, LayoutMetrics.unit)
         .accessibilityElement(children: .combine)
-    }
-
-    /// The bar's colour by how much is left, so a quota that needs attention
-    /// says so from the list rather than only from inside it.
-    private var barTint: Color {
-        presentation.summary.pacing?.phase.usageTint ?? .accentColor
     }
 }

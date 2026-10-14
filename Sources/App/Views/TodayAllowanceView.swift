@@ -64,10 +64,7 @@ struct TodayAllowanceView: View {
     /// rendering that remainder as "2%" leaves three lines that no longer add.
     private func dayFigure(_ value: Double?) -> String {
         guard let value else { return PercentageFormatter.unknown }
-        if value.rounded() == value {
-            return formatter.string(value)
-        }
-        return formatter.stringWithFraction(value)
+        return formatter.preciseString(value)
     }
 
     private var planned: Double? {
@@ -128,22 +125,6 @@ extension PacingStatus.Phase {
         case .onTrack, .ahead, .expired: .secondary
         case .behind: .orange
         case .exhausted: .red
-        }
-    }
-
-    /// The tint for a bar measuring share spent.
-    ///
-    /// A share spent is drawn in the accent colour while it is ordinary and
-    /// alarms in the same colours as the phase it is in, so a quota that has run
-    /// out is the same red in a list row as it is beside its own label. Exhausted
-    /// was orange here and red there, which is the kind of difference a user
-    /// reads as two different states.
-    var usageTint: Color {
-        switch self {
-        case .onTrack, .ahead: .accentColor
-        case .behind: .orange
-        case .exhausted: .red
-        case .expired: .secondary
         }
     }
 }

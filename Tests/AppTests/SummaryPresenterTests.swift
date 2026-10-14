@@ -148,10 +148,11 @@ struct SummaryPresenterTests {
         #expect(abs((allowance.usedToday ?? 0) + remaining - allowance.suggested) < SummaryFixture.tolerance)
     }
 
-    @Test("Today's remaining is unknown, not the whole allowance, when nothing was read")
-    func todayRemainingUnknownWithoutATimeline() async throws {
-        // A provider that has not reported today has spent an unknown
-        // amount, and showing the whole share as available invites overspending.
+    @Test("Today's remaining is the whole allowance, when today's usage is unread")
+    func todayRemainingWhenUsageUnread() async throws {
+        // With no reading for today, the amount spent is not known, but the day's
+        // plan is: showing it as the upper bound keeps Remaining aligned with
+        // what the user still may spend rather than leaving the figure blank.
         var world = SummaryFixture.World()
         world.withTimeline = false
         let fixture = try await SummaryFixture.make(world)
@@ -161,7 +162,7 @@ struct SummaryPresenterTests {
         let share = try SummaryFixture.todayShare(of: fixture.plan)
 
         #expect(abs(allowance.suggested - share) < SummaryFixture.tolerance)
-        #expect(allowance.remainingAfterToday == nil)
+        #expect(abs((allowance.remainingAfterToday ?? .nan) - allowance.suggested) < SummaryFixture.tolerance)
     }
 
     @Test("Overspending today leaves zero remaining, never a negative one")

@@ -79,7 +79,7 @@ struct QuotaDetailView: View {
                 UsageBar(
                     value: presentation.usagePercentage ?? 0,
                     maximum: UsageConstants.percentageScale,
-                    tint: usageTint
+                    tint: ShareTint.color(for: presentation.usagePercentage, of: UsageConstants.percentageScale)
                 )
                 if let unavailable {
                     Caption(text: unavailable, isWarning: true)
@@ -123,12 +123,6 @@ struct QuotaDetailView: View {
 
     private var outlook: some View {
         OutlookRow(presentation: presentation, reference: reference, calendar: calendarGrid)
-    }
-
-    /// The bar follows the pacing state, so "behind" is visible before the text
-    /// under the calendar is read.
-    private var usageTint: Color {
-        presentation.summary.pacing?.phase.usageTint ?? .accentColor
     }
 
     // MARK: Footer

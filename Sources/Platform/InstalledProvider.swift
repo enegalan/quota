@@ -73,7 +73,7 @@ public enum ProviderState: String, Codable, Sendable, Equatable, CaseIterable {
 
     public var prerequisite: Prerequisite {
         switch self {
-        case .notInstalled: .installation
+        case .notInstalled, .missing: .installation
         // Signed out, never signed in, and a session that lapsed are the same
         // step to a user: put the credentials in.
         case .installed, .authRequired, .authExpired: .authentication

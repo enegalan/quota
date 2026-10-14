@@ -28,13 +28,15 @@ struct Main: App {
         MenuBarExtra {
             MainPopover(model: model, launchFailure: launchFailure)
                 .task {
-                    delegate.model = model
-                    delegate.onTogglePopover = { togglePopover() }
-                    await model.load()
                     await model.refreshOnAppear()
                 }
         } label: {
             MenuBarLabel(presentation: model.primaryPresentation)
+                .task {
+                    delegate.model = model
+                    delegate.onTogglePopover = { togglePopover() }
+                    await model.load()
+                }
         }
         .menuBarExtraStyle(.window)
 

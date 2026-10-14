@@ -29,7 +29,7 @@ struct PolicyEditor: View {
 
             switch policy {
             case .even:
-                Caption(text: policy.summary)
+                EmptyView()
             case .weekly:
                 WeeklyWeightsEditor(weights: weightsBinding)
             case .custom:
@@ -101,7 +101,7 @@ struct WeeklyWeightsEditor: View {
                         EmptyView()
                     }
                     .labelsHidden()
-                    Text(formatter.string(share(for: weekday)))
+                    Text(formatter.preciseString(share(for: weekday)))
                         .font(.system(size: LayoutMetrics.footnoteSize))
                         .monospacedDigit()
                         .frame(width: LayoutMetrics.weightColumnWidth, alignment: .trailing)

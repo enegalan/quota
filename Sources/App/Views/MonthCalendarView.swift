@@ -49,10 +49,10 @@ struct MonthCalendarView: View {
         let day = presenter.day(date)
         var lines: [String] = []
         if let planned = day.planned, day.kind != .zeroAllocation {
-            lines.append(formatter.string(planned))
+            lines.append(formatter.preciseString(planned))
         }
         if let actual = day.actual {
-            lines.append(formatter.string(actual))
+            lines.append(formatter.preciseString(actual))
         }
         return lines
     }
@@ -131,7 +131,7 @@ struct DateDetailView: View {
                 .font(.system(size: LayoutMetrics.captionSize))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-            Text(value.map(formatter.stringWithFraction) ?? PercentageFormatter.unknown)
+            Text(value.map(formatter.preciseString) ?? PercentageFormatter.unknown)
                 .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
                 .monospacedDigit()
                 .lineLimit(1)

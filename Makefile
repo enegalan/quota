@@ -54,11 +54,11 @@ bundle: ## Assemble Quota.app (set SIGNING_IDENTITY for a distributable build)
 run: bundle ## Build, then launch
 	@open $(BUNDLE)
 
-# The mock provider, built as its own package to prove the boundary holds: it can
-# only see PluginKit, so it cannot reach anything the application happens to
-# have on its classpath. Its scratch path is outside the repository so its build
-# products never end up among ours to lint, format, or commit.
-PLUGIN_SCRATCH := $(TMPDIR)/quota-plugin-mock
+# Every provider under Plugins/, each built as its own package so the boundary
+# holds: a plugin can only see PluginKit, and cannot reach anything the
+# application happens to have on its classpath. Scratch paths are outside the
+# repository so build products never end up among ours to lint, format, or commit.
+PLUGIN_SCRATCH := $(TMPDIR)/quota-plugins
 
 plugins: ## Build every provider plugin as its own package
 	@for plugin in Plugins/*/; do \

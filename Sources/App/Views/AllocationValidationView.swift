@@ -18,18 +18,18 @@ struct AllocationValidationView: View {
             EmptyView()
         case .underallocated(let unassigned):
             Caption(
-                text: "Underallocated: \(formatter.string(unassigned)) of your quota has not been assigned.",
+                text: "Underallocated: \(formatter.preciseString(unassigned)) of your quota has not been assigned.",
                 isWarning: true
             )
         case .overallocated(let exceeding):
             Caption(
-                text: "Overallocated by \(formatter.string(exceeding)). The days have been trimmed to fit.",
+                text: "Overallocated by \(formatter.preciseString(exceeding)). The days have been trimmed to fit.",
                 isWarning: true
             )
         case .noEligibleDays(let retained):
             VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
                 Caption(
-                    text: "Eligible days: 0. \(formatter.string(retained)) of your quota is unallocated.",
+                    text: "Eligible days: 0. \(formatter.preciseString(retained)) of your quota is unallocated.",
                     isWarning: true
                 )
                 Text("Your quota has not been discarded. Extend the period or change the policy to spend it.")

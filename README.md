@@ -17,7 +17,7 @@ much time is left, how much can I use each day?".
 
 ## Status
 
-Version 1.0.0. Mock and Cursor providers are implemented. Cursor is packaged as
+Version 1.0.0. Cursor provider is implemented. Cursor is packaged as
 an unofficial provider. Releases are on the
 [releases page](https://github.com/enegalan/quota/releases); see
 [Installing a release](#installing-a-release), [Provider status](#provider-status)
@@ -169,8 +169,8 @@ allocation engine (`CursorProviderTests` / fictional-provider test prove that).
    application, and that file name is the identifier everything else uses, so
    there is no separate list to keep in step. A package whose executable is
    named differently fails the bundle rather than being skipped.
-7. **Worked example.** `Plugins/mock` is the scripted reference.
-   `Plugins/cursor` is a real unofficial integration.
+7. **Worked example.** `Plugins/cursor` is a real unofficial integration.
+   `Tests/Fixtures/TestPlugin` keeps the round-trip contract honest.
 
 ## Why the application is not sandboxed
 

@@ -110,7 +110,7 @@ struct UsageBar: View {
         }
         .frame(height: LayoutMetrics.barHeight)
         .accessibilityElement()
-        .accessibilityLabel(tint == .accentColor ? "Share" : "Usage")
+        .accessibilityLabel("Share")
     }
 
     /// The filled width, never past the end of the track.
@@ -122,6 +122,54 @@ struct UsageBar: View {
     private func width(in available: CGFloat) -> CGFloat {
         guard maximum > 0, value.isFinite else { return 0 }
         return available * CGFloat(min(1, max(0, value / maximum)))
+    }
+}
+
+/// The colour a share-of-allowance bar is drawn in, as a continuous warning.
+///
+/// A share spent starts green while there is still margin before the allowance
+/// is filled, and changes progressively to red as the bar fills. The hue moves
+/// linearly from green to red, passing through yellow, so the colour reads as
+/// "becoming warmer" as consumption increases without introducing a discrete
+/// threshold.
+enum ShareTint {
+    /// Hue at an empty bar, where the whole allowance is still available.
+    ///
+    /// Green (120°) in the HSV colour space.
+    static let emptyHue: Double = 0.33
+
+    /// Hue at a full bar, where the allowance is entirely spent.
+    ///
+    /// Red (0°) in the HSV colour space.
+    static let fullHue: Double = 0.0
+
+    /// Saturation applied to the computed hue.
+    static let saturation: Double = 0.8
+
+    /// Brightness applied to the computed hue.
+    static let brightness: Double = 0.9
+
+    /// A neutral tint used when no share is known or the maximum is invalid.
+    static let neutral: Color = .secondary
+
+    /// The hue for a given fill fraction, clamped to the unit range.
+    ///
+    /// The mapping is linear from `emptyHue` (0% spent) to `fullHue` (100% spent).
+    static func hue(forFillFraction fraction: Double) -> Double {
+        let clamped = min(1, max(0, fraction))
+        return emptyHue + (fullHue - emptyHue) * clamped
+    }
+
+    /// The tint colour for the proportion `value` of `maximum`.
+    ///
+    /// If the value is unknown or `maximum` is not positive, returns `neutral`.
+    static func color(for value: Double?, of maximum: Double) -> Color {
+        guard let value, maximum > 0, value.isFinite else {
+            return neutral
+        }
+        let fraction = value / maximum
+        let h = hue(forFillFraction: fraction)
+        return Color(hue: h, saturation: saturation, brightness: brightness)
     }
 }
 

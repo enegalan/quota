@@ -42,8 +42,8 @@ struct MenuBarLabel: View {
     static func text(for allowance: TodayAllowance?, formatter: PercentageFormatter) -> String {
         guard let allowance else { return "Quota · \(PercentageFormatter.unknown)" }
         let used = allowance.usedToday.map {
-            formatter.string($0, distinctFrom: allowance.suggested)
+            formatter.preciseString($0)
         } ?? PercentageFormatter.unknown
-        return "Quota · \(used) / \(formatter.string(allowance.suggested))"
+        return "Quota · \(used) / \(formatter.preciseString(allowance.suggested))"
     }
 }

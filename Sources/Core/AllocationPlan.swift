@@ -78,8 +78,8 @@ public struct TodayAllowance: Sendable, Hashable, Codable {
     public let usedToday: Double?
 
     public var remainingAfterToday: Double? {
-        guard let usedToday else { return nil }
-        let remaining = suggested - usedToday
+        let measuredUsedToday = usedToday ?? 0
+        let remaining = suggested - measuredUsedToday
         return remaining > 0 ? remaining : 0
     }
 

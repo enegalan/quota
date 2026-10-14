@@ -107,6 +107,7 @@ struct QuotaCreationFlow: View {
                         calendar: model.userCalendar,
                         reference: model.reference
                     )
+                    Caption(text: policy.summary)
                 }
             }
         }

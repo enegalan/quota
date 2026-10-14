@@ -15,6 +15,19 @@ extension AppModel {
     func connect(providerID: String, credentials: String? = nil) async {
         await performing(for: providerID) {
             let id = try ProviderID(providerID)
+            // Automatic detection+installation: a provider that is still in
+            // 'available' is installed here, so the user never has to take an
+            // explicit install step. Detection is local (the app only unpacks a
+            // provider it already ships), and credentials are still required
+            // before anything reaches the service.
+            if try await self.environment.installed.provider(id.rawValue) == nil {
+                guard let available = self.environment.manager.available.first(
+                    where: { $0.id == id.rawValue }
+                ) else {
+                    throw ProviderError(code: .notInstalled)
+                }
+                _ = try await self.environment.installer.install(available)
+            }
             if let credentials, !credentials.isEmpty {
                 try await self.environment.credentials.writeCredential(
                     credentials, for: id

@@ -54,7 +54,7 @@ struct CustomAssignmentsEditor: View {
                 Text("Assigned")
                     .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
                 Spacer()
-                Text(formatter.stringWithFraction(Share.total(assignments)))
+                Text(formatter.preciseString(Share.total(assignments)))
                     .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(totalColour)
@@ -75,7 +75,7 @@ struct CustomAssignmentsEditor: View {
         } else if Share.isComplete(assignments) {
             Caption(text: "Every percent of the allowance has a day.")
         } else {
-            Caption(text: "\(formatter.stringWithFraction(unassigned)) still to assign.")
+            Caption(text: "\(formatter.preciseString(unassigned)) still to assign.")
         }
     }
 
@@ -136,7 +136,7 @@ struct CustomAssignmentsEditor: View {
     private func lines(for date: LocalDate) -> [String] {
         let share = assignments[date]
         guard let share, share > 0 else { return [] }
-        return [formatter.string(share)]
+        return [formatter.preciseString(share)]
     }
 
     // MARK: One day
@@ -159,7 +159,7 @@ struct CustomAssignmentsEditor: View {
                 Text(date.description)
                     .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
                 Spacer()
-                Text(formatter.string(share(for: date)))
+                Text(formatter.preciseString(share(for: date)))
                     .font(.system(size: LayoutMetrics.footnoteSize))
                     .monospacedDigit()
                 Stepper(
@@ -172,7 +172,7 @@ struct CustomAssignmentsEditor: View {
                 .help("The share this day is given, up to what is left of 100%")
             }
             if ceilingForSelectedDayIsBeneathTheScale {
-                Caption(text: "\(formatter.string(ceiling(for: date))) is all this day can take.")
+                Caption(text: "\(formatter.preciseString(ceiling(for: date))) is all this day can take.")
             }
         }
         .padding(.horizontal, LayoutMetrics.inset)
