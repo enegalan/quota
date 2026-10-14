@@ -164,7 +164,7 @@ enum ShareTint {
     ///
     /// If the value is unknown or `maximum` is not positive, returns `neutral`.
     static func color(for value: Double?, of maximum: Double) -> Color {
-        guard let value, maximum > 0, value.isFinite else {
+        guard let value, maximum > 0, maximum.isFinite, value.isFinite else {
             return neutral
         }
         let fraction = value / maximum
