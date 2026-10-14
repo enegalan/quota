@@ -11,6 +11,8 @@ included:
 
 excluded:
   - .build
+  - "**/.build"
+  - "**/.build/**"
   # A plugin is its own package. `make plugins` builds it with a scratch path
   # outside the repository so its products never appear among ours to lint, and
   # these two entries catch a plain `swift build` run inside one anyway.

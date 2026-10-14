@@ -1,6 +1,6 @@
-@testable import App
 import SwiftUI
 import XCTest
+@testable import App
 
 final class ShareTintTests: XCTestCase {
     func testHueAtBounds() {

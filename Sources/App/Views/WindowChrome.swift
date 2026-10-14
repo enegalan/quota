@@ -168,8 +168,8 @@ enum ShareTint {
             return neutral
         }
         let fraction = value / maximum
-        let h = hue(forFillFraction: fraction)
-        return Color(hue: h, saturation: saturation, brightness: brightness)
+        let hueValue = hue(forFillFraction: fraction)
+        return Color(hue: hueValue, saturation: saturation, brightness: brightness)
     }
 }
 
