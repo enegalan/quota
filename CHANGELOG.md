@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-14
+
+### Fixed
+
+- The plugin host's concurrent-calls test no longer races the handshake. Its two
+  calls could start in either order, and a usage call that reached the host before
+  the process was up returned without sending its request — leaving the fake
+  plugin holding a single request and the launch to time out. The usage call now
+  waits for the process to be up, so the case tests id-based correlation rather
+  than the scheduler. The application itself is unchanged.
+
 ## [1.0.1] - 2026-10-14
 
 ### Fixed
