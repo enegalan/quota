@@ -81,32 +81,161 @@ struct PolicyEditor: View {
 /// and computed here because it is a restatement of what the user is editing
 /// rather than a plan figure: the plan itself still comes from the engine, which
 /// normalises against the days actually in the period.
+///
+/// The editor is now two things stacked: a week-shape chart that makes the ratio
+/// visible at a glance, and the rows that carry the actual controls. A number on
+/// a row says what a day was given; the chart says how the week feels.
 struct WeeklyWeightsEditor: View {
     @Binding var weights: WeekdayWeights
 
     private let formatter = PercentageFormatter()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
-            ForEach(PolicyWeekdays.all, id: \.self) { weekday in
-                HStack {
-                    Text(Self.weekdayTitle(weekday))
-                        .font(.system(size: LayoutMetrics.footnoteSize))
-                    Spacer()
-                    Stepper(
-                        value: binding(for: weekday),
-                        in: 0 ... PolicyWeekdays.maximumWeight,
-                        step: PolicyWeekdays.weightStep
-                    ) {
-                        EmptyView()
+        VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
+            presets
+            weekChart
+            VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
+                ForEach(PolicyWeekdays.all, id: \.self) { weekday in
+                    HStack(spacing: LayoutMetrics.rowSpacing) {
+                        weekdayMark(for: weekday)
+                        Text(Self.weekdayTitle(weekday))
+                            .font(.system(size: LayoutMetrics.footnoteSize))
+                        Spacer(minLength: 0)
+                        Stepper(
+                            value: binding(for: weekday),
+                            in: 0 ... PolicyWeekdays.maximumWeight,
+                            step: PolicyWeekdays.weightStep
+                        ) {
+                            EmptyView()
+                        }
+                        .labelsHidden()
+                        Text(formatter.preciseString(share(for: weekday)))
+                            .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
+                            .monospacedDigit()
+                            .frame(width: LayoutMetrics.weightColumnWidth, alignment: .trailing)
                     }
-                    .labelsHidden()
-                    Text(formatter.preciseString(share(for: weekday)))
-                        .font(.system(size: LayoutMetrics.footnoteSize))
-                        .monospacedDigit()
-                        .frame(width: LayoutMetrics.weightColumnWidth, alignment: .trailing)
                 }
             }
+            Caption(text: "Days weighted zero carry no allowance. Bars show each weekday's share of the week.")
+        }
+        .animation(.easeInOut(duration: 0.2), value: weights)
+    }
+
+    // MARK: Presets
+
+    /// Shortcuts to the shapes a weekly policy is most often reaching for.
+    ///
+    /// The domain already names these shapes (uniform and workdays only); the
+    /// editor just had no way to ask for one without stepping seven times. Empty
+    /// space on a week with no useful default is worse than a button that puts
+    /// a standard shape one press away.
+    private var presets: some View {
+        HStack(spacing: LayoutMetrics.actionSpacing) {
+            Button("Equal week") {
+                weights = .uniform
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Give every weekday the same share")
+            Button("Workdays only") {
+                weights = .weekdaysOnly
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Weight weekdays one and weekends zero")
+            Button {
+                nudgeWeekends(by: 1)
+            } label: {
+                Label("Boost weekends", systemImage: "sun.max")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Add one weight to each weekend day")
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: Week chart
+
+    /// The week at a glance: each weekday a bar, its height that weekday's share.
+    ///
+    /// Normalised against the largest share rather than against 100%, because
+    /// seven equal bars at a seventh of the height each would all look the same
+    /// and a ratio of 2 against 1 would be invisible — which is the one thing the
+    /// chart has to show that the numbers alone do not.
+    private var weekChart: some View {
+        HStack(alignment: .bottom, spacing: LayoutMetrics.unit) {
+            ForEach(PolicyWeekdays.all, id: \.self) { weekday in
+                VStack(spacing: LayoutMetrics.lineSpacing) {
+                    Text(formatter.preciseString(share(for: weekday)))
+                        .font(.system(size: LayoutMetrics.captionSize))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    GeometryReader { proxy in
+                        RoundedRectangle(cornerRadius: LayoutMetrics.cornerRadius)
+                            .fill(barTint(for: weekday))
+                            .frame(height: barHeight(for: weekday, in: proxy.size.height))
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                    }
+                    .frame(height: 44)
+                    Text(Self.shortWeekdayTitle(weekday))
+                        .font(.system(size: LayoutMetrics.captionSize, weight: .medium))
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(LayoutMetrics.inset)
+        .background(Color.primary.opacity(LayoutMetrics.barTrackOpacity))
+        .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
+    }
+
+    /// A small mark so the rows and the bars refer to the same day.
+    private func weekdayMark(for weekday: Int) -> some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(barTint(for: weekday))
+            .frame(width: LayoutMetrics.unit * 2, height: LayoutMetrics.footnoteSize)
+    }
+
+    /// Colour for a day: accent for weekdays, secondary for weekends, dimmed for
+    /// days weighted to nothing so an excluded day reads as excluded rather than
+    /// merely low.
+    private func barTint(for weekday: Int) -> Color {
+        let value = weight(for: weekday)
+        if value <= 0 {
+            return Color.primary.opacity(LayoutMetrics.emptyDayOpacity)
+        }
+        return Self.isWeekend(weekday)
+            ? Color.secondary
+            : Color.accentColor
+    }
+
+    /// Bar height as a fraction of the tallest bar, always leaving a small
+    /// pedestal so a zero-weight day is still visible as a gap in the pattern
+    /// rather than as no bar at all.
+    private func barHeight(for weekday: Int, in available: CGFloat) -> CGFloat {
+        let shares = PolicyWeekdays.all.map { share(for: $0) }
+        let tallest = shares.max() ?? 0
+        guard tallest > 0 else { return LayoutMetrics.unit }
+        let fraction = share(for: weekday) / tallest
+        return max(LayoutMetrics.unit, available * CGFloat(fraction))
+    }
+
+    /// Adds one unit of weight to each weekend day, capping at the editor's
+    /// maximum. A quick way to soften a "workdays only" policy without touching
+    /// the weekdays by hand.
+    private func nudgeWeekends(by amount: Int) {
+        var updated: [Int: Int] = [:]
+        for day in PolicyWeekdays.all {
+            updated[day] = weight(for: day)
+        }
+        for day in PolicyWeekdays.all where Self.isWeekend(day) {
+            updated[day] = min(
+                PolicyWeekdays.maximumWeight,
+                (updated[day] ?? PolicyWeekdays.defaultWeight) + amount
+            )
+        }
+        if let newWeights = try? WeekdayWeights(weights: updated) {
+            weights = newWeights
         }
     }
 
@@ -117,28 +246,13 @@ struct WeeklyWeightsEditor: View {
 
     /// A weekday's weight, in arbitrary units.
     ///
-    /// The default where the set holds no entry for that day, so a policy
-    /// stored without every weekday still has a complete row to show and to
-    /// edit. Substituting zero instead would draw a missing day as
-    /// emphatically unweighted, and would quietly take it out of the ratio
-    /// the editor prints beside the stepper.
+    /// The default where the set holds no entry for that day, so a policy stored
+    /// without every weekday still has a complete row to show and to edit.
     private func weight(for weekday: Int) -> Int {
         weights.weights[weekday] ?? PolicyWeekdays.defaultWeight
     }
 
     /// A stepper's binding onto one weekday's weight.
-    ///
-    /// Every edit rebuilds the whole set rather than assigning a single key,
-    /// because `WeekdayWeights` is a value the domain validates as a unit. An
-    /// edit that only replaced the day being pressed would have to assume the
-    /// other six are already right, and the stepper is the one place that
-    /// assumption would be made without anyone making it.
-    ///
-    /// Reconstruction is also what lets the guards below run on the value the
-    /// domain is about to see rather than on a single key the guards cannot
-    /// judge. How a set of weights adds up is still the domain's to normalise
-    /// against the days actually in the period; this binding only has to keep
-    /// the shape legal.
     private func binding(for weekday: Int) -> Binding<Int> {
         Binding(
             get: { weight(for: weekday) },
@@ -166,5 +280,20 @@ struct WeeklyWeightsEditor: View {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
         return calendar.weekdaySymbols[safe: weekday - 1] ?? ""
+    }
+
+    /// A short name for the chart axis.
+    private static func shortWeekdayTitle(_ weekday: Int) -> String {
+        String(weekdayTitle(weekday).prefix(3))
+    }
+
+    /// Whether a PolicyWeekdays number falls on a weekend.
+    ///
+    /// The calendar this editor is written against numbers Sunday as 1 and
+    /// Saturday as 7; the engine keys policies by that numbering, so the
+    /// mark is answered here rather than by reaching into the domain's
+    /// weekend test, which lives in a different module.
+    private static func isWeekend(_ weekday: Int) -> Bool {
+        weekday == 1 || weekday == 7
     }
 }

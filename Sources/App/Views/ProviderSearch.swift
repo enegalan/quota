@@ -12,10 +12,35 @@ enum ProviderSearch {
     /// shown to nobody in this window, so matching on it would surface a provider
     /// through a word the user cannot see on screen.
     static func matches(_ listing: ProviderListing, query: String) -> Bool {
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !needle.isEmpty else { return true }
-        let haystack = (listing.displayName + " " + listing.summary).lowercased()
-        return haystack.contains(needle)
+        let tokens = normalizedTokens(query)
+        guard !tokens.isEmpty else { return true }
+        // Everything the user can actually see on a row is searchable: name,
+        // summary, and the state the row announces. The identifier stays out,
+        // for the same reason as before — matching invisible text would surface
+        // a provider the user has no word to account for.
+        let haystack = (
+            listing.displayName + " " +
+                listing.summary + " " +
+                listing.state.statusLabel + " " +
+                listing.state.unavailableLabel
+        ).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        // A query is read as several words rather than as one literal string, so
+        // typing "cursor ide" still finds a provider whose name and summary each
+        // carry one of the words. Every word has to appear; the order does not.
+        return tokens.allSatisfy { haystack.contains($0) }
+    }
+
+    /// A query split into lowercased, diacritic-free tokens.
+    ///
+    /// Whitespace separates terms; empty input yields no tokens, so clearing the
+    /// field restores the whole list instead of hiding everything.
+    private static func normalizedTokens(_ query: String) -> [String] {
+        query
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+            .filter { !$0.isEmpty }
     }
 
     /// Narrows every section at once, keeping each listing in its own section.
@@ -68,9 +93,31 @@ struct ProviderSearchField: View {
     @Binding var query: String
 
     var body: some View {
-        TextField("Search providers", text: $query)
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.regular)
-            .accessibilityLabel("Search providers")
+        HStack(spacing: LayoutMetrics.rowSpacing) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            TextField("Search providers", text: $query)
+                .textFieldStyle(.plain)
+                .accessibilityLabel("Search providers")
+            if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, LayoutMetrics.inset)
+        .padding(.vertical, LayoutMetrics.rowSpacing)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: LayoutMetrics.cornerRadius)
+                .strokeBorder(Color.primary.opacity(LayoutMetrics.barTrackOpacity), lineWidth: 1)
+        )
     }
 }

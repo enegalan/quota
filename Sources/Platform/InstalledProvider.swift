@@ -81,6 +81,40 @@ public enum ProviderState: String, Codable, Sendable, Equatable, CaseIterable {
         }
     }
 
+    /// The short word the interface shows for this state.
+    ///
+    /// Centralised here so the search can be answered about the word the user
+    /// actually sees rather than about a raw enum case, and so the row and any
+    /// other surface never disagree about what a state is called.
+    public var statusLabel: String {
+        switch self {
+        case .notInstalled: "Available"
+        case .installing: "Installing"
+        case .installed: "Installed"
+        case .connected: "Connected"
+        case .synchronizing: "Syncing"
+        case .installationFailed: "Install failed"
+        case .authRequired: "Sign in required"
+        case .authExpired: "Session expired"
+        case .updateAvailable: "Update available"
+        case .updating: "Updating"
+        case .updateFailed: "Update failed"
+        case .disabled: "Disabled"
+        case .incompatible: "Incompatible"
+        case .missing: "Missing"
+        }
+    }
+
+    /// What to say when this state leaves the provider unusable.
+    public var unavailableLabel: String {
+        switch self {
+        case .incompatible: "Needs a newer Quota"
+        case .missing: "Not installed"
+        case .disabled: "Integration disabled"
+        default: ""
+        }
+    }
+
     // Whether the interface lists this state under a failure heading.
 }
 

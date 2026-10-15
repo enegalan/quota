@@ -17,7 +17,9 @@ final class BackgroundRefreshController {
     private weak var model: AppModel?
     private var timer: Timer?
     private var powerObserver: NSObjectProtocol?
-
+    /// Keeps the process from App Nap, which would otherwise pause the timer
+    /// while no window is open and make the menu bar label look frozen.
+    private var activity: (any NSObjectProtocol)?
     /// Begins polling for due quotas, and watches for power-state changes.
     ///
     /// The power observer is registered before the first tick, so a machine
@@ -26,6 +28,14 @@ final class BackgroundRefreshController {
     /// work the mode is meant to prevent.
     func start(model: AppModel) {
         self.model = model
+        activity = ProcessInfo.processInfo.beginActivity(
+            options: [
+                .userInitiatedAllowingIdleSystemSleep,
+                .suddenTerminationDisabled,
+                .automaticTerminationDisabled,
+            ],
+            reason: "Quota background refresh"
+        )
         powerObserver = NotificationCenter.default.addObserver(
             forName: .NSProcessInfoPowerStateDidChange,
             object: nil,
@@ -50,6 +60,10 @@ final class BackgroundRefreshController {
         if let powerObserver {
             NotificationCenter.default.removeObserver(powerObserver)
             self.powerObserver = nil
+        }
+        if let activity {
+            ProcessInfo.processInfo.endActivity(activity)
+            self.activity = nil
         }
     }
 

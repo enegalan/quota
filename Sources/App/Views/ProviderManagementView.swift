@@ -78,7 +78,16 @@ struct ProviderManagementView: View {
     /// screen, not about how a group is drawn.
     private func group(_ title: String, listings: [ProviderListing]) -> some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.titleSpacing) {
-            SectionTitle(title)
+            HStack(spacing: LayoutMetrics.rowSpacing) {
+                SectionTitle(title)
+                Text("\(listings.count)")
+                    .font(.system(size: LayoutMetrics.captionSize, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, LayoutMetrics.unit)
+                    .padding(.vertical, LayoutMetrics.lineSpacing)
+                    .background(Color.primary.opacity(LayoutMetrics.barTrackOpacity))
+                    .clipShape(Capsule())
+            }
             ForEach(listings) { listing in
                 ProviderRow(listing: listing, model: model) {
                     Task { await askAboutRemoving(listing) }
@@ -119,6 +128,11 @@ struct ProviderRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: LayoutMetrics.rowSpacing) {
+            Image(systemName: "puzzlepiece.extension")
+                .font(.system(size: LayoutMetrics.bodySize))
+                .foregroundStyle(statusColor == .secondary ? Color.accentColor : statusColor)
+                .frame(width: LayoutMetrics.bodySize + LayoutMetrics.unit)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
                 HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.rowSpacing) {
                     Text(listing.displayName)
@@ -142,13 +156,27 @@ struct ProviderRow: View {
     }
 
     private var statusPill: some View {
-        Text(statusLabel)
-            .font(.system(size: LayoutMetrics.captionSize, weight: .medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, LayoutMetrics.unit)
+        Text(listing.state.statusLabel)
+            .font(.system(size: LayoutMetrics.captionSize, weight: .semibold))
+            .foregroundStyle(statusColor)
+            .padding(.horizontal, LayoutMetrics.unit * 2)
             .padding(.vertical, LayoutMetrics.lineSpacing)
-            .background(Color.primary.opacity(LayoutMetrics.barTrackOpacity))
-            .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cornerRadius))
+            .background(statusColor.opacity(LayoutMetrics.emptyDayOpacity * 0.3))
+            .clipShape(Capsule())
+    }
+
+    /// The colour a state reads as.
+    ///
+    /// Connected is the good news; failed and incompatible states get the
+    /// destructive colour; everything else stays neutral so a page of installed
+    /// providers does not look like a row of warnings.
+    private var statusColor: Color {
+        switch listing.state {
+        case .connected, .synchronizing: .green
+        case .installationFailed, .updateFailed, .authExpired, .missing, .incompatible: .red
+        case .authRequired, .updateAvailable: .orange
+        default: .secondary
+        }
     }
 
     private var actions: some View {
@@ -244,31 +272,7 @@ struct ProviderRow: View {
             .controlSize(.small)
     }
 
-    private var statusLabel: String {
-        switch listing.state {
-        case .notInstalled: "Available"
-        case .installing: "Installing"
-        case .installed: "Installed"
-        case .connected: "Connected"
-        case .synchronizing: "Syncing"
-        case .installationFailed: "Install failed"
-        case .authRequired: "Sign in required"
-        case .authExpired: "Session expired"
-        case .updateAvailable: "Update available"
-        case .updating: "Updating"
-        case .updateFailed: "Update failed"
-        case .disabled: "Disabled"
-        case .incompatible: "Incompatible"
-        case .missing: "Missing"
-        }
-    }
-
     private var unavailableLabel: String {
-        switch listing.state {
-        case .incompatible: "Needs a newer Quota"
-        case .missing: "Not installed"
-        case .disabled: "Integration disabled"
-        default: ""
-        }
+        listing.state.unavailableLabel
     }
 }

@@ -31,7 +31,7 @@ struct Main: App {
                     await model.refreshOnAppear()
                 }
         } label: {
-            MenuBarLabel(presentation: model.primaryPresentation)
+            MenuBarLabel(model: model)
                 .task {
                     delegate.model = model
                     delegate.onTogglePopover = { togglePopover() }

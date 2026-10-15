@@ -29,7 +29,14 @@ struct ProviderChoices: View {
         VStack(alignment: .leading, spacing: LayoutMetrics.rowSpacing) {
             ProviderSearchField(query: $searchQuery)
             if filtered.isEmpty {
-                Caption(text: ProviderSearch.emptyMessage(query: searchQuery, hasAnyProviders: !listings.isEmpty))
+                VStack(spacing: LayoutMetrics.rowSpacing) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: LayoutMetrics.bodySize))
+                        .foregroundStyle(.secondary)
+                    Caption(text: ProviderSearch.emptyMessage(query: searchQuery, hasAnyProviders: !listings.isEmpty))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, LayoutMetrics.inset)
             } else {
                 VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
                     ForEach(filtered, id: \.id) { listing in
@@ -53,39 +60,52 @@ struct ProviderChoices: View {
         return Button {
             onSelect(listing)
         } label: {
-            HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.rowSpacing) {
-                VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
-                    Text(listing.displayName)
-                        .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Text(caption(listing))
-                        .font(.system(size: LayoutMetrics.captionSize))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                if isSelected {
-                    Text("Selected")
-                        .font(.system(size: LayoutMetrics.captionSize, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                }
-            }
-            .padding(.horizontal, LayoutMetrics.inset)
-            .padding(.vertical, LayoutMetrics.rowSpacing)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius)
-                    .strokeBorder(
-                        isSelected ? Color.accentColor : Color.clear,
-                        lineWidth: LayoutMetrics.selectionRingWidth
-                    )
-            )
-            .contentShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
+            rowLabel(for: listing, isSelected: isSelected)
         }
         .buttonStyle(.plain)
         .disabled(!isAvailable(listing))
         .opacity(isAvailable(listing) ? 1 : LayoutMetrics.emptyDayOpacity)
+    }
+
+    private func rowLabel(for listing: ProviderListing, isSelected: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.rowSpacing) {
+            Image(systemName: "puzzlepiece.extension")
+                .font(.system(size: LayoutMetrics.footnoteSize))
+                .foregroundStyle(isAvailable(listing) ? Color.accentColor : .secondary)
+                .frame(width: LayoutMetrics.footnoteSize + LayoutMetrics.unit)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
+                Text(listing.displayName)
+                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(caption(listing))
+                    .font(.system(size: LayoutMetrics.captionSize))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if isSelected {
+                Text("Selected")
+                    .font(.system(size: LayoutMetrics.captionSize, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, LayoutMetrics.unit)
+                    .padding(.vertical, LayoutMetrics.lineSpacing)
+                    .background(Color.accentColor.opacity(LayoutMetrics.barTrackOpacity * 4))
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(.horizontal, LayoutMetrics.inset)
+        .padding(.vertical, LayoutMetrics.rowSpacing)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius)
+                .strokeBorder(
+                    isSelected ? Color.accentColor : Color.primary.opacity(LayoutMetrics.barTrackOpacity),
+                    lineWidth: isSelected ? LayoutMetrics.selectionRingWidth : 1
+                )
+        )
+        .contentShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
     }
 }

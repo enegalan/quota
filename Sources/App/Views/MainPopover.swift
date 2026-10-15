@@ -86,13 +86,23 @@ struct MainPopover: View {
     /// The full card for the quota the menu bar item speaks for.
     private func preview(for presentation: QuotaPresentation) -> some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.rowSpacing) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(presentation.summary.quota.name)
-                    .font(.system(size: LayoutMetrics.bodySize, weight: .semibold))
+            HStack(alignment: .center, spacing: LayoutMetrics.rowSpacing) {
+                VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
+                    HStack(spacing: LayoutMetrics.lineSpacing) {
+                        Text(presentation.summary.quota.name)
+                            .font(.system(size: LayoutMetrics.bodySize + 3, weight: .bold))
+                            .lineLimit(1)
+                        MenuBarMarker()
+                    }
+                    Caption(presentation.accountCaption)
+                    PacingView(pacing: presentation.summary.pacing)
+                }
                 Spacer(minLength: 0)
-                MenuBarMarker()
+                UsageRing(
+                    fraction: (presentation.usagePercentage ?? 0) / 100.0,
+                    label: formatter.string(presentation.usagePercentage)
+                )
             }
-            Caption(presentation.accountCaption)
             usageSummary(for: presentation)
             TodayAllowanceView(
                 presentation: presentation
@@ -107,7 +117,10 @@ struct MainPopover: View {
                 isWarning: presentation.syncIsWarning(asOf: model.reference)
             )
         }
-        .cardChrome()
+        .padding(LayoutMetrics.inset)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
+        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 
     /// Empty popover: one short pitch and the door into the window.
@@ -149,8 +162,11 @@ struct MainPopover: View {
                     Caption(presentation.accountCaption)
                 }
                 Spacer(minLength: 0)
+                Circle()
+                    .fill(ShareTint.color(for: presentation.usagePercentage, of: 100))
+                    .frame(width: 6, height: 6)
                 Text(formatter.string(presentation.usagePercentage))
-                    .font(.system(size: LayoutMetrics.footnoteSize))
+                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                 Text("Show")
@@ -181,29 +197,71 @@ struct MainPopover: View {
 
     private var footer: some View {
         HStack(spacing: LayoutMetrics.actionSpacing) {
-            Button("Open Quota") {
+            Button {
                 MainWindowOpener.open(using: openWindow)
+            } label: {
+                Label("Open", systemImage: "macwindow")
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            Button(model.isRefreshing ? "Refreshing…" : "Refresh") {
+            .controlSize(.regular)
+            .foregroundStyle(.white)
+            Button {
                 Task { await model.refreshAll() }
+            } label: {
+                Label(model.isRefreshing ? "Refreshing…" : "Refresh", systemImage: "arrow.clockwise")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .tint(.accentColor)
+            .foregroundStyle(.white)
             .disabled(model.isRefreshing)
             Spacer()
-            Button("Quit") {
+            Button {
                 NSApp.terminate(nil)
+            } label: {
+                Label("Quit", systemImage: "power")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .tint(.red)
+            .foregroundStyle(.white)
             .keyboardShortcut(
                 KeyEquivalent(Character(Shortcut.quitKeyEquivalent)),
                 modifiers: .command
             )
         }
-        .font(.system(size: LayoutMetrics.footnoteSize))
+        .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
+    }
+}
+
+/// A compact ring that shows how much of the allowance is spent.
+///
+/// The figure sits in the middle so the most important number stays the
+/// largest thing in the card, with the proportion encoded as the ring's fill
+/// rather than as a second number the reader has to compare.
+struct UsageRing: View {
+    let fraction: Double
+    let label: String
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(LayoutMetrics.barTrackOpacity), lineWidth: 7)
+            Circle()
+                .trim(from: 0, to: min(1, max(0, fraction)))
+                .stroke(
+                    ShareTint.color(for: fraction * 100, of: 100),
+                    style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+            Text(label)
+                .font(.system(size: LayoutMetrics.bodySize, weight: .bold))
+                .monospacedDigit()
+        }
+        .frame(width: 64, height: 64)
+        .padding(8)
+        .drawingGroup()
+        .accessibilityLabel("\(label) used")
     }
 }
 

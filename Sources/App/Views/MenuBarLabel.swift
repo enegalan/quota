@@ -12,9 +12,28 @@ import SwiftUI
 /// size the name costs more width than it explains, and the popover is one click
 /// away.
 struct MenuBarLabel: View {
-    let presentation: QuotaPresentation?
+    /// The presentation the label speaks for, either handed in (for tests) or
+    /// read live from the model (for the status item). Holding the model here
+    /// rather than resolving it in the parent is what lets the status item
+    /// notice a refresh rather than waiting to be rebuilt.
+    private let presentation: QuotaPresentation?
+    private let model: AppModel?
 
     private let formatter = PercentageFormatter()
+
+    init(presentation: QuotaPresentation?) {
+        self.presentation = presentation
+        model = nil
+    }
+
+    init(model: AppModel) {
+        presentation = nil
+        self.model = model
+    }
+
+    private var resolvedPresentation: QuotaPresentation? {
+        model?.primaryPresentation ?? presentation
+    }
 
     var body: some View {
         Text(text)
@@ -24,7 +43,7 @@ struct MenuBarLabel: View {
 
     /// The label as text, for the allowance the presentation carries.
     var text: String {
-        Self.text(for: presentation?.summary.todayAllowance, formatter: formatter)
+        Self.text(for: resolvedPresentation?.summary.todayAllowance, formatter: formatter)
     }
 
     /// The label as text, for an allowance and a formatter.
