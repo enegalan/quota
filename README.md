@@ -17,7 +17,7 @@ much time is left, how much can I use each day?".
 
 ## Status
 
-Version 1.0.4. Cursor provider is implemented. Cursor is packaged as
+Version 1.0.5. Cursor provider is implemented. Cursor is packaged as
 an unofficial provider. Releases are on the
 [releases page](https://github.com/enegalan/quota/releases); see
 [Installing a release](#installing-a-release), [Provider status](#provider-status)
@@ -36,8 +36,8 @@ Every `v*` tag builds `Quota.app`, verifies it, and attaches it to that tag's
 `Quota-<version>-arm64.zip` and `Quota-<version>-x86_64.zip`, each with a
 `.sha256` beside it.
 
-1.0.4: [arm64](https://github.com/enegalan/quota/releases/download/v1.0.4/Quota-1.0.4-arm64.zip)
-· [x86_64](https://github.com/enegalan/quota/releases/download/v1.0.4/Quota-1.0.4-x86_64.zip)
+1.0.5: [arm64](https://github.com/enegalan/quota/releases/download/v1.0.5/Quota-1.0.5-arm64.zip)
+· [x86_64](https://github.com/enegalan/quota/releases/download/v1.0.5/Quota-1.0.5-x86_64.zip)
 
 1. Download the zip for your Mac, and check it against the checksum:
 

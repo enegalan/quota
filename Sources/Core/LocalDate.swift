@@ -152,10 +152,6 @@ extension LocalDate: Codable {
         var numbers: [Int] = []
         var digits = ""
 
-        /// Commits the digits gathered so far as one component.
-        ///
-        /// - Returns: false when nothing was collected or the digits are not a
-        ///   number; that is the caller's signal to reject the whole string.
         func commit() -> Bool {
             guard !digits.isEmpty, let value = Int(digits) else { return false }
             numbers.append(value)
