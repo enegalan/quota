@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-10-15
+
+### Added
+
+- Maintainer release skill (`release-version`) covering changelog, version bump,
+  verification, commit, tagging, push, and watching the release workflow.
+
+### Changed
+
+- Polished the menu bar popover: a usage ring, tinted progress indication, larger
+  footer buttons with readable (white) labels, and consistent spacing so the ring
+  is no longer clipped.
+
 ## [1.0.3] - 2026-10-14
 
 ### Changed
