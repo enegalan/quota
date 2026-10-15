@@ -1,6 +1,4 @@
-<img src="App/quota.icon/Assets/logo.png" alt="Quota" width="360" />
-
-# Quota
+<img src="art/logo.png" alt="Quota" width="200" />
 
 > How much of my remaining quota can I use on each day until the end of the period?
 
