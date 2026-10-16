@@ -42,7 +42,6 @@ If you have one or more AI subscriptions and want to pace your daily usage to re
 
 Download the latest version from the [releases page](https://github.com/enegalan/quota/releases):
 
-
 1. Download the `.zip` for your Mac:
 
    - `arm64`: Apple Silicon (M1, M2, M3, M4)
