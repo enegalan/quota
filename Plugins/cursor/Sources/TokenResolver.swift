@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 enum TokenSourceName: String, Equatable {
@@ -92,11 +93,19 @@ enum TokenResolver {
     }
 
     private static func readKeychainPassword(service: String) -> String? {
+        // Keychain entries owned by Cursor belong to a different code signature,
+        // so macOS can keep asking for consent no matter how often it is granted.
+        // Ask the item without allowing interaction: if that still needs the user,
+        // the read simply fails and the next token source is used instead of
+        // blocking on a dialog for a token we may not even end up needing.
+        let context = LAContext()
+        context.interactionNotAllowed = true
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationContext as String: context,
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)

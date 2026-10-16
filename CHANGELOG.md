@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-10-16
+
+### Fixed
+
+- Past days in a quota's calendar keep their planned allocation after a recalculation, instead of losing it. The calendar now retains each past day's plan alongside the current plan's figures for today and beyond.
+- The Cursor provider no longer triggers a repeated macOS Keychain consent prompt while refreshing. Keychain entries that need interactive access are skipped and the next token source is used.
+
 ## [1.0.5] - 2026-10-15
 
 ### Added

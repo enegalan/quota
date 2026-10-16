@@ -68,14 +68,67 @@ struct QuotaPresentation: Identifiable, Hashable {
     /// Built from the timeline already resolved rather than looked up again, so
     /// the calendar cannot disagree with the summary above it about what was
     /// spent today.
+    ///
+    /// A plan is regenerated from the remaining allowance as a quota is used, so
+    /// it stops naming days that have already passed — even though they are the
+    /// days the user is asking about when they compare what they spent to what
+    /// they had planned. The display keeps those days' plans (reconstructed from
+    /// the quota's own policy over the whole period) alongside the current
+    /// plan's figures for today and the future, so a past day that was planned
+    /// still says what it was planned to be.
     func calendar(calendar: Calendar, reference: Date) -> CalendarPresenter {
         CalendarPresenter(
-            plan: summary.plan,
+            plan: displayPlan(calendar: calendar, reference: reference),
             timeline: timeline,
             allowance: summary.todayAllowance,
             bucketID: bucketID,
             calendar: calendar,
             reference: reference
+        )
+    }
+
+    /// A plan the calendar can draw every day of the period from, past days
+    /// included, while retaining the current plan's figures for today and beyond.
+    private func displayPlan(calendar: Calendar, reference: Date) -> AllocationPlan? {
+        let period = summary.plan?.period ?? summary.quota.period
+        var byDate: [LocalDate: Double] = [:]
+
+        // What the quota's policy prescribed for every day when the allowance was
+        // whole: the only source of a past day's plan once the live plan has
+        // moved on past it.
+        if let whole = try? AllocationEngine(calendar: calendar).plan(
+            quotaID: summary.quota.id,
+            policy: summary.quota.policy,
+            period: period,
+            totalRemaining: UsageConstants.percentageScale,
+            asOf: period.start
+        ) {
+            for allocation in whole.allocations {
+                byDate[allocation.date] = allocation.percentage
+            }
+        }
+
+        // The current plan wins for the days it still names: its figures already
+        // account for everything spent up to now.
+        if let plan = summary.plan {
+            for allocation in plan.allocations {
+                byDate[allocation.date] = allocation.percentage
+            }
+        }
+
+        guard !byDate.isEmpty else { return summary.plan }
+
+        let allocations = byDate
+            .map { Allocation(date: $0.key, percentage: $0.value) }
+            .sorted { $0.date < $1.date }
+        let total = allocations.reduce(0) { $0 + $1.percentage }
+        return try? AllocationPlan(
+            quotaID: summary.quota.id,
+            generatedAt: reference,
+            totalRemaining: max(total, UsageConstants.minimumPercentage),
+            period: period,
+            allocations: allocations,
+            validation: .exact
         )
     }
 

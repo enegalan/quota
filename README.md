@@ -15,7 +15,7 @@ much time is left, how much can I use each day?".
 
 ## Status
 
-Version 1.0.5. Cursor provider is implemented. Cursor is packaged as
+Version 1.0.6. Cursor provider is implemented. Cursor is packaged as
 an unofficial provider. Releases are on the
 [releases page](https://github.com/enegalan/quota/releases); see
 [Installing a release](#installing-a-release), [Provider status](#provider-status)
