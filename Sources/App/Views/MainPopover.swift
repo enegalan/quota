@@ -92,6 +92,7 @@ struct MainPopover: View {
                         Text(presentation.summary.quota.name)
                             .font(.system(size: LayoutMetrics.bodySize + 3, weight: .bold))
                             .lineLimit(1)
+                            .padding(2)
                         MenuBarMarker()
                     }
                     Caption(presentation.accountCaption)
@@ -103,7 +104,6 @@ struct MainPopover: View {
                     label: formatter.string(presentation.usagePercentage)
                 )
             }
-            usageSummary(for: presentation)
             TodayAllowanceView(
                 presentation: presentation
             )
@@ -129,18 +129,6 @@ struct MainPopover: View {
             title: "Welcome to Quota",
             message: "Connect a provider and create a quota to start tracking usage."
         )
-    }
-
-    /// What is spent against the period, and what is left of it.
-    private func usageSummary(for presentation: QuotaPresentation) -> some View {
-        HStack {
-            Text("\(formatter.string(presentation.usagePercentage)) used")
-                .font(.system(size: LayoutMetrics.bodySize, weight: .medium))
-            Spacer()
-            Text("\(formatter.string(presentation.remainingPercentage)) remaining")
-                .font(.system(size: LayoutMetrics.footnoteSize))
-                .foregroundStyle(.secondary)
-        }
     }
 
     /// One other quota, and the click that makes it the one in the menu bar.

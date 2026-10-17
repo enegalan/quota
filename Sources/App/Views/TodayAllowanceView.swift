@@ -1,14 +1,13 @@
 import Core
 import SwiftUI
 
-/// Today's block: planned, used, and remaining, labelled so they cannot be
-/// confused.
+/// Today's block: planned, used, and remaining, shown as a bar first and as
+/// figures beside it, so the proportion is read rather than worked out.
 ///
-/// The three labels are the whole point of the block. requires actual usage
-/// and planned allocation to stay separate in the interface, and a block that
-/// showed three bare numbers would leave the reader to guess which was which —
-/// so each line carries its own word and the planned line is marked as a plan
-/// rather than a measurement.
+/// The bar's track is the day's plan, its fill is what has been spent of it,
+/// and the part of the track the fill does not reach is what remains. Each
+/// figure keeps its own mark and small label so the three numbers cannot be
+/// confused even when the block is read at a glance.
 ///
 /// All three figures come from the same `TodayAllowance`. Remaining is derived
 /// as planned minus used there, not recomputed beside a live usage reading that
@@ -29,39 +28,76 @@ struct TodayAllowanceView: View {
             if showsTitle {
                 SectionTitle("Today")
             }
-            row(label: "Planned", value: planned)
-            row(label: "Used", value: used)
-            row(label: "Remaining", value: remaining, isEmphasis: true)
+            allowanceBar
+            figuresRow
         }
     }
 
-    /// One labelled figure of the block.
+    /// The day's plan as a track, what has been spent as its fill.
     ///
-    /// Extracted because the three lines differ in only three ways — their
-    /// label, their figure, and whether the last of them is emphasised — and
-    /// writing the row out three times in the body would make a change to the
-    /// block's typography three edits in three places.
-    ///
-    /// Formatting is all that happens here. The figures arrive from the
-    /// presentation already derived, so this stays a way of setting type
-    /// around a number the engine computed rather than a second place where a
-    /// number is worked out.
-    private func row(label: String, value: Double?, isEmphasis: Bool = false) -> some View {
-        HStack {
-            Text(label)
-                .font(.system(size: LayoutMetrics.footnoteSize))
-            Spacer()
-            Text(dayFigure(value))
-                .font(.system(size: LayoutMetrics.footnoteSize, weight: isEmphasis ? .semibold : .regular))
-                .monospacedDigit()
+    /// The track's full width is the planned allowance; the fill is the used
+    /// share of it, tinted from green to red as the plan is consumed, and what
+    /// is left of the track is what remains. A use above the plan fills the
+    /// track and reads as over plan rather than spilling past it.
+    private var allowanceBar: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.primary.opacity(LayoutMetrics.barTrackOpacity))
+                    .frame(height: LayoutMetrics.barHeight)
+                if let planned, planned > 0 {
+                    Capsule()
+                        .fill(usedTint)
+                        .frame(width: barFillWidth(in: proxy.size.width), height: LayoutMetrics.barHeight)
+                }
+            }
         }
+        .frame(height: LayoutMetrics.barHeight)
+        .accessibilityElement()
+        .accessibilityLabel("Today's allowance: \(plannedLabel), \(usedLabel), \(remainingLabel)")
+    }
+
+    /// The fill width as a fraction of the track, clamped so a use above the
+    /// plan fills the track rather than drawing past its end.
+    private func barFillWidth(in trackWidth: CGFloat) -> CGFloat {
+        guard let planned, let used, planned > 0 else { return 0 }
+        return trackWidth * CGFloat(min(max(used / planned, 0), 1))
+    }
+
+    /// Planned, used, remaining as small figures, each with its own mark.
+    private var figuresRow: some View {
+        HStack(spacing: LayoutMetrics.sectionSpacing) {
+            todayFigure(mark: .secondary, label: "Planned", value: planned)
+            todayFigure(mark: usedTint, label: "Used", value: used)
+            todayFigure(mark: .secondary, label: "Remaining", value: remaining, isEmphasis: true)
+        }
+    }
+
+    /// The tint the used figure shares with the bar's fill.
+    private var usedTint: Color {
+        ShareTint.color(for: used, of: max(planned ?? 0, 1))
+    }
+
+    /// One figure of the row: a coloured mark, the value, and its small label.
+    private func todayFigure(mark: Color, label: String, value: Double?, isEmphasis: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
+            HStack(spacing: LayoutMetrics.lineSpacing) {
+                Circle()
+                    .fill(mark)
+                    .frame(width: LayoutMetrics.menuBarMarkerSize, height: LayoutMetrics.menuBarMarkerSize)
+                Text(dayFigure(value))
+                    .font(.system(size: LayoutMetrics.footnoteSize, weight: isEmphasis ? .semibold : .regular))
+                    .monospacedDigit()
+            }
+            Text(label)
+                .font(.system(size: LayoutMetrics.captionSize))
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement()
+        .accessibilityLabel("\(label) \(dayFigure(value))")
     }
 
     /// A day's figure, with a decimal when it is not a whole point.
-    ///
-    /// Whole-point rounding of used and remaining separately would break the
-    /// identity the block claims: 0.8 used of a 3 plan is 2.2 remaining, and
-    /// rendering that remainder as "2%" leaves three lines that no longer add.
     private func dayFigure(_ value: Double?) -> String {
         guard let value else { return PercentageFormatter.unknown }
         return formatter.preciseString(value)
@@ -77,6 +113,18 @@ struct TodayAllowanceView: View {
 
     private var remaining: Double? {
         presentation.summary.todayAllowance?.remainingAfterToday
+    }
+
+    private var plannedLabel: String {
+        dayFigure(planned)
+    }
+
+    private var usedLabel: String {
+        dayFigure(used)
+    }
+
+    private var remainingLabel: String {
+        dayFigure(remaining)
     }
 }
 
