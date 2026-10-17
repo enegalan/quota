@@ -69,11 +69,11 @@ struct ProviderChoices: View {
 
     private func rowLabel(for listing: ProviderListing, isSelected: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.rowSpacing) {
-            Image(systemName: "puzzlepiece.extension")
-                .font(.system(size: LayoutMetrics.footnoteSize))
-                .foregroundStyle(isAvailable(listing) ? Color.accentColor : .secondary)
-                .frame(width: LayoutMetrics.footnoteSize + LayoutMetrics.unit)
-                .accessibilityHidden(true)
+            ProviderMark(
+                providerID: listing.id,
+                size: LayoutMetrics.footnoteSize,
+                fallbackColor: isAvailable(listing) ? Color.accentColor : .secondary
+            )
             VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
                 Text(listing.displayName)
                     .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))

@@ -80,6 +80,25 @@ swift build --package-path "${REPO_ROOT}" -c "${configuration}" --product "${APP
 # rather than skipping.
 readonly PROVIDERS_DIR_NAME="Providers"
 readonly ARTIFACT_FILE_EXTENSION="tar.gz"
+readonly PROVIDER_LOGOS_DIR_NAME="ProviderLogos"
+readonly PROVIDER_LOGO_FILE_NAME="logo.png"
+
+# Each provider ships its own logo inside its package, and it is filed in the
+# bundle under the provider's identifier so the interface can find it by id. A
+# provider without one is a packaging failure, not a row that quietly falls back.
+copy_provider_logos() {
+    local logos_dir="$1"
+    mkdir -p "${logos_dir}"
+    shopt -s nullglob
+    for plugin_dir in "${REPO_ROOT}"/Plugins/*/; do
+        local id
+        id="$(basename "${plugin_dir}")"
+        local logo="${plugin_dir}${PROVIDER_LOGO_FILE_NAME}"
+        [[ -f "${logo}" ]] || fail "Plugins/${id} ships no ${PROVIDER_LOGO_FILE_NAME}"
+        cp "${logo}" "${logos_dir}/${id}.png"
+    done
+    shopt -u nullglob
+}
 
 package_bundled_providers() {
     local providers_dir="$1"
@@ -139,6 +158,7 @@ iconutil -c icns "${iconset_dir}" -o "${RESOURCES_DIR}/AppIcon.icns"
 rm -rf "${iconset_dir}"
 
 package_bundled_providers "${RESOURCES_DIR}/${PROVIDERS_DIR_NAME}"
+copy_provider_logos "${RESOURCES_DIR}/${PROVIDER_LOGOS_DIR_NAME}"
 printf 'APPL????' >"${CONTENTS_DIR}/PkgInfo"
 
 codesign --force --sign "${signing_identity}" --entitlements "${REPO_ROOT}/App/Quota.entitlements" \

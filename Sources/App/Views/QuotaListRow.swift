@@ -24,8 +24,14 @@ struct QuotaListRow: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
-            Caption(presentation.accountCaption)
-                .lineLimit(1)
+            HStack(spacing: LayoutMetrics.unit) {
+                ProviderMark(
+                    providerID: presentation.summary.quota.providerID.rawValue,
+                    size: LayoutMetrics.footnoteSize
+                )
+                Caption(presentation.accountCaption)
+                    .lineLimit(1)
+            }
             UsageBar(
                 value: presentation.usagePercentage ?? 0,
                 maximum: UsageConstants.percentageScale,

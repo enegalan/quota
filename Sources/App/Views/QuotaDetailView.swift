@@ -60,10 +60,16 @@ struct QuotaDetailView: View {
         VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
             Text(presentation.summary.quota.name)
                 .font(.title2.weight(.semibold))
-            Caption(
-                text: presentation.accountCaption.text,
-                isWarning: presentation.accountCaption.isWarning
-            )
+            HStack(spacing: LayoutMetrics.unit) {
+                ProviderMark(
+                    providerID: presentation.summary.quota.providerID.rawValue,
+                    size: LayoutMetrics.bodySize
+                )
+                Caption(
+                    text: presentation.accountCaption.text,
+                    isWarning: presentation.accountCaption.isWarning
+                )
+            }
         }
     }
 

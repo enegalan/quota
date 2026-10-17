@@ -1,129 +1,64 @@
 import Foundation
-import LocalAuthentication
-import Security
+import ProviderSupport
 
-enum TokenSourceName: String, Equatable {
-    case stateDatabase
-    case keychain
-    case credentialsFile
-}
-
-struct ResolvedToken: Equatable {
-    let accessToken: String
-    let source: TokenSourceName
-    let decoded: DecodedAccessToken
-    let accountLabel: String
-}
-
-enum TokenResolverError: Error, Equatable {
-    case notFound
-    case rejected(TokenDecoderError)
-}
-
+/// Where Cursor keeps its sign-in, in the order its own installation writes it.
+///
+/// The sources are Cursor's — this database, these keychain services, these
+/// files — and the walk over them, the non-interactive keychain read and the
+/// refusal to cache any of it are `CredentialResolver`'s.
 enum TokenResolver {
-    /// Ordered strategy: state database, then keychain, then credentials file.
-    /// Re-reads on every call; never caches.
+    /// Resolved afresh on every call: a token rotated by a new sign-in is
+    /// picked up on the next reading rather than held until a cache is told
+    /// to forget it. A rejection surfaces as `ResolutionError`, which already
+    /// reports *no credential here* as a sign-in and *a credential that was
+    /// refused* as a failed one.
     static func resolve(now: Date = Date()) throws -> ResolvedToken {
-        var lastDecoderError: TokenDecoderError?
+        let resolved = try CredentialResolver.resolve(
+            sources: credentialSources(),
+            validate: { try TokenDecoder.decode($0, now: now) }
+        )
+        // Only the state database knows whose the account is; every other
+        // source falls back to the subject the token itself names.
+        let cachedEmail = resolved.source == .stateDatabase ? StateDatabase.readCachedEmail() : nil
+        return ResolvedToken(
+            accessToken: resolved.rawToken,
+            source: resolved.source,
+            decoded: resolved.value,
+            accountLabel: cachedEmail ?? resolved.value.userID
+        )
+    }
 
-        if let resolved = tryResolve(
-            token: try? StateDatabase.readAccessToken(),
-            source: .stateDatabase,
-            accountLabel: StateDatabase.readCachedEmail(),
-            now: now,
-            lastError: &lastDecoderError
-        ) {
-            return resolved
-        }
+    private static func credentialSources() -> [(CredentialSource, () throws -> String?)] {
+        var sources: [(CredentialSource, () throws -> String?)] = [
+            (.stateDatabase, { try? StateDatabase.readAccessToken() }),
+        ]
 
         for service in CursorConstants.keychainServiceNames {
-            if let resolved = tryResolve(
-                token: readKeychainPassword(service: service),
-                source: .keychain,
-                accountLabel: nil,
-                now: now,
-                lastError: &lastDecoderError
-            ) {
-                return resolved
-            }
+            sources.append((.keychain, { KeychainReader.password(service: service) }))
         }
 
         for relative in CursorConstants.credentialsFileRelativePaths {
             let url = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent(relative)
-            if let resolved = tryResolve(
-                token: readCredentialsFile(at: url),
-                source: .credentialsFile,
-                accountLabel: nil,
-                now: now,
-                lastError: &lastDecoderError
-            ) {
-                return resolved
-            }
-        }
-
-        if let lastDecoderError {
-            throw TokenResolverError.rejected(lastDecoderError)
-        }
-        throw TokenResolverError.notFound
-    }
-
-    private static func tryResolve(
-        token: String?,
-        source: TokenSourceName,
-        accountLabel: String?,
-        now: Date,
-        lastError: inout TokenDecoderError?
-    ) -> ResolvedToken? {
-        guard let token else { return nil }
-        do {
-            let decoded = try TokenDecoder.decode(token, now: now)
-            return ResolvedToken(
-                accessToken: token,
-                source: source,
-                decoded: decoded,
-                accountLabel: accountLabel ?? decoded.userID
+            sources.append(
+                (.credentialsFile, {
+                    CredentialsFileReader.token(
+                        at: url,
+                        keys: CursorConstants.credentialsFileTokenKeys
+                    )
+                })
             )
-        } catch let error as TokenDecoderError {
-            lastError = error
-            return nil
-        } catch {
-            return nil
         }
-    }
 
-    private static func readKeychainPassword(service: String) -> String? {
-        // Keychain entries owned by Cursor belong to a different code signature,
-        // so macOS can keep asking for consent no matter how often it is granted.
-        // Ask the item without allowing interaction: if that still needs the user,
-        // the read simply fails and the next token source is used instead of
-        // blocking on a dialog for a token we may not even end up needing.
-        let context = LAContext()
-        context.interactionNotAllowed = true
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecUseAuthenticationContext as String: context,
-        ]
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        return sources
     }
+}
 
-    private static func readCredentialsFile(at url: URL) -> String? {
-        guard let data = try? Data(contentsOf: url),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            return nil
-        }
-        for key in CursorConstants.credentialsFileTokenKeys {
-            if let value = object[key] as? String, !value.isEmpty {
-                return value
-            }
-        }
-        return nil
-    }
+/// A credential resolved out of Cursor's own state: the token *and* the claims
+/// read out of it, already agreed to be one thing.
+struct ResolvedToken: Equatable {
+    let accessToken: String
+    let source: CredentialSource
+    let decoded: DecodedAccessToken
+    let accountLabel: String
 }

@@ -70,6 +70,23 @@ struct ShippedFileTests {
         }
     }
 
+    @Test("Every packaged provider ships its own logo")
+    func packagedProvidersShipALogo() throws {
+        for id in try Self.packagedProviders() {
+            let logo = Self.repositoryRoot
+                .appendingPathComponent("Plugins", isDirectory: true)
+                .appendingPathComponent(id, isDirectory: true)
+                .appendingPathComponent(BundleConstants.providerLogoSourceFileName)
+            // The logo lives with the provider rather than in a central folder,
+            // so a provider added without one is a packaging failure the build
+            // script would refuse — and this is where that is caught first.
+            #expect(
+                FileManager.default.fileExists(atPath: logo.path),
+                "Plugins/\(id) ships no \(BundleConstants.providerLogoSourceFileName)"
+            )
+        }
+    }
+
     /// The version the application itself declares.
     ///
     /// Read from the shipped Info.plist rather than from `Bundle.main`, because
@@ -100,5 +117,10 @@ struct ShippedFileTests {
         #expect(script.contains(BundleConstants.providersDirectoryName))
         #expect(script.contains(BundleConstants.artifactFileExtension))
         #expect(script.contains("quota-provider-"))
+        // The logo's source file and its directory in the bundle are named by
+        // constants the interface reads, so the script naming its own copies of
+        // them is a second place to get wrong.
+        #expect(script.contains(BundleConstants.providerLogoSourceFileName))
+        #expect(script.contains(BundleConstants.providerLogosDirectoryName))
     }
 }

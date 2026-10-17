@@ -24,13 +24,14 @@ A layer exists **only if it crosses a physical boundary**. There are three such
 boundaries, therefore three layers plus the composition root. There is no fourth
 layer, and adding one requires justifying a new physical boundary.
 
-| #   | Layer    | Module      | Single responsibility                                                              | May import               |
-| --- | -------- | ----------- | ---------------------------------------------------------------------------------- | ------------------------ |
-| 1   | Core     | `Core`      | Domain model and pure calculation. No I/O, no network, no files, no ambient clock. | nothing                  |
-| 2   | Contract | `PluginKit` | The only vocabulary shared with plugins. Does not know the app exists.             | nothing                  |
-| 3   | Platform | `Platform`  | All I/O: files, Keychain, host networking, processes, installation, the clock.     | Core, Contract           |
-| 4   | App      | `App`       | SwiftUI interface and the composition root.                                        | Core, Contract, Platform |
-| —   | Plugins  | `Plugins/*` | One provider each, in its own package.                                             | Contract only            |
+| #   | Layer       | Module            | Single responsibility                                                              | May import               |
+| --- | ----------- | ----------------- | ---------------------------------------------------------------------------------- | ------------------------ |
+| 1   | Core        | `Core`            | Domain model and pure calculation. No I/O, no network, no files, no ambient clock. | nothing                  |
+| 2   | Contract    | `PluginKit`       | The only vocabulary shared with plugins. Does not know the app exists.             | nothing                  |
+| 3   | Platform    | `Platform`        | All I/O: files, Keychain, host networking, processes, installation, the clock.     | Core, Contract           |
+| 4   | App         | `App`             | SwiftUI interface and the composition root.                                        | Core, Contract, Platform |
+| —   | Scaffolding | `ProviderSupport` | The reusable half of a plugin's own side: loop, HTTP, credentials, readings.       | Contract only            |
+| —   | Plugins     | `Plugins/*`       | One provider each, in its own package.                                             | Contract, Scaffolding    |
 
 ### 2.1 Why Contract is a layer and not a file
 
@@ -40,8 +41,13 @@ would drag the entire I/O layer into every plugin and would make §6 impossible 
 guarantee. It cannot live inside `Core`, because the core is the thing plugins
 are forbidden from knowing.
 
-So it is its own module, with no dependencies at all, and every plugin depends on
-it exclusively. This is the only reason that module exists.
+So it is its own module, with no dependencies at all, and a plugin's package
+depends on exactly two modules — this one and `ProviderSupport` — and nothing
+else. This is the only reason that module exists.
+
+`ProviderSupport` extends the same rule in the same direction. It is what a
+plugin's own side looks like when it is written once instead of per provider,
+it depends on `PluginKit` and nothing else, and only plugins import it.
 
 ### 2.2 What deliberately has no layer of its own
 
@@ -65,6 +71,18 @@ QuotaStore          persistence          two implementations: in-memory (tests),
 PluginHost          plugin execution     one implementation, tested with a real
                                          child process built from fixtures
 ```
+
+### 2.4 Why ProviderSupport is not a fourth layer
+
+It adds no boundary: it sits on the _plugin_ side of the boundary `PluginKit`
+already defines, so the import rule is unchanged — it depends only on
+`PluginKit`, and `Core`, `Platform` and `App` may not import it.
+
+Its purpose is homogeneity: the loop, the routing of the four methods, the
+error translation, the HTTP classification, the keychain read and the reading
+arithmetic exist once, so two providers never report the same state differently.
+A provider is then a descriptor, its credential locations, and the mapping from
+its payloads to readings.
 
 ---
 
@@ -390,8 +408,16 @@ interprets it, never matches on it, and never branches on it. Only the code is
 part of the contract.
 
 `PluginKit` also ships `PluginSide`, the child half of the protocol, so that
-a plugin never reimplements framing, correlation, or decoding. A plugin author
-writes one function and gets the rest.
+a plugin never reimplements framing, correlation, or decoding.
+
+`ProviderSupport` starts where `PluginKit` stops: the same side of the pipe,
+implemented rather than specified. It ships `ProviderPluginHandler` — the four
+calls a provider implements — and `ProviderPlugin`, which routes them and maps
+whatever the handler threw onto the wire. Around that it holds the mechanics
+every provider needs and none should re-write: one `HTTPClient`, the credential
+readers, `JWT`, and the JSON, day, period and percentage helpers. A provider
+author writes a descriptor, three methods, and its payload mapping, and gets
+the rest.
 
 ### 3.9 Platform — persisted records
 
@@ -612,9 +638,10 @@ These are the rules whose violation is a defect. Each has a test.
 Rules 10, 11, 15, 16 and the layer graph are part of the product contract. The
 SwiftPM target graph in `Package.swift` is the physical expression of the layer
 graph: `Core` and `PluginKit` have no package dependencies;
-`Platform` depends on both; `App` depends on all three; each provider
-under `Plugins/` is its own package that depends only on `PluginKit`.
-Provider name literals stay out of `Sources/`. Numeric policy lives in
+`ProviderSupport` depends only on `PluginKit`; `Platform` depends on `Core` and
+`PluginKit` (never on `ProviderSupport`); `App` depends on `Core`, `PluginKit` and
+`Platform`; each provider under `Plugins/` is its own package that depends only on
+`PluginKit` and `ProviderSupport`. Provider name literals stay out of `Sources/`. Numeric policy lives in
 `*Constants.swift` files (see §7). Review and the Definition of Done checklist
 catch regressions; there is no separate mechanical guard script.
 

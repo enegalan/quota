@@ -16,6 +16,7 @@ let package = Package(
             name: "QuotaPluginCursor",
             dependencies: [
                 .product(name: "PluginKit", package: "Quota"),
+                .product(name: "ProviderSupport", package: "Quota"),
             ]
         ),
     ]

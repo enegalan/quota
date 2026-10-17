@@ -128,11 +128,11 @@ struct ProviderRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: LayoutMetrics.rowSpacing) {
-            Image(systemName: "puzzlepiece.extension")
-                .font(.system(size: LayoutMetrics.bodySize))
-                .foregroundStyle(statusColor == .secondary ? Color.accentColor : statusColor)
-                .frame(width: LayoutMetrics.bodySize + LayoutMetrics.unit)
-                .accessibilityHidden(true)
+            ProviderMark(
+                providerID: listing.id,
+                size: LayoutMetrics.bodySize,
+                fallbackColor: statusColor == .secondary ? Color.accentColor : statusColor
+            )
             VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
                 HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.rowSpacing) {
                     Text(listing.displayName)

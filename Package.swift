@@ -9,6 +9,7 @@ let package = Package(
     products: [
         .executable(name: "Quota", targets: ["App"]),
         .library(name: "PluginKit", targets: ["PluginKit"]),
+        .library(name: "ProviderSupport", targets: ["ProviderSupport"]),
     ],
     targets: [
         .target(
@@ -17,6 +18,11 @@ let package = Package(
         ),
         .target(
             name: "PluginKit",
+            swiftSettings: swiftSettings
+        ),
+        .target(
+            name: "ProviderSupport",
+            dependencies: ["PluginKit"],
             swiftSettings: swiftSettings
         ),
         .target(
@@ -51,6 +57,11 @@ let package = Package(
         .testTarget(
             name: "PluginKitTests",
             dependencies: ["PluginKit"],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "ProviderSupportTests",
+            dependencies: ["ProviderSupport"],
             swiftSettings: swiftSettings
         ),
         .testTarget(

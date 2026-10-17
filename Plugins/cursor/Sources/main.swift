@@ -1,74 +1,44 @@
 import Foundation
 import PluginKit
+import ProviderSupport
 
-/// Cursor provider plugin.
-///
-/// Credentials are read from Cursor's own local state on every refresh and never
-/// cached or logged.
-private let descriptor = ProviderDescriptor(
-    id: CursorConstants.providerID,
-    displayName: CursorConstants.displayName,
-    description: CursorConstants.description,
-    capabilities: [.automaticUsageRetrieval, .multipleQuotas],
-    protocolRange: PluginProtocolConstants.hostRange,
-    suggestedRefreshIntervalSeconds: CursorConstants.suggestedRefreshIntervalSeconds
-)
+//  Cursor provider plugin.
+//
+//  Everything Cursor's own lives in this file: what it is, where its
+//  credentials are, and how its payloads become readings. The loop, the HTTP,
+//  the credential walk and the failure translation are `ProviderSupport`'s.
 
-private let side = PluginSide()
+struct CursorProvider: ProviderPluginHandler {
+    private let log = ProviderLog(providerID: CursorConstants.providerID)
 
-private func answer(_ request: PluginRequest) -> PluginResponse {
-    let result: PluginResult = switch request.method {
-    case .describe:
-        .success(.describe(descriptor))
-    case .connect:
-        connect()
-    case .disconnect:
-        .success(.connect(ConnectResult(accountLabel: nil)))
-    case .fetchUsage:
-        fetchUsage(request)
-    }
-    return PluginResponse(id: request.id, result: result)
-}
+    let descriptor = ProviderDescriptor(
+        id: CursorConstants.providerID,
+        displayName: CursorConstants.displayName,
+        description: CursorConstants.description,
+        capabilities: [.automaticUsageRetrieval, .multipleQuotas],
+        suggestedRefreshIntervalSeconds: CursorConstants.suggestedRefreshIntervalSeconds
+    )
 
-private func connect() -> PluginResult {
-    do {
+    func connect(_ request: ConnectRequest) throws -> ConnectResult {
         let resolved = try TokenResolver.resolve()
-        // Source name only — never the token.
-        fputs("quota-provider-cursor: token source=\(resolved.source.rawValue)\n", stderr)
-        return .success(.connect(ConnectResult(accountLabel: resolved.accountLabel)))
-    } catch let error as TokenResolverError {
-        return .failure(ErrorMapper.providerError(from: error))
-    } catch {
-        return .failure(ProviderError(code: .pluginError))
-    }
-}
-
-private func fetchUsage(_ request: PluginRequest) -> PluginResult {
-    let day: String = if case .fetchUsage(let payload) = request.payload {
-        payload.localDate
-    } else {
-        "1970-01-01"
+        // Which source answered, never the token: this line outlives the call
+        // and ends up wherever the user pastes their log.
+        log.note("token source=\(resolved.source.rawValue)")
+        return ConnectResult(accountLabel: resolved.accountLabel)
     }
 
-    do {
-        // Re-read on every refresh; never reuse a previous resolve.
+    func fetchUsage(_ request: FetchUsageRequest) throws -> UsageResult {
+        // Resolved again on every refresh rather than remembered, so a token
+        // rotated by a new sign-in is picked up on the next reading.
         let resolved = try TokenResolver.resolve()
-        let usage = try UsageClient.fetchUsage(token: resolved, localDate: day)
+        let usage = try UsageClient.fetchUsage(token: resolved, localDate: request.localDate)
         guard !usage.quotas.isEmpty else {
-            return .failure(ProviderError(code: .nothingToReport))
+            throw ProviderError(code: .nothingToReport)
         }
-        return .success(.usage(usage))
-    } catch let error as TokenResolverError {
-        return .failure(ErrorMapper.providerError(from: error))
-    } catch let error as UsageClientError {
-        return .failure(ErrorMapper.providerError(from: error))
-    } catch let error as UsageNormaliserError {
-        return .failure(ErrorMapper.providerError(from: error))
-    } catch {
-        return .failure(ProviderError(code: .pluginError))
+        return usage
     }
 }
 
-while let request = side.nextRequest() {
-    try side.write(answer(request))
-}
+//  Credentials are read from Cursor's own local state on every refresh and
+//  never cached or logged.
+ProviderPlugin(handler: CursorProvider()).serve()
