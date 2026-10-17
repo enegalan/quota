@@ -37,17 +37,6 @@ Status:
 | OpenAI Codex CLI   | https://openai.com/codex            | Planned  | Codex plan usage and limits                      |
 | Gemini CLI         | https://gemini.google.com           | Planned  | Gemini usage for terminal development            |
 | GitHub Copilot CLI | https://github.com/features/copilot | Planned  | Copilot usage from terminal                      |
-| Aider              | https://aider.chat                  | Planned  | Usage delegated to the configured model provider |
 | Amazon Q Developer | https://aws.amazon.com/q/developer  | Planned  | Per-user and per-team quotas                     |
-| OpenCode           | https://opencode.ai                 | Research | Usage across configured providers                |
 
-## IDE extensions that aggregate providers
 
-Some extensions do not have their own quota; they use OpenAI, Anthropic, or other providers instead.
-
-| Provider  | Website              | Status   | What Quota paces                           |
-| --------- | -------------------- | -------- | ------------------------------------------ |
-| Continue  | https://continue.dev | Research | Usage according to the configured provider |
-| Cline     | https://cline.bot    | Research | Usage according to the configured provider |
-| Roo Code  | https://roocode.com  | Research | Usage according to the configured provider |
-| Kilo Code | https://kilocode.ai  | Research | Usage according to the configured provider |
