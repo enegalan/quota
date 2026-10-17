@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-18
+
+### Added
+
+- Each provider now shows its own logo beside its name — in the providers list,
+  the quota creation flow, and a quota's account line. The mark ships inside the
+  provider's own package (`Plugins/<id>/logo.png`) and the build script files it
+  in the application bundle under the provider's identifier. A provider without
+  a logo falls back to the generic provider symbol rather than an empty space,
+  and the build refuses a packaged provider that ships none.
+- A shared `ProviderSupport` library — credentials, JWT, an HTTP client, and a
+  reader for a provider application's local state — that provider plugins build
+  on. The Cursor provider is rewritten over it, so its behaviour lives in one
+  place with its own tests instead of being repeated per provider.
+- `PROVIDERS.md`: the AI coding providers Quota supports, plans to support, or
+  is researching, and what it paces for each.
+
+### Changed
+
+- The today panel leads with a bar: the day's plan is its track, the spend is
+  its fill, and what remains is what is left of the track, with the three
+  figures beside it. The proportion is read at a glance rather than worked out
+  from two numbers.
+- The README was rewritten and shortened.
+
 ## [1.0.6] - 2026-10-16
 
 ### Fixed
