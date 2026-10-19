@@ -28,8 +28,6 @@ struct CalendarLegendItem: Identifiable, Hashable {
         case today
         /// The ring around the selected day.
         case selected
-        /// A day with nothing assigned to it.
-        case empty
         /// A day outside the period.
         case outOfPeriod
     }
@@ -47,8 +45,8 @@ struct CalendarLegend: View {
     let items: [CalendarLegendItem]
 
     var body: some View {
-        // Adaptive wrapping: four marks in a row when there is room, two-by-two
-        // when the pane is narrow, so the key never clips mid-label.
+        // Adaptive wrapping: three marks in a row when there is room, two and
+        // one when the pane is narrow, so the key never clips mid-label.
         LazyVGrid(
             columns: [GridItem(.adaptive(minimum: 110), spacing: LayoutMetrics.actionSpacing)],
             alignment: .leading,
@@ -100,7 +98,6 @@ struct CalendarLegend: View {
         switch marker {
         case .today: Color.accentColor.opacity(LayoutMetrics.todayTintOpacity)
         case .selected: Color.clear
-        case .empty: Color.primary.opacity(LayoutMetrics.emptyDayOpacity)
         case .outOfPeriod: Color.primary.opacity(LayoutMetrics.outOfPeriodOpacity)
         }
     }

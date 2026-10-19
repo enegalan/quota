@@ -77,6 +77,19 @@ struct CalendarPresenterTests {
         #expect(day.kind.isWithinPeriod)
     }
 
+    @Test("A day with nothing allocated is planned at zero")
+    func zeroAllocationIsPlannedAtZero() throws {
+        // The policy either gave the day nothing or said nothing about it, and
+        // to the reader those are the same claim: a day of the month with
+        // nothing set aside for it. A day carrying no figure at all would have
+        // to be drawn as a different kind of day to be told apart from a day
+        // outside the period, and the two are not different.
+        let plan = try Self.plan(naming: [21, 22, 23])
+        let presenter = try Self.marchPresenter(plan: plan)
+        let day = presenter.day(try LocalDate(year: 2026, month: 3, day: 25))
+        #expect(day.planned == 0)
+    }
+
     @Test("A day with no plan at all is out of period, not empty")
     func outOfPeriodWithoutAPlan() throws {
         let presenter = try Self.marchPresenter()

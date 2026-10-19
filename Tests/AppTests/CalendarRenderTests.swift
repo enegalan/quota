@@ -129,6 +129,15 @@ struct CalendarRenderTests {
         }
     }
 
+    @Test("The key names three kinds of day, and not a fourth")
+    func keyNamesThreeKindsOfDay() {
+        // A day with nothing allocated is a day planned at zero, and it is
+        // drawn like any other day. The only day the grid treats differently
+        // from a funded one is a day outside the period, and the key says so
+        // — and nothing else.
+        #expect(MonthCalendarView.legend.map(\.label) == ["Today", "Selected", "Outside period"])
+    }
+
     // MARK: Thresholds
 
     /// How much of a picture may differ between two renders of the same world.

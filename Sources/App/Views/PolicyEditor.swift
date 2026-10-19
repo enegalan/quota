@@ -94,7 +94,7 @@ struct WeeklyWeightsEditor: View {
         VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
             presets
             weekChart
-            VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
+            VStack(alignment: .leading, spacing: LayoutMetrics.rowSpacing) {
                 ForEach(PolicyWeekdays.all, id: \.self) { weekday in
                     HStack(spacing: LayoutMetrics.rowSpacing) {
                         weekdayMark(for: weekday)

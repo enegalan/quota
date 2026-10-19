@@ -44,7 +44,10 @@ struct CalendarDay: Sendable, Hashable, Identifiable {
     let date: LocalDate
     let kind: Kind
 
-    /// The share of the allowance planned for this day, if there is one.
+    /// The share of the allowance planned for this day.
+    ///
+    /// Zero for a day with nothing allocated to it, and nil only for a day
+    /// outside the period, which is not a day the user can spend.
     let planned: Double?
 
     /// What was actually used, if it can be established.
@@ -199,15 +202,19 @@ struct CalendarPresenter: Sendable {
     /// called `day` would be one of the two hiding the other.
     private func classified(_ date: LocalDate, today: LocalDate? = nil) -> CalendarDay {
         let todayDate = today ?? LocalDate(date: reference, calendar: calendar)
-        let planned = plan?.allocation(on: date)?.percentage
-        let kind = classify(date: date, today: todayDate, planned: planned)
+        let allocation = plan?.allocation(on: date)?.percentage
+        let kind = classify(date: date, today: todayDate, planned: allocation)
         guard kind.isWithinPeriod else {
             return CalendarDay(date: date, kind: kind)
         }
         return CalendarDay(
             date: date,
             kind: kind,
-            planned: planned,
+            // A day with nothing allocated to it is a day planned at zero. The
+            // policy either gave it nothing or said nothing about it, and to
+            // the reader those are the same claim: a day of the month with
+            // nothing set aside for it.
+            planned: kind == .zeroAllocation ? 0 : allocation,
             actual: actual(on: date),
             remaining: remaining(on: date, kind: kind)
         )

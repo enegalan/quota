@@ -29,6 +29,7 @@ struct MonthGrid: View {
         VStack(alignment: .leading, spacing: LayoutMetrics.titleSpacing) {
             if showsNavigation {
                 navigation
+                    .padding(.bottom, LayoutMetrics.navigationSpacing)
             }
             grid(layout)
             if showsLegend, !legend.isEmpty {
@@ -146,15 +147,21 @@ struct MonthGrid: View {
         )
     }
 
-    /// Shows today's month, leaving the selection alone.
+    /// Shows today's month and selects today.
     ///
-    /// Moves the page only. The button is a navigation control, and a user
-    /// who pages forward to look at a later date must not find the selection
-    /// dragged along with them; when the panel above also wants today
-    /// selected, that is its decision to make through `onSelect`.
+    /// The button is called "Today", so it takes the user to today. Moving the
+    /// page alone would leave the selection on a day that is no longer on
+    /// screen — and the strip under the grid, which describes that day, would
+    /// go on describing it while the calendar showed another month.
     private func jumpToToday() {
-        guard let today, let todayDate = today.date(calendar: calendar) else { return }
-        visibleMonth = todayDate
+        guard let today else { return }
+        visibleMonth = today.date(calendar: calendar)
+        // The selection toggles where it is set, so a day that is already
+        // selected would be cleared by that. "Today" is a request to go to
+        // today, not a request to change what is selected.
+        if selected != today {
+            onSelect(today)
+        }
     }
 
     /// Pages by whole months from wherever the grid has been taken to.

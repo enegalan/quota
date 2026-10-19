@@ -42,13 +42,15 @@ struct MonthCalendarView: View {
     /// The two figures a day carries: what was planned for it, and what was spent
     /// of it.
     ///
-    /// A day with no allocation has no figure to show. The grid's own empty state
-    /// says so, and a "0%" beside an unfunded day would read as a plan of nothing
-    /// rather than as no plan at all.
+    /// A day with nothing allocated carries a planned figure of zero rather than
+    /// no figure at all: the policy either gave it nothing or said nothing about
+    /// it, and to the reader those are the same claim — a day of the month with
+    /// nothing set aside for it. A day outside the period carries neither, and
+    /// says so by being greyed out.
     private func lines(for date: LocalDate) -> [String] {
         let day = presenter.day(date)
         var lines: [String] = []
-        if let planned = day.planned, day.kind != .zeroAllocation {
+        if let planned = day.planned {
             lines.append(formatter.preciseString(planned))
         }
         if let actual = day.actual {
@@ -68,10 +70,14 @@ struct MonthCalendarView: View {
     }
 
     /// What the grid's marks mean here.
+    ///
+    /// Three marks, not four: a day with nothing allocated is a day planned at
+    /// zero, and it is drawn like any other day with that figure in it. The only
+    /// day the grid treats differently from a funded one is a day outside the
+    /// period, which is not a day the user can spend at all.
     static let legend: [CalendarLegendItem] = [
         CalendarLegendItem(label: "Today", marker: .today),
         CalendarLegendItem(label: "Selected", marker: .selected),
-        CalendarLegendItem(label: "Nothing planned", marker: .empty),
         CalendarLegendItem(label: "Outside period", marker: .outOfPeriod),
     ]
 }
