@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-19
+
+### Added
+
+- A quota's card now says when the provider's window turns over — the date and
+  the hour the allowance resets — in the popover and in the detail view, beside
+  the countdown that answers the same question in days.
+
+### Changed
+
+- The today panel leads with the day's plan as a figure, in the same idiom the
+  allowance card uses, with the bar beneath it drawing the day against that
+  plan. The figures below it are the two measurements alone, used and remaining,
+  so a plan and a reading are never set side by side as though both were
+  readings.
+
+### Fixed
+
+- A provider's reset hour is no longer rounded away to midnight. The window is
+  carried as the instant the provider reported, end to end, so a quota that
+  resets at 10:46 says 10:46.
+- A window corrected to its exact instants no longer wipes the recorded
+  history. Only the points from before the new window's start are dropped — the
+  ones metered by the cycle it replaced — so "used today" survives a correction
+  that changed no cycle at all.
+
 ## [1.1.0] - 2026-10-18
 
 ### Added
