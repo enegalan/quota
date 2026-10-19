@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-10-19
+
+### Fixed
+
+- A provider that dies while the app is talking to it no longer takes the app
+  down with it. Writing to a plugin that has gone raised a signal the app did
+  not handle, and the app closed with it — losing the menu bar item over a
+  provider that crashed.
+
 ## [1.3.2] - 2026-10-19
 
 ### Fixed
