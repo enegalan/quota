@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-19
+
+### Added
+
+- Every provider has a page. Clicking a provider opens it: the account it reads
+  as, the version on this machine and the one in this build, the protocol it
+  speaks, how often it is asked, and the limits it meters with the window each
+  of them turns over on. The page is read from what the app already knows, so
+  it shows the same figures the rest of the window is showing.
+
+### Changed
+
+- The providers list is built around that click. The mark sits on a tile of its
+  own, the whole card opens the page rather than one corner of it, and the
+  pointer is answered with an outline and a disclosure that moves, without
+  flooding the card with colour.
+- The calendar's month selector and the days it selects are drawn as two
+  things: the arrows now flank the month they move, the month sits on a tile of
+  its own, and the jump to today is offered by the month menu rather than by a
+  button beside it that looked like it was editing the month's title.
+- A day with nothing allocated is a day planned at zero, and is drawn like any
+  other day with that figure in it. Only a day outside the period is greyed out,
+  and the calendar's key says so and nothing else.
+- The weekly policy's seven days are given room to breathe, and the calendar
+  leaves more space between the month selector and the grid.
+
+### Fixed
+
+- "Used today" is measured from the day's first reading when the app has no
+  reading from before the day, instead of showing a dash. A day the app did not
+  see from the start can only be measured from where it started watching.
+- The jump to today now selects today, so the figures under the calendar stop
+  describing a day the calendar is no longer showing.
+
 ## [1.2.0] - 2026-10-19
 
 ### Added
