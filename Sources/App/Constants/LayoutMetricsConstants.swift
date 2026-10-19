@@ -30,6 +30,15 @@ enum LayoutMetrics {
     /// Below a section title.
     static let titleSpacing: CGFloat = 6
 
+    /// Between the month selector and the days it selects.
+    ///
+    /// Wider than a section's own spacing: the selector is a control row and
+    /// the grid below it is a table, and a table that starts right under a row
+    /// of buttons reads as part of them. Enough that the two are plainly two
+    /// things, and the calendar is read as a calendar rather than as a toolbar
+    /// with a table under it.
+    static let navigationSpacing: CGFloat = 26
+
     /// Between the window's edge and the content of a detail pane.
     static let windowPadding: CGFloat = 20
 
@@ -57,6 +66,14 @@ enum LayoutMetrics {
     /// Sidebar and quota list column widths inside the main window.
     static let sidebarWidth: CGFloat = 160
     static let quotaListWidth: CGFloat = 200
+
+    /// How wide the providers list is drawn.
+    ///
+    /// Narrower than the window, because a card stretched across a thousand
+    /// points holds the same four things in the same places with a wide gap in
+    /// the middle of it, and a gap in the middle of a card reads as something
+    /// missing rather than as space.
+    static let providerListWidth: CGFloat = 640
 
     /// The narrowest the detail pane may be dragged to.
     ///
@@ -221,6 +238,19 @@ enum LayoutMetrics {
 
     /// How long a value takes to settle when the provider's number moves.
     static let refreshAnimation: Double = 0.2
+
+    /// How long a hover response takes to settle.
+    ///
+    /// Quick: the pointer is a question, not an event, and an answer that takes
+    /// its time reads as a lag rather than as a response.
+    static let hoverAnimation: Double = 0.12
+
+    /// How strongly the outline of a hovered row is drawn.
+    ///
+    /// A line rather than a fill: a card that floods with colour to say it can
+    /// be pressed competes with the figures inside it, and a row whose figures
+    /// are the reason it is there should not have to shout over them.
+    static let hoverOutlineOpacity: Double = 0.35
 
     // MARK: Dates
 

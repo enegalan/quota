@@ -20,6 +20,9 @@ struct ProviderManagementView: View {
     /// the user decides — a count taken at launch would be a count of a world
     /// that has since changed.
     @State private var pendingRemoval: PendingRemoval?
+
+    /// The provider whose page is open, if one is.
+    @State private var opened: ProviderListing?
     @State private var searchQuery = ""
 
     private var filtered: ProviderSections {
@@ -47,6 +50,17 @@ struct ProviderManagementView: View {
                 listingBody
             }
         }
+        .sheet(item: $opened) { listing in
+            ProviderDetailSheet(
+                listing: listing,
+                model: model,
+                onUninstall: {
+                    opened = nil
+                    Task { await askAboutRemoving(listing) }
+                }
+            )
+        }
+        .frame(maxWidth: LayoutMetrics.providerListWidth, alignment: .leading)
     }
 
     @ViewBuilder
@@ -89,17 +103,20 @@ struct ProviderManagementView: View {
                     .clipShape(Capsule())
             }
             ForEach(listings) { listing in
-                ProviderRow(listing: listing, model: model) {
-                    Task { await askAboutRemoving(listing) }
-                }
+                ProviderRow(
+                    listing: listing,
+                    model: model,
+                    onUninstall: { Task { await askAboutRemoving(listing) } },
+                    onShowDetails: { opened = listing }
+                )
             }
         }
     }
 
     /// Reads what removing a provider would strand, and offers the dialog.
     ///
-    /// A removal nothing depends on is not a decision, so it is not put to
-    /// the user as one. A provider with quotas behind it is.
+    /// A removal nothing depends on is not a decision, so it is not put to the
+    /// user as one. A provider with quotas behind it is.
     private func askAboutRemoving(_ listing: ProviderListing) async {
         guard let impact = await model.impact(ofUninstalling: listing) else { return }
         guard impact.needsConfirmation else {
@@ -125,154 +142,96 @@ struct ProviderRow: View {
     let listing: ProviderListing
     let model: AppModel
     let onUninstall: () -> Void
+    let onShowDetails: () -> Void
+
+    /// Whether the pointer is over the row, which is how the row answers it.
+    @State private var isHovered = false
 
     var body: some View {
         HStack(alignment: .top, spacing: LayoutMetrics.rowSpacing) {
-            ProviderMark(
-                providerID: listing.id,
-                size: LayoutMetrics.bodySize,
-                fallbackColor: statusColor == .secondary ? Color.accentColor : statusColor
-            )
+            mark
             VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
                 HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.rowSpacing) {
                     Text(listing.displayName)
                         .font(.system(size: LayoutMetrics.bodySize, weight: .semibold))
                         .lineLimit(1)
-                    statusPill
+                    ProviderStatusPill(state: listing.state)
                 }
                 if !listing.summary.isEmpty {
                     Text(listing.summary)
                         .font(.system(size: LayoutMetrics.captionSize))
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
-                if listing.provider.described != nil { /* no separate unofficial flag now; omitted */ }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            actions
+            ProviderActions(listing: listing, model: model, onUninstall: onUninstall)
+            detailsButton
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardChrome()
+        // The whole card is the way into the provider's page, the mark and the
+        // gaps included: a row that only answers in one place is a row the user
+        // has to aim at.
+        .contentShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
+        .onTapGesture { onShowDetails() }
+        .overlay(hoverOutline)
+        .onHover { isHovered = $0 }
     }
 
-    private var statusPill: some View {
-        Text(listing.state.statusLabel)
-            .font(.system(size: LayoutMetrics.captionSize, weight: .semibold))
-            .foregroundStyle(statusColor)
-            .padding(.horizontal, LayoutMetrics.unit * 2)
-            .padding(.vertical, LayoutMetrics.lineSpacing)
-            .background(statusColor.opacity(LayoutMetrics.emptyDayOpacity * 0.3))
-            .clipShape(Capsule())
-    }
-
-    /// The colour a state reads as.
+    /// The outline the row takes while the pointer is over it.
     ///
-    /// Connected is the good news; failed and incompatible states get the
-    /// destructive colour; everything else stays neutral so a page of installed
-    /// providers does not look like a row of warnings.
-    private var statusColor: Color {
-        switch listing.state {
-        case .connected, .synchronizing: .green
-        case .installationFailed, .updateFailed, .authExpired, .missing, .incompatible: .red
-        case .authRequired, .updateAvailable: .orange
-        default: .secondary
-        }
+    /// A line and not a wash of colour: the row is opened by being pressed, and
+    /// the figures on it are the reason it is worth opening.
+    private var hoverOutline: some View {
+        RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius)
+            .strokeBorder(
+                Color(nsColor: .controlAccentColor)
+                    .opacity(isHovered ? LayoutMetrics.hoverOutlineOpacity : 0),
+                lineWidth: 1
+            )
+            .allowsHitTesting(false)
+            .animation(.easeOut(duration: LayoutMetrics.hoverAnimation), value: isHovered)
     }
 
-    private var actions: some View {
-        HStack(spacing: LayoutMetrics.actionSpacing) {
-            if model.busyProviderID == listing.id {
-                Text("Working…")
-                    .font(.system(size: LayoutMetrics.captionSize))
-                    .foregroundStyle(.secondary)
-            } else {
-                // The prerequisite first, because install and connect are the
-                // same two answers wherever they are offered; the states that
-                // need no step are then told apart by what else they offer.
-                switch listing.state.prerequisite {
-                case .installation:
-                    installButton
-                case .authentication:
-                    connectButton
-                    uninstallButton
-                case .none:
-                    switch listing.state {
-                    case .updateAvailable, .updateFailed:
-                        updateButton
-                        uninstallButton
-                    case .connected:
-                        disconnectButton
-                        uninstallButton
-                    case .incompatible, .missing, .disabled:
-                        Text(unavailableLabel)
-                            .font(.system(size: LayoutMetrics.captionSize))
-                            .foregroundStyle(.secondary)
-                    default:
-                        if listing.state.permitsLaunch {
-                            uninstallButton
-                        }
-                    }
-                }
-            }
-        }
-        .font(.system(size: LayoutMetrics.footnoteSize))
-    }
-
-    /// Each action the row can offer, written once.
+    /// The provider's mark, on a tile of its own.
     ///
-    /// They were inline in five branches of the switch above, each repeating the
-    /// same style pair, so a button's appearance and its action could disagree
-    /// between two states that both offer it.
-    private var installButton: some View {
-        Button("Install") {
-            Task { await model.install(listing) }
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.small)
+    /// The tile is what gives the row its left edge: a mark floating in the
+    /// white of a card has nothing to sit on, and a rounded square is the
+    /// shape a user already reads as an icon.
+    private var mark: some View {
+        ProviderMark(
+            providerID: listing.id,
+            size: LayoutMetrics.headlineFigureSize,
+            fallbackColor: listing.state.tint
+        )
+        .padding(LayoutMetrics.unit * 2)
+        .background(
+            RoundedRectangle(cornerRadius: LayoutMetrics.cornerRadius + 2)
+                .fill(Color.primary.opacity(LayoutMetrics.hoverTintOpacity * 2))
+        )
+        .allowsHitTesting(false)
     }
 
-    private var updateButton: some View {
-        Button("Update") {
-            Task { await model.update(listing) }
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.small)
-    }
-
-    private var disconnectButton: some View {
-        Button("Disconnect") {
-            Task { await model.disconnect(providerID: listing.id) }
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-    }
-
-    /// Named "Reconnect" once there is an account to reconnect to: a button
-    /// reading Connect on a provider that was signed in yesterday is asking the
-    /// user to do something they already did.
-    private var connectButton: some View {
-        Button(listing.state == .authRequired || listing.state == .authExpired
-            ? "Reconnect"
-            : "Connect")
-        {
-            Task { await model.connect(providerID: listing.id) }
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.small)
-    }
-
-    /// The one destructive action, written once.
+    /// The way into the provider's own page.
     ///
-    /// Five branches of the switch above offered it, so a provider state added
-    /// later had to remember it — and one that forgot would leave a user able to
-    /// install a provider with no way to remove it.
-    private var uninstallButton: some View {
-        Button("Uninstall", role: .destructive, action: onUninstall)
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-    }
-
-    private var unavailableLabel: String {
-        listing.state.unavailableLabel
+    /// A button and not only a tap on the row, so the page is reachable from
+    /// the keyboard and from a screen reader, and so the row says it opens
+    /// something rather than looking like a row that happens to be clickable.
+    ///
+    /// It moves a little to the right under the pointer, the way a disclosure
+    /// does in a list: the row answers the pointer without flooding itself with
+    /// colour, which is a claim the figures on it do not need to make.
+    private var detailsButton: some View {
+        Button(action: onShowDetails) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: LayoutMetrics.captionSize))
+                .foregroundStyle(isHovered ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        .offset(x: isHovered ? LayoutMetrics.unit : 0)
+        .animation(.easeOut(duration: LayoutMetrics.hoverAnimation), value: isHovered)
+        .help("Show \(listing.displayName) details")
+        .accessibilityLabel("Show \(listing.displayName) details")
     }
 }
