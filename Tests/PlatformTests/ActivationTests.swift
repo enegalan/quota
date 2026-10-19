@@ -88,8 +88,73 @@ struct ActivationTests {
         let record = try #require(await installedProviderRepository(upgrade.store).provider(
             InstallerFixture.id
         ))
-        #expect(record.state == .updateFailed)
+        #expect(record.state == previous.state)
         #expect(record.version == previous.version)
+        // And the failure is on the record, so it outlives the session that had
+        // it: the next launch can say what went wrong.
+        #expect(record.lastError == .pluginError)
+    }
+
+    @Test("A failed update leaves the provider connected and usable")
+    func failedUpdateKeepsTheProviderUsable() async throws {
+        // The provider that failed to update is the provider the user had, on
+        // the version they had, connected to the account they had. A state that
+        // says otherwise takes away the way back: the row would offer an Update
+        // and an Uninstall and nothing else, and a user who could not sign in
+        // again would have to remove the provider to get it back.
+        let directory = try InstallerFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = try await InstallerFixture.installer(in: directory)
+        let previous = try await fixture.install()
+        let connected = previous.with(state: .connected)
+        try await installedProviderRepository(fixture.store).save(connected)
+        let upgrade = try await InstallerFixture.installer(
+            version: Self.upgraded, in: directory
+        )
+        _ = try? await upgrade.installer.update(upgrade.provider, previous: connected) { _ in
+            throw VerificationFailed()
+        }
+        let record = try #require(await installedProviderRepository(upgrade.store).provider(
+            InstallerFixture.id
+        ))
+        #expect(record.state == .connected)
+        // The version on disk is the old one, and it is the one the link points
+        // at: the provider that works is still the provider that runs.
+        #expect(record.version == connected.version)
+        let active = try #require(PluginLayout.activeVersionDirectory(
+            InstallerFixture.id,
+            in: directory
+        ))
+        #expect(active.lastPathComponent == connected.version.description)
+    }
+
+    @Test("A successful update keeps the provider connected")
+    func successfulUpdateKeepsTheConnection() async throws {
+        // The new version is the same provider as the old one — the same
+        // account, still connected. An install that staged it did not know that,
+        // and a provider that loses its connection because its code was
+        // replaced is a provider the user has to sign into again for nothing.
+        let directory = try InstallerFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = try await InstallerFixture.installer(in: directory)
+        let previous = try await fixture.install()
+        try await installedProviderRepository(fixture.store).save(
+            previous.with(state: .connected)
+        )
+        let upgrade = try await InstallerFixture.installer(
+            version: Self.upgraded, in: directory
+        )
+        let updated = try await upgrade.installer.update(
+            upgrade.provider,
+            previous: previous.with(state: .connected)
+        ) { _ in }
+        #expect(updated.state == .connected)
+        #expect(updated.version == Self.upgraded)
+        let record = try #require(await installedProviderRepository(upgrade.store).provider(
+            InstallerFixture.id
+        ))
+        #expect(record.state == .connected)
+        #expect(record.lastError == nil)
     }
 
     @Test("A partially written version directory is discarded, not activated")

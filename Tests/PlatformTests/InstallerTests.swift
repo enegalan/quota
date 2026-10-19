@@ -84,7 +84,7 @@ struct InstallerTests {
             in: directory,
             bundled: DirectoryBundledArtifacts(directory: directory.appendingPathComponent("none"))
         )
-        await #expect(throws: PluginInstaller.InstallError.notShipped("not-packaged")) {
+        await #expect(throws: InstallError.notShipped("not-packaged")) {
             try await fixture.install()
         }
     }
@@ -97,7 +97,7 @@ struct InstallerTests {
         let fixture = try await InstallerFixture.installer(
             artifact: Data(full.prefix(full.count / 2)), in: directory
         )
-        await #expect(throws: PluginInstaller.InstallError.self) {
+        await #expect(throws: InstallError.self) {
             try await fixture.install()
         }
         #expect(
@@ -114,7 +114,7 @@ struct InstallerTests {
             artifact: try PluginArtifact.archive(executable: "something-else"), in: directory
         )
         await #expect(
-            throws: PluginInstaller.InstallError.missingExecutable(InstallerFixture.id)
+            throws: InstallError.missingExecutable(InstallerFixture.id)
         ) {
             try await fixture.install()
         }
@@ -138,7 +138,7 @@ struct InstallerTests {
             artifact: try PluginArtifact.archive(nested: 2), in: directory
         )
         await #expect(
-            throws: PluginInstaller.InstallError.missingExecutable(InstallerFixture.id)
+            throws: InstallError.missingExecutable(InstallerFixture.id)
         ) {
             try await fixture.install()
         }
@@ -150,7 +150,7 @@ struct InstallerTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let fixture = try await InstallerFixture.installer(in: directory)
         _ = try await fixture.install()
-        await #expect(throws: PluginInstaller.InstallError.alreadyInstalled(
+        await #expect(throws: InstallError.alreadyInstalled(
             InstallerFixture.id,
             fixture.provider.version.description
         )) {

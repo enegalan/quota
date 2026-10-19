@@ -327,13 +327,6 @@ final class AppModel {
         }
     }
 
-    // Not wired: updating needs a `verify` that launches the new version and
-    // confirms it answers, and no such check exists outside the installer's own
-    // tests. Passing an empty one would let the interface report an update as
-    // verified when nothing had been launched, which is the same false claim
-    // is written against. `install` covers a first-time provider, which is
-    // what the creation flow needs; an update button appears when the check exists.
-
     // MARK: - reporting a failure
 
     /// Puts a failure where the interface can show it, and reloads.

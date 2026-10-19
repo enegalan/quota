@@ -44,20 +44,6 @@ public struct PluginInstaller: Sendable {
 
     // The fixed places an install can be in.
 
-    /// Why an install did not complete.
-    public enum InstallError: Error, Equatable {
-        /// The archive is not readable as an archive.
-        case extractionFailed(String)
-        /// The archive holds no executable where the host will look for one.
-        case missingExecutable(String)
-        /// This build does not package that provider.
-        case notShipped(String)
-        /// Something about the plugins directory stopped this.
-        case fileSystem(String)
-        /// A provider with that id is already installed at that version.
-        case alreadyInstalled(String, String)
-    }
-
     /// Installs a provider, activating it only once everything has been checked.
     ///
     /// An install of a version that is already active is refused rather than
@@ -150,6 +136,13 @@ public struct PluginInstaller: Sendable {
     /// The previous symlink target is read before anything changes and restored if
     /// the new version cannot answer a handshake, because a provider that will not
     /// start is worse than one that is a version behind.
+    ///
+    /// The state the provider had is kept either way. The new version is the same
+    /// provider as the old one — the same account, still connected — and an
+    /// install that staged it did not know that: a provider that loses its
+    /// connection because its code was replaced is a provider the user has to
+    /// sign into again for nothing, and one whose update failed is still the
+    /// provider they had, working as it did.
     public func update(
         _ provider: AvailableProvider,
         previous: InstalledProvider,
@@ -161,7 +154,7 @@ public struct PluginInstaller: Sendable {
             record = try await install(provider)
         } catch {
             try await repository.update(provider.id) { _ in
-                previous.with(state: .updateFailed, lastError: .pluginError)
+                replacing(previous, state: previous.state, lastError: .pluginError)
             }
             throw error
         }
@@ -174,17 +167,41 @@ public struct PluginInstaller: Sendable {
             try? FileManager.default.removeItem(
                 at: PluginLayout.versionDirectory(provider.id, provider.version, in: pluginsDirectory)
             )
-            // The old version is running and stays launchable, but the record
-            // says the update failed: the user asked for something that did not
-            // happen, and a state that reads "installed" would leave them
-            // wondering why the version in the interface never moved.
+            // The old version is running and stays launchable, and the record
+            // says so: the user asked for something that did not happen, and a
+            // record reading "installed" would leave them wondering why the
+            // version in the interface never moved. The state it had is kept,
+            // because the provider it describes is still the one that works.
             try await repository.save(
-                previous.with(state: .updateFailed, lastError: .pluginError)
+                replacing(previous, state: previous.state, lastError: .pluginError)
             )
             throw error
         }
-        try await repository.save(record)
-        return record
+        let connected = replacing(record, state: previous.state, lastError: nil)
+        try await repository.save(connected)
+        return connected
+    }
+
+    /// The same record with a state and an error of its own.
+    ///
+    /// Built field by field rather than through `with`, whose nil means "keep
+    /// what was there": an update that succeeded must clear the failure the
+    /// last one recorded, and one that failed must record the failure it just
+    /// had.
+    private func replacing(
+        _ record: InstalledProvider,
+        state: ProviderState,
+        lastError: ProviderErrorCode?
+    ) -> InstalledProvider {
+        InstalledProvider(
+            id: record.id,
+            version: record.version,
+            relativePath: record.relativePath,
+            state: state,
+            installedAt: record.installedAt,
+            contentHash: record.contentHash,
+            lastError: lastError
+        )
     }
 
     /// Removes a provider's code, and only its code.
