@@ -81,6 +81,14 @@ public struct SystemProcessHandle: ProcessHandle {
         environment: [String: String],
         standardErrorURL: URL
     ) throws {
+        // A plugin that has died leaves its stdin closed, and writing to a pipe
+        // whose reader is gone raises SIGPIPE — which would take the host down
+        // with it, over a provider that crashed rather than over anything the
+        // user did. Ignored, the write fails with an error the caller can
+        // report, which is the whole of what the host can do about a plugin that
+        // has gone.
+        signal(SIGPIPE, SIG_IGN)
+
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments

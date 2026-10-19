@@ -35,6 +35,36 @@ struct PluginHostBoundaryTests {
 
     // MARK: Launch failures
 
+    /// A write to a plugin that has died must be an error, not a signal.
+    ///
+    /// A plugin that exits leaves its stdin closed, and writing to a pipe whose
+    /// reader is gone raises SIGPIPE — which, unhandled, takes the whole host
+    /// down with it. In the application that is the app itself closing over a
+    /// provider that crashed; in a test run it is the whole suite.
+    @Test("Writing to a plugin that has died is an error, not a dead process")
+    func writingToADeadPluginThrows() async throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let log = directory.appendingPathComponent("stderr.log")
+        FileManager.default.createFile(atPath: log.path, contents: nil)
+        let handle = try SystemProcessHandle(
+            executable: URL(fileURLWithPath: "/usr/bin/true"),
+            environment: [:],
+            standardErrorURL: log
+        )
+        // Waited for rather than assumed: the write has to happen after the
+        // process is gone for the pipe to be broken, and a test that races it
+        // would pass without ever reaching the write.
+        for _ in 0 ..< 100 where handle.isRunning {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(!handle.isRunning)
+
+        #expect(throws: (any Error).self) {
+            try handle.writeLine(Data("are you there".utf8))
+        }
+    }
+
     @Test("A missing executable reports pluginError")
     func missingExecutableReportsPluginError() async throws {
         let directory = try makeTemporaryDirectory()
