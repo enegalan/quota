@@ -53,19 +53,36 @@ public enum SnapshotNormaliser: Sendable {
         return try QuotaPeriod(start: start, end: end)
     }
 
-    /// The first instant of a `yyyy-MM-dd` day.
+    /// The first instant of a `yyyy-MM-dd` day, or the whole instant an ISO
+    /// 8601 timestamp names.
     ///
-    /// Parsed in UTC on purpose: a period boundary is a calendar day in the
-    /// provider's terms, and resolving it against the user's timezone would move
-    /// a period by a day for anyone west of Greenwich. The formatter is made per
-    /// call rather than shared, because `ISO8601DateFormatter` is not `Sendable`
-    /// and a shared one would be a data race the next time two quotas are read
-    /// at once — which must be possible.
+    /// Both spellings, because providers write both — and the difference is
+    /// the fact a reset time is made of. A provider naming 10:46 as its reset
+    /// hands the app an instant; parsing only the day would turn it into
+    /// midnight and the interface would name an hour the provider never said.
+    ///
+    /// A day-only boundary is still parsed in UTC on purpose: a period
+    /// boundary that arrives as a calendar day is a calendar day in the
+    /// provider's terms, and resolving it against the user's timezone would
+    /// move a period by a day for anyone west of Greenwich. The formatters are
+    /// made per call rather than shared, because `ISO8601DateFormatter` is not
+    /// `Sendable` and a shared one would be a data race the next time two
+    /// quotas are read at once — which must be possible.
     private static func date(_ text: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withFullDate]
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter.date(from: text)
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let instant = fractional.date(from: text) {
+            return instant
+        }
+        let whole = ISO8601DateFormatter()
+        whole.formatOptions = [.withInternetDateTime]
+        if let instant = whole.date(from: text) {
+            return instant
+        }
+        let day = ISO8601DateFormatter()
+        day.formatOptions = [.withFullDate]
+        day.timeZone = TimeZone(secondsFromGMT: 0)
+        return day.date(from: text)
     }
 
     /// The percentage, when it is one that can be shown as a figure.

@@ -27,6 +27,12 @@ struct SnapshotNormalisationTests {
         let period = try #require(snapshot.period(forBucket: "plan"))
         #expect(calendar.component(.day, from: period.start) == 22)
         #expect(calendar.component(.day, from: period.end) == 22)
+        // …and to the second, not merely to the day: the fixture's cycle ends at
+        // 10:46:32, and a normaliser that truncated to the day would hand the
+        // interface midnight UTC — an hour the provider never named, on a day
+        // that is yesterday's for anyone west of Greenwich.
+        #expect(period.start == Date(timeIntervalSince1970: 1_790_073_992))
+        #expect(period.end == Date(timeIntervalSince1970: 1_792_665_992))
     }
 
     @Test("Usage-summary fallback agrees on period and plan percentage")

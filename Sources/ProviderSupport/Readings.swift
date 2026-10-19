@@ -76,10 +76,40 @@ public enum DayFormat {
         whole.formatOptions = [.withInternetDateTime]
         return whole.date(from: value)
     }
+
+    /// An instant as the wire writes one: ISO 8601, UTC, to the second.
+    ///
+    /// To the second because that is the finest claim a provider makes about a
+    /// reset: sub-second precision dropped here cannot lose a fact, while
+    /// keeping it would let two spellings of the same second — `.000Z` and a
+    /// bare `Z` — compare as different windows.
+    public static func instantString(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter.string(from: date)
+    }
 }
 
 /// The window a reading is measured over: first and last day, `yyyy-MM-dd`.
 public struct PeriodDays: Equatable, Sendable {
+    public let start: String
+    public let end: String
+
+    public init(start: String, end: String) {
+        self.start = start
+        self.end = end
+    }
+}
+
+/// The same window kept as the instants the provider named, ISO 8601 in UTC.
+///
+/// Whole rather than reduced to days because a reset is an instant: a weekly
+/// limit that turns over at 14:00 is not the same fact as one that turns over
+/// at midnight, and a window truncated to its day hands the interface a
+/// boundary the provider never stated — midnight UTC, an hour that belongs to
+/// nobody's working day and, west of Greenwich, on the wrong day.
+public struct PeriodWindow: Equatable, Sendable {
     public let start: String
     public let end: String
 
@@ -105,19 +135,7 @@ public enum UsagePeriod {
         startKey: String,
         endKey: String
     ) throws -> PeriodDays {
-        guard let startRaw = JSONAccess.string(json, key: startKey),
-              let endRaw = JSONAccess.string(json, key: endKey),
-              let startMillis = Double(startRaw),
-              let endMillis = Double(endRaw)
-        else {
-            throw UsageDataError.missingField("\(startKey)/\(endKey)")
-        }
-        return try days(
-            from: (
-                Date(timeIntervalSince1970: startMillis / millisecondsPerSecond),
-                Date(timeIntervalSince1970: endMillis / millisecondsPerSecond)
-            )
-        )
+        try days(from: try instants(fromMillisecondsStrings: json, startKey: startKey, endKey: endKey))
     }
 
     /// ISO 8601 instants.
@@ -126,6 +144,52 @@ public enum UsagePeriod {
         startKey: String,
         endKey: String
     ) throws -> PeriodDays {
+        try days(from: try instants(fromISO8601: json, startKey: startKey, endKey: endKey))
+    }
+
+    /// The same boundaries as whole instants, for a provider that names the
+    /// hour its limit turns over.
+    public static func window(
+        fromMillisecondsStrings json: [String: Any],
+        startKey: String,
+        endKey: String
+    ) throws -> PeriodWindow {
+        try window(from: try instants(fromMillisecondsStrings: json, startKey: startKey, endKey: endKey))
+    }
+
+    /// The same boundaries as whole instants, for a provider that names the
+    /// hour its limit turns over.
+    public static func window(
+        fromISO8601 json: [String: Any],
+        startKey: String,
+        endKey: String
+    ) throws -> PeriodWindow {
+        try window(from: try instants(fromISO8601: json, startKey: startKey, endKey: endKey))
+    }
+
+    private static func instants(
+        fromMillisecondsStrings json: [String: Any],
+        startKey: String,
+        endKey: String
+    ) throws -> (start: Date, end: Date) {
+        guard let startRaw = JSONAccess.string(json, key: startKey),
+              let endRaw = JSONAccess.string(json, key: endKey),
+              let startMillis = Double(startRaw),
+              let endMillis = Double(endRaw)
+        else {
+            throw UsageDataError.missingField("\(startKey)/\(endKey)")
+        }
+        return (
+            Date(timeIntervalSince1970: startMillis / millisecondsPerSecond),
+            Date(timeIntervalSince1970: endMillis / millisecondsPerSecond)
+        )
+    }
+
+    private static func instants(
+        fromISO8601 json: [String: Any],
+        startKey: String,
+        endKey: String
+    ) throws -> (start: Date, end: Date) {
         guard let startRaw = JSONAccess.string(json, key: startKey),
               let endRaw = JSONAccess.string(json, key: endKey),
               let start = DayFormat.instant(fromISO8601: startRaw),
@@ -133,20 +197,33 @@ public enum UsagePeriod {
         else {
             throw UsageDataError.missingField("\(startKey)/\(endKey)")
         }
-        return try days(from: (start, end))
+        return (start, end)
     }
 
     /// The check is here rather than per provider because a period that runs
     /// backwards is wrong for all of them, and the ways it goes wrong all
     /// produce the same silent damage: a reading filed against a window that
     /// never happened.
-    private static func days(from interval: (start: Date, end: Date)) throws -> PeriodDays {
+    private static func checked(_ interval: (start: Date, end: Date)) throws -> (start: Date, end: Date) {
         guard interval.start <= interval.end else {
             throw UsageDataError.invalidPeriod
         }
+        return interval
+    }
+
+    private static func days(from interval: (start: Date, end: Date)) throws -> PeriodDays {
+        let interval = try checked(interval)
         return PeriodDays(
             start: DayFormat.string(from: interval.start),
             end: DayFormat.string(from: interval.end)
+        )
+    }
+
+    private static func window(from interval: (start: Date, end: Date)) throws -> PeriodWindow {
+        let interval = try checked(interval)
+        return PeriodWindow(
+            start: DayFormat.instantString(from: interval.start),
+            end: DayFormat.instantString(from: interval.end)
         )
     }
 }

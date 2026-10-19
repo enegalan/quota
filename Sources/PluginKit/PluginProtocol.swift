@@ -251,7 +251,10 @@ public struct ProviderUsage: Codable, Sendable, Equatable {
     /// Percentage used, 0...100.
     public let usagePercentage: Double
 
-    /// The period the percentage is measured over, as `yyyy-MM-dd`.
+    /// The period the percentage is measured over, as `yyyy-MM-dd` or an ISO
+    /// 8601 instant. The instant where a provider names one: a reset is an
+    /// hour of the day as much as a day, and the interface can only say which
+    /// if the wire keeps it.
     public let periodStart: String
     public let periodEnd: String
 

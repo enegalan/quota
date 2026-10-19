@@ -27,13 +27,13 @@ enum CursorFixtureLoader {
         return 0
     }
 
-    /// Mirrors the plugin's percentage rule and period formatting for fixtures.
+    /// Mirrors the plugin's percentage rule and period handling for fixtures.
     static func usageResult(fromCurrentPeriod json: [String: Any], day: String) throws -> UsageResult {
         let plan = try #require(json["planUsage"] as? [String: Any])
         let startMs = try #require(Double(json["billingCycleStart"] as? String ?? ""))
         let endMs = try #require(Double(json["billingCycleEnd"] as? String ?? ""))
-        let start = dayString(Date(timeIntervalSince1970: startMs / 1000))
-        let end = dayString(Date(timeIntervalSince1970: endMs / 1000))
+        let start = instantString(Date(timeIntervalSince1970: startMs / 1000))
+        let end = instantString(Date(timeIntervalSince1970: endMs / 1000))
         let planPercent = try planUsagePercentage(plan)
         let apiPercent = try numeric(plan, "apiPercentUsed")
         return UsageResult(
@@ -65,8 +65,8 @@ enum CursorFixtureLoader {
     static func usageResult(fromSummary json: [String: Any], day: String) throws -> UsageResult {
         let individual = try #require(json["individualUsage"] as? [String: Any])
         let plan = try #require(individual["plan"] as? [String: Any])
-        let start = dayString(try parseISO(try #require(json["billingCycleStart"] as? String)))
-        let end = dayString(try parseISO(try #require(json["billingCycleEnd"] as? String)))
+        let start = instantString(try parseISO(try #require(json["billingCycleStart"] as? String)))
+        let end = instantString(try parseISO(try #require(json["billingCycleEnd"] as? String)))
         let planPercent = try planUsagePercentage(plan)
         let apiPercent = try numeric(plan, "apiPercentUsed")
         return UsageResult(
@@ -113,10 +113,9 @@ enum CursorFixtureLoader {
         return used / limit * UsageConstants.percentageScale
     }
 
-    private static func dayString(_ date: Date) -> String {
+    private static func instantString(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withFullDate]
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.formatOptions = [.withInternetDateTime]
         return formatter.string(from: date)
     }
 

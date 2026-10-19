@@ -79,6 +79,13 @@ struct DayFormatTests {
         #expect(fractional == Date(timeIntervalSince1970: 1_792_238_400.5))
     }
 
+    @Test("An instant is written whole, to the second, in UTC")
+    func instantString() {
+        #expect(DayFormat.instantString(from: Date(timeIntervalSince1970: 1_792_238_400)) == "2026-10-17T12:00:00Z")
+        // The fraction is the serializer's detail, not the value's.
+        #expect(DayFormat.instantString(from: Date(timeIntervalSince1970: 1_792_238_400.5)) == "2026-10-17T12:00:00Z")
+    }
+
     @Test("Something that is not an instant is not read as one")
     func notAnInstant() {
         #expect(DayFormat.instant(fromISO8601: "17/10/2026") == nil)
@@ -120,6 +127,36 @@ struct UsagePeriodTests {
         #expect(period.end == "2026-10-31")
     }
 
+    @Test("The window whole: milliseconds since the epoch arrive with their hour")
+    func windowFromMillisecondsStrings() throws {
+        let json: [String: Any] = [
+            "billingCycleStart": "1790073992000",
+            "billingCycleEnd": "1792665992000",
+        ]
+        let window = try UsagePeriod.window(
+            fromMillisecondsStrings: json,
+            startKey: keys.start,
+            endKey: keys.end
+        )
+        #expect(window.start == "2026-09-22T10:46:32Z")
+        #expect(window.end == "2026-10-22T10:46:32Z")
+    }
+
+    @Test("The window whole: ISO 8601 instants survive, fraction and all")
+    func windowFromISO8601() throws {
+        let json: [String: Any] = [
+            "billingCycleStart": "2026-10-01T00:00:00.000Z",
+            "billingCycleEnd": "2026-10-31T23:59:59Z",
+        ]
+        let window = try UsagePeriod.window(
+            fromISO8601: json,
+            startKey: keys.start,
+            endKey: keys.end
+        )
+        #expect(window.start == "2026-10-01T00:00:00Z")
+        #expect(window.end == "2026-10-31T23:59:59Z")
+    }
+
     @Test("Boundaries that arrive as numbers rather than strings are still missing")
     func numbersAreNotStrings() {
         // Providers quote these on purpose — JavaScript numbers are too large
@@ -156,6 +193,15 @@ struct UsagePeriodTests {
             // window that never happened.
         } catch {
             Issue.record("expected invalidPeriod, got \(error)")
+        }
+        // Whole instants are refused by the same rule: keeping the time does
+        // not loosen the check the days were held to.
+        #expect(throws: UsageDataError.self) {
+            try UsagePeriod.window(
+                fromISO8601: json,
+                startKey: keys.start,
+                endKey: keys.end
+            )
         }
     }
 

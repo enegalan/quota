@@ -13,7 +13,7 @@ enum UsageNormaliser {
         fromCurrentPeriod json: [String: Any],
         updatedAtDay: String
     ) throws -> UsageResult {
-        let period = try UsagePeriod.days(
+        let period = try UsagePeriod.window(
             fromMillisecondsStrings: json,
             startKey: CursorConstants.billingStartKey,
             endKey: CursorConstants.billingEndKey
@@ -26,7 +26,7 @@ enum UsageNormaliser {
         fromUsageSummary json: [String: Any],
         updatedAtDay: String
     ) throws -> UsageResult {
-        let period = try UsagePeriod.days(
+        let period = try UsagePeriod.window(
             fromISO8601: json,
             startKey: CursorConstants.billingStartKey,
             endKey: CursorConstants.billingEndKey
@@ -38,7 +38,7 @@ enum UsageNormaliser {
 
     private static func makeResult(
         plan: [String: Any],
-        period: PeriodDays,
+        period: PeriodWindow,
         updatedAtDay: String
     ) throws -> UsageResult {
         let planPercentage = try planUsagePercentage(plan)
