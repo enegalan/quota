@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-10-19
+
+### Fixed
+
+- A provider's page reads itself again after an action taken from it. An
+  update, a sign-in or a removal now shows in the page that was used, instead
+  of the page having to be closed and opened again to see what the click had
+  done.
+
 ## [1.3.1] - 2026-10-19
 
 ### Fixed
