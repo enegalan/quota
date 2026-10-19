@@ -52,7 +52,7 @@ struct ProviderManagementView: View {
         }
         .sheet(item: $opened) { listing in
             ProviderDetailSheet(
-                listing: listing,
+                providerID: listing.id,
                 model: model,
                 onUninstall: {
                     opened = nil

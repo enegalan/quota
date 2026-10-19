@@ -58,6 +58,19 @@ public struct ProviderSections: Sendable, Equatable {
     }
 
     public static let empty = ProviderSections(available: [], installed: [], connected: [])
+
+    /// Every listing, in the order the sections are shown.
+    ///
+    /// Connected first, because a connected provider is the one a user is
+    /// working with, and the rest behind it.
+    public var all: [ProviderListing] {
+        connected + installed + available
+    }
+
+    /// The listing for one provider, whichever section it is in.
+    public func listing(id: String) -> ProviderListing? {
+        all.first { $0.id == id }
+    }
 }
 
 /// What this build offers, what is installed, and the rules that relate them.

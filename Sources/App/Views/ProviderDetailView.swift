@@ -140,7 +140,14 @@ private struct DetailRow: View {
 /// the store rather than a request to the provider — and a provider that
 /// cannot be reached has a page too, saying so.
 struct ProviderDetailSheet: View {
-    let listing: ProviderListing
+    /// The provider whose page is open.
+    ///
+    /// The identifier and not the listing the page was opened with: that
+    /// listing is a fact about the moment the page opened, and an update
+    /// changes it — the version, the state, the account — while the page is on
+    /// screen. The page is about the provider, and the provider is the one the
+    /// app knows about now.
+    let providerID: String
     let model: AppModel
     let onUninstall: () -> Void
 
@@ -161,7 +168,7 @@ struct ProviderDetailSheet: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .navigationTitle(listing.displayName)
+            .navigationTitle(detail?.displayName ?? listing?.displayName ?? "")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
@@ -175,8 +182,26 @@ struct ProviderDetailSheet: View {
             maxHeight: LayoutMetrics.sheetMaxHeight,
             alignment: .top
         )
-        .task {
-            detail = await model.providerDetail(for: listing)
+        // Keyed by the instant every figure in the app is relative to, which
+        // moves on each load: an action taken from this page — an update, a
+        // sign-in, a removal — reloads the model, and the page reads the
+        // result of it rather than what it said before.
+        .task(id: model.reference) {
+            await reload()
         }
+    }
+
+    /// The provider as the app knows it now.
+    private var listing: ProviderListing? {
+        model.sections.listing(id: providerID)
+    }
+
+    /// Reads the page again from the store.
+    ///
+    /// The old figures stay on screen until the new ones arrive, so a reload
+    /// does not blank the page while it happens.
+    private func reload() async {
+        guard let listing else { return }
+        detail = await model.providerDetail(for: listing)
     }
 }
