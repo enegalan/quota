@@ -178,14 +178,29 @@ struct SummaryPresenter: Sendable {
     }
 
     /// What the user has used so far today, as the timeline can establish it.
+    ///
+    /// The whole of the day when there is a reading from before it, and what has
+    /// been measured since the day's first reading otherwise: a day the app did
+    /// not see from the start can only be measured from where it started
+    /// watching, and a figure the user can see is worth more than a dash that
+    /// says nothing about the usage they know they are doing.
     func usedToday(timeline: UsageTimeline?, bucketID: String?) -> Double? {
         guard let timeline, let bucketID else { return nil }
-        return timeline.usedOn(
+        let day = calendar.startOfDay(for: reference)
+        if let used = timeline.usedOn(
             bucketID: bucketID,
-            from: calendar.startOfDay(for: reference),
+            from: day,
             to: reference,
             calendar: calendar
-        )
+        ) {
+            return used
+        }
+        return timeline.usedSinceFirstReadingOn(
+            bucketID: bucketID,
+            onOrAfter: day,
+            to: reference,
+            calendar: calendar
+        )?.used
     }
 
     /// Future strip: the days coming up, with the zeros left in.

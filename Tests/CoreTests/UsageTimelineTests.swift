@@ -120,6 +120,45 @@ struct UsageTimelineTests {
         ) == nil)
     }
 
+    /// The floor a day is measured from when there is no reading from before it:
+    /// the rise since the day's first reading, which leaves out whatever was
+    /// spent before that reading and cannot be recovered from it.
+    @Test("The floor is the rise since the day's first reading")
+    func floorIsTheRiseSinceTheFirstReading() throws {
+        let timeline = UsageTimeline(points: [try point(9, 45), try point(17, 55)])
+        let first = try quotaInstant(2026, 9, 15, hour: 9)
+        let floor = try #require(timeline.usedSinceFirstReadingOn(
+            bucketID: "models",
+            onOrAfter: try quotaInstant(2026, 9, 15, hour: 0),
+            to: try quotaInstant(2026, 9, 15, hour: 17),
+            calendar: quotaCalendar
+        ))
+        #expect(floor.used == 10)
+        #expect(floor.since == first)
+    }
+
+    @Test("A day with a single reading has no floor")
+    func floorNeedsTwoReadings() throws {
+        let timeline = UsageTimeline(points: [try point(9, 45)])
+        #expect(timeline.usedSinceFirstReadingOn(
+            bucketID: "models",
+            onOrAfter: try quotaInstant(2026, 9, 15, hour: 0),
+            to: try quotaInstant(2026, 9, 15, hour: 17),
+            calendar: quotaCalendar
+        ) == nil)
+    }
+
+    @Test("A day with no reading at all has no floor")
+    func floorWithoutAnyReading() throws {
+        let timeline = UsageTimeline(points: [])
+        #expect(timeline.usedSinceFirstReadingOn(
+            bucketID: "models",
+            onOrAfter: try quotaInstant(2026, 9, 15, hour: 0),
+            to: try quotaInstant(2026, 9, 15, hour: 17),
+            calendar: quotaCalendar
+        ) == nil)
+    }
+
     @Test("The latest reading is the most recent one at or before the reference")
     func latestPoint() throws {
         let timeline = UsageTimeline(points: [try point(1, 10), try point(12, 30), try point(17, 35)])

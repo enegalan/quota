@@ -76,4 +76,43 @@ public struct UsageTimeline: Sendable, Hashable, Codable {
         let used = latest.usagePercentage - baseline.usagePercentage
         return used >= UsageConstants.minimumPercentage ? used : nil
     }
+
+    /// The first reading for a bucket taken on or after a day began.
+    ///
+    /// The other end of the day's measurement: the reading a day's spending is
+    /// measured from when there is no reading from before the day.
+    public func firstPoint(
+        bucketID: String,
+        onOrAfter day: Date,
+        calendar: Calendar
+    ) -> TimelinePoint? {
+        let startOfDay = calendar.startOfDay(for: day)
+        return points.first { $0.bucketID == bucketID && $0.recordedAt >= startOfDay }
+    }
+
+    /// How much of a bucket was used between the day's first reading and an
+    /// instant.
+    ///
+    /// A floor on the day's usage rather than the day's usage: it is what the
+    /// app saw, and whatever was spent before that first reading is not in it
+    /// and cannot be recovered from it.
+    ///
+    /// - Returns: the usage measured and the instant it was measured from, or
+    ///   nil when the day has no reading, or only one.
+    public func usedSinceFirstReadingOn(
+        bucketID: String,
+        onOrAfter day: Date,
+        to reference: Date,
+        calendar: Calendar
+    ) -> (used: Double, since: Date)? {
+        guard let first = firstPoint(bucketID: bucketID, onOrAfter: day, calendar: calendar) else {
+            return nil
+        }
+        guard let latest = latestPoint(bucketID: bucketID, asOf: reference) else { return nil }
+        guard first.recordedAt < latest.recordedAt else { return nil }
+
+        let used = latest.usagePercentage - first.usagePercentage
+        guard used >= UsageConstants.minimumPercentage else { return nil }
+        return (used, first.recordedAt)
+    }
 }

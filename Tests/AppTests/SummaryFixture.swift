@@ -76,6 +76,12 @@ struct SummaryFixture {
         /// is written again, because the refresh succeeded, but the limit is not
         /// in it any more.
         var bucketGone = false
+        /// Whether the history begins before the day.
+        ///
+        /// Without a reading from before the day, the day's spending can only be
+        /// measured from the day's first reading — the state the app is in on the
+        /// first day it knows a provider, and after a window correction.
+        var withBaseline = true
         /// Whether the period's days have all gone by.
         var periodEndingYesterday = false
         /// Whether weekends are left unfunded.
@@ -211,7 +217,7 @@ struct SummaryFixture {
         }
         guard world.withTimeline else { return }
         try await repositories.timelines.append(
-            try history(for: quota, usedToday: world.usedToday),
+            try history(for: quota, usedToday: world.usedToday, withBaseline: world.withBaseline),
             keepingAtMost: timelineRetention
         )
     }
@@ -250,16 +256,37 @@ struct SummaryFixture {
     /// started, so a single reading cannot establish it. The baseline sits at the
     /// start of the day and the reading at noon, both inside the window the
     /// presenter asks about.
-    private static func history(for quota: Quota, usedToday: Double) throws -> TimelineRecord {
+    ///
+    /// Without a baseline the history starts in the morning instead, which is
+    /// what the app knows on the first day it reads a provider: the day's
+    /// spending can then only be measured from that first reading.
+    private static func history(
+        for quota: Quota,
+        usedToday: Double,
+        withBaseline: Bool
+    ) throws -> TimelineRecord {
         var points: [TimelinePoint] = []
         if usedToday > 0 {
-            let midnight = calendar.startOfDay(for: reference)
             let noon = try #require(
                 calendar.date(bySettingHour: 12, minute: 0, second: 0, of: reference)
             )
-            points.append(
-                try TimelinePoint(recordedAt: midnight, bucketID: bucketID, usagePercentage: 0)
-            )
+            if withBaseline {
+                let midnight = calendar.startOfDay(for: reference)
+                points.append(
+                    try TimelinePoint(recordedAt: midnight, bucketID: bucketID, usagePercentage: 0)
+                )
+            } else {
+                let morning = try #require(
+                    calendar.date(bySettingHour: 9, minute: 0, second: 0, of: reference)
+                )
+                points.append(
+                    try TimelinePoint(
+                        recordedAt: morning,
+                        bucketID: bucketID,
+                        usagePercentage: usedToday / 2
+                    )
+                )
+            }
             points.append(
                 try TimelinePoint(recordedAt: noon, bucketID: bucketID, usagePercentage: usedToday)
             )

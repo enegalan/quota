@@ -75,6 +75,16 @@ public struct AllocationPlan: Sendable, Hashable, Codable {
 public struct TodayAllowance: Sendable, Hashable, Codable {
     public let date: LocalDate
     public let suggested: Double
+
+    /// The day's spending, as the app has measured it.
+    ///
+    /// The whole of the day when there is a reading from before it, and what has
+    /// been measured since the day's first reading otherwise: a day the app did
+    /// not see from the start can only be measured from where it started
+    /// watching.
+    ///
+    /// Nil when the provider has not been read today at all, which is not the
+    /// same as a day with nothing spent on it.
     public let usedToday: Double?
 
     public var remainingAfterToday: Double? {

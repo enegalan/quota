@@ -176,6 +176,46 @@ struct SummaryPresenterTests {
         #expect(allowance.remainingAfterToday == 0)
     }
 
+    @Test("A day with a reading from before it is measured in full")
+    func dayWithABaselineIsMeasuredWhole() async throws {
+        var world = SummaryFixture.World()
+        world.usedToday = 2
+        let fixture = try await SummaryFixture.make(world)
+
+        let presentation = try await fixture.presenter.presentation(for: fixture.quota)
+        let allowance = try #require(presentation.summary.todayAllowance)
+
+        #expect(allowance.usedToday == 2)
+    }
+
+    @Test("A day the app did not see from the start is measured from its first reading")
+    func dayWithoutABaselineIsMeasuredFromItsFirstReading() async throws {
+        var world = SummaryFixture.World()
+        world.usedToday = 2
+        world.withBaseline = false
+        let fixture = try await SummaryFixture.make(world)
+
+        let presentation = try await fixture.presenter.presentation(for: fixture.quota)
+        let allowance = try #require(presentation.summary.todayAllowance)
+
+        // The rise since the app's first reading of the day, which is the most
+        // the day can be measured from: what came before that reading is not
+        // in anyone's hands.
+        #expect(allowance.usedToday == 1)
+    }
+
+    @Test("A day with no reading at all is unknown")
+    func dayWithoutAReadingIsUnknown() async throws {
+        var world = SummaryFixture.World()
+        world.withTimeline = false
+        let fixture = try await SummaryFixture.make(world)
+
+        let presentation = try await fixture.presenter.presentation(for: fixture.quota)
+        let allowance = try #require(presentation.summary.todayAllowance)
+
+        #expect(allowance.usedToday == nil)
+    }
+
     @Test("A quota with no plan has no today's allowance")
     func noPlanNoAllowance() async throws {
         var world = SummaryFixture.World()
