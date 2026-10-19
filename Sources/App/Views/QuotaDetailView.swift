@@ -127,8 +127,19 @@ struct QuotaDetailView: View {
         }
     }
 
+    /// How far the period is from over, and when the provider resets it.
+    ///
+    /// The reset caption sits with the countdown because the two are the same
+    /// question asked two ways: days remaining says how much time is left,
+    /// and the reset instant says exactly when the clock the provider keeps
+    /// turns over.
     private var outlook: some View {
-        OutlookRow(presentation: presentation, reference: reference, calendar: calendarGrid)
+        VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
+            OutlookRow(presentation: presentation, reference: reference, calendar: calendarGrid)
+            if let reset = presentation.resetCaption(asOf: reference, calendar: calendarGrid) {
+                Caption(text: reset)
+            }
+        }
     }
 
     // MARK: Footer

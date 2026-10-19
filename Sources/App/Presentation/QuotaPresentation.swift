@@ -173,6 +173,34 @@ struct QuotaPresentation: Identifiable, Hashable {
         period.remainingDays(through: reference, calendar: calendar)
     }
 
+    /// When the provider resets this quota's usage, as a caption, while a
+    /// reset is still ahead.
+    ///
+    /// The period's own end rather than a provider field of its own: the window
+    /// the provider reports *is* the reset, and a second source for the same
+    /// instant would be somewhere the two could disagree. The date and time
+    /// together, not just the day, because a reset is an instant — a weekly or
+    /// session limit that turns over at 14:00 is not the same fact as one that
+    /// turns over at midnight, and a caption that dropped the time would hide
+    /// exactly the difference that matters.
+    ///
+    /// Silent once the period has ended: an expired period has no reset still
+    /// to come — the next one arrives with the provider's next answer — and
+    /// naming an instant already past as "when usage resets" would be a
+    /// countdown to nothing.
+    func resetCaption(asOf reference: Date, calendar: Calendar) -> String? {
+        guard period.status(asOf: reference) == .active else { return nil }
+        let instant = LayoutMetrics.date(period.end, template: Self.resetTemplate, calendar: calendar)
+        return "Resets \(instant)."
+    }
+
+    /// The date-and-time skeleton the reset caption is written from.
+    ///
+    /// A template rather than a fixed pattern because the order and separators
+    /// are the locale's to decide, the same rule the other written dates in the
+    /// interface follow.
+    private static let resetTemplate = "dMMMyjm"
+
     /// The line that says when the figures were last fetched.
     ///
     /// The provider's own failure text wins where there is one, because it names

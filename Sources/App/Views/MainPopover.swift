@@ -112,6 +112,9 @@ struct MainPopover: View {
                 reference: model.reference,
                 calendar: model.userCalendar
             )
+            if let reset = presentation.resetCaption(asOf: model.reference, calendar: model.userCalendar) {
+                Caption(text: reset)
+            }
             Caption(
                 text: presentation.syncCaption(asOf: model.reference, calendar: model.userCalendar),
                 isWarning: presentation.syncIsWarning(asOf: model.reference)

@@ -1,13 +1,16 @@
 import Core
 import SwiftUI
 
-/// Today's block: planned, used, and remaining, shown as a bar first and as
-/// figures beside it, so the proportion is read rather than worked out.
+/// Today's block: the plan as a figure, the day drawn as a bar against it,
+/// and the two measurements spelled out beneath.
 ///
 /// The bar's track is the day's plan, its fill is what has been spent of it,
-/// and the part of the track the fill does not reach is what remains. Each
-/// figure keeps its own mark and small label so the three numbers cannot be
-/// confused even when the block is read at a glance.
+/// and the part of the track the fill does not reach is what remains — so the
+/// plan is drawn, as the width everything is measured against, and set above
+/// the bar as a figure in the same idiom the allowance card uses. The two
+/// measurements are what the figures below spell out, each with its own mark
+/// and small label; the plan keeps its own row because it is the only number
+/// here that is not a measurement.
 ///
 /// All three figures come from the same `TodayAllowance`. Remaining is derived
 /// as planned minus used there, not recomputed beside a live usage reading that
@@ -28,9 +31,31 @@ struct TodayAllowanceView: View {
             if showsTitle {
                 SectionTitle("Today")
             }
+            plannedFigure
             allowanceBar
             figuresRow
         }
+    }
+
+    /// The day's plan, as a figure in the allowance card's own idiom.
+    ///
+    /// A value with its small label beside it, the way the allowance card sets
+    /// its used and remaining pair: the plan is read against the bar beneath
+    /// it, and a figure in the same idiom says the two are one question. The
+    /// value keeps the day's own precision rather than the headline's whole
+    /// points, because the two readings below are precise and a plan rounded
+    /// differently would not add up to them.
+    private var plannedFigure: some View {
+        HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.lineSpacing) {
+            Text(plannedLabel)
+                .font(.system(size: LayoutMetrics.headlineFigureSize))
+                .monospacedDigit()
+            Text("planned")
+                .font(.system(size: LayoutMetrics.footnoteSize))
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Planned \(plannedLabel) for today")
     }
 
     /// The day's plan as a track, what has been spent as its fill.
@@ -64,10 +89,13 @@ struct TodayAllowanceView: View {
         return trackWidth * CGFloat(min(max(used / planned, 0), 1))
     }
 
-    /// Planned, used, remaining as small figures, each with its own mark.
+    /// Used and remaining as small figures, each with its own mark.
+    ///
+    /// Two and not three: the plan is the figure above the bar and the bar's
+    /// track, and a third figure in the row would put the measurement and the
+    /// thing it is measured against side by side as though both were readings.
     private var figuresRow: some View {
         HStack(spacing: LayoutMetrics.sectionSpacing) {
-            todayFigure(mark: .secondary, label: "Planned", value: planned)
             todayFigure(mark: usedTint, label: "Used", value: used)
             todayFigure(mark: .secondary, label: "Remaining", value: remaining, isEmphasis: true)
         }
