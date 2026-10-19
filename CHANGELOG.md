@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-19
+
+### Fixed
+
+- Updating a provider no longer leaves it signed out. The new version is the
+  same provider as the old one — the same account, still connected — and an
+  update that failed now leaves the version and the connection the user had, so
+  it can be retried without removing the provider and starting again.
+- The reasons an install or an update can fail are now said in the app's own
+  words, instead of the system's words for an error it has never heard of.
+
 ## [1.3.0] - 2026-10-19
 
 ### Added
