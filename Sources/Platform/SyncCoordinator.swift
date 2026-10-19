@@ -94,7 +94,8 @@ public enum SyncError: Error, Equatable {
 /// be shown for this quota", and something above it decides when to call. A
 /// coordinator that owns a timer cannot be tested for a policy, only observed,
 /// and the policies here — keep the last good reading, refuse a period that has
-/// ended, reset the timeline on a period change — are the whole point.
+/// ended, prune the timeline to the new window on a period change — are the
+/// whole point.
 public struct SyncCoordinator: Sendable {
     let quotas: QuotaRepository
     let snapshots: SnapshotRepository
@@ -243,12 +244,13 @@ public struct SyncCoordinator: Sendable {
     /// not the reading's first bucket. That distinction is the whole reason the
     /// period lives on the bucket: two limits on one account can reset at
     /// different instants, and stamping both quotas with the same window made
-    /// every refresh a "the provider moved the window" event — which deletes the
+    /// every refresh a "the provider moved the window" event — which pruned the
     /// timeline, so a five-hour quota and a weekly one erased each other's
     /// history on every poll and neither ever knew what it had spent today.
     ///
     /// - Returns: whether the period changed, which the caller reports because it
-    ///   means the timeline the user has been looking at no longer applies.
+    ///   means the window the timeline and plan are built on has moved — the
+    ///   history behind it now starts at the new window's first instant.
     @discardableResult
     private func file(
         _ snapshot: UsageSnapshot,
@@ -285,11 +287,16 @@ public struct SyncCoordinator: Sendable {
 
         if changed {
             // The provider says it is metering a different window, so the quota
-            // is corrected and the timeline dropped first. Keeping points from
-            // the old period would make used-today a total across two cycles,
-            // which is the one number that has no meaning at all. Dropped before
-            // the new point is added so the timeline is never briefly a mix.
-            try await timelines.delete(quotaID: quota.id)
+            // is corrected and points from before that window are dropped first:
+            // they were metered against the cycle it replaced, and keeping them
+            // would make used-today a total across two cycles, which is the one
+            // number that has no meaning at all. Points inside the new window
+            // stay — a window corrected from a truncated date to its exact
+            // instants is the same cycle spelled more precisely, and dropping
+            // them would erase the baseline of the day over a change of
+            // precision. Dropped before the new point is added so the timeline
+            // is never briefly a mix.
+            try await timelines.prune(quotaID: quota.id, before: bucket.period.start)
         }
         try await appendToTimeline(
             bucket,

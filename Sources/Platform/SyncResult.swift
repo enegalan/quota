@@ -37,7 +37,8 @@ public struct SyncOutcome: Sendable, Equatable, Identifiable {
     public let quotaID: UUID
     public let result: SyncResult
     /// Whether the provider reported a different period than the quota had, in
-    /// which case the quota's period was corrected and its timeline reset.
+    /// which case the quota's period was corrected and its timeline trimmed to
+    /// the new window.
     public let periodChanged: Bool
 
     public var id: UUID {

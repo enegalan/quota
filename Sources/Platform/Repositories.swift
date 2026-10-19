@@ -265,6 +265,31 @@ public struct TimelineRepository: Sendable {
         )
     }
 
+    /// Removes points recorded before an instant, across one quota's histories.
+    ///
+    /// What a period correction calls instead of removing the record. Points from
+    /// before the new window's start were metered against the cycle it replaced,
+    /// and those percentages do not compare with the current meter's — so they
+    /// go. Points inside the window are the same meter's readings and stay: a
+    /// window corrected from a truncated date to its exact instants is the same
+    /// cycle spelled more precisely, and dropping its points would take away the
+    /// baseline "how much have I used today" is measured from, for a cycle that
+    /// never actually rolled.
+    public func prune(quotaID: UUID, before instant: Date) async throws {
+        let pruned = try await all().map { record -> TimelineRecord in
+            guard record.quotaID == quotaID else { return record }
+            return TimelineRecord(
+                quotaID: record.quotaID,
+                bucketID: record.bucketID,
+                accountLabel: record.accountLabel,
+                timeline: UsageTimeline(
+                    points: record.timeline.points.filter { $0.recordedAt >= instant }
+                )
+            )
+        }
+        try await store.saveTimelines(pruned)
+    }
+
     /// Removes every recorded history belonging to one quota.
     ///
     /// Across every bucket and account, as with the snapshots: points left behind

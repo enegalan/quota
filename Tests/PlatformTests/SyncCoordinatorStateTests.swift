@@ -56,6 +56,48 @@ struct SyncCoordinatorStateTests {
         #expect(timeline.timeline.points.first?.recordedAt == next)
     }
 
+    @Test("A window corrected to its exact instants keeps the points it still meters")
+    func precisionCorrectionKeepsInWindowPoints() async throws {
+        let start = Fixture.periodStart
+        let refined = start.addingTimeInterval(3600)
+        let first = try Fixture.snapshot(usage: 30, updatedAt: start)
+        let second = try Fixture.snapshot(usage: 35, updatedAt: start.addingTimeInterval(5 * 3600))
+        let corrected = try Fixture.snapshot(
+            usage: 37,
+            periodStart: refined,
+            updatedAt: start.addingTimeInterval(10 * 3600)
+        )
+        let provider = ScriptedProvider([.success(first), .success(second), .success(corrected)])
+        let harness = try await Fixture.makeHarness(fetcher: provider, now: start, periodStart: start)
+
+        _ = try await harness.coordinator.refresh(quotaID: harness.quota.id)
+        _ = try await harness.coordinator(readingAt: start.addingTimeInterval(5 * 3600))
+            .refresh(quotaID: harness.quota.id)
+        let outcome = try await harness.coordinator(readingAt: start.addingTimeInterval(10 * 3600))
+            .refresh(quotaID: harness.quota.id)
+
+        // The window did move — an hour later than the truncated date claimed —
+        // so the correction is reported and the quota is stamped with it.
+        #expect(outcome.periodChanged)
+        let updated = try #require(await harness.quotas.quota(id: harness.quota.id))
+        let expected = try Fixture.period(refined, days: 30)
+        #expect(updated.period == expected)
+        let timeline = try #require(
+            await harness.timelines.timeline(
+                quotaID: harness.quota.id,
+                bucketID: "primary",
+                accountLabel: "work@example.com"
+            )
+        )
+        // The reading taken before the corrected start is another window's, and
+        // goes. The ones taken inside the window stay: this correction changed
+        // no cycle, and dropping its points would erase the baseline the day is
+        // measured from — used-today would go unknown for the rest of the day
+        // over a change of precision alone.
+        let kept = [start.addingTimeInterval(5 * 3600), start.addingTimeInterval(10 * 3600)]
+        #expect(timeline.timeline.points.map(\.recordedAt) == kept)
+    }
+
     @Test("A rate-limited result backs off exponentially, within the cap")
     func rateLimitBacksOff() async throws {
         let now = Fixture.periodStart
