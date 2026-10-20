@@ -110,7 +110,8 @@ struct MainPopover: View {
             OutlookRow(
                 presentation: presentation,
                 reference: model.reference,
-                calendar: model.userCalendar
+                calendar: model.userCalendar,
+                showsPacing: false
             )
             if let reset = presentation.resetCaption(asOf: model.reference, calendar: model.userCalendar) {
                 Caption(text: reset)
