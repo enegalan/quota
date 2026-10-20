@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-10-20
+
+### Fixed
+
+- A provider's allowance period that begins part-way through a day now covers
+  that day. The provider reports the exact instant its allowance starts, and
+  the calendar asked about the day's midnight — so the first day of the period
+  was drawn as a day outside it, while the plan beside it planned that day.
+
 ## [1.3.7] - 2026-10-20
 
 ### Fixed
