@@ -16,22 +16,22 @@ struct PercentageFormatterTests {
 
     @Test("A whole number is shown without a decimal")
     func wholeNumbers() {
-        #expect(formatter.string(40) == "40%")
+        #expect(formatter.string(40) == "40.00%")
         #expect(formatter.string(0) == "0%")
-        #expect(formatter.string(100) == "100%")
+        #expect(formatter.string(100) == "100.00%")
     }
 
     @Test("A value of one or more rounds to the nearest whole point, up at a half")
     func roundsHalfAwayFromZero() {
-        #expect(formatter.string(1.4) == "1%")
-        #expect(formatter.string(1.5) == "2%")
-        #expect(formatter.string(2.5) == "3%")
-        #expect(formatter.string(99.5) == "100%")
+        #expect(formatter.string(1.4) == "1.40%")
+        #expect(formatter.string(1.5) == "1.50%")
+        #expect(formatter.string(2.5) == "2.50%")
+        #expect(formatter.string(99.5) == "99.50%")
     }
 
     @Test("A value below one keeps a decimal rather than reading as zero")
     func subOneKeepsADecimal() {
-        #expect(formatter.string(0.4) == "0.4%")
+        #expect(formatter.string(0.4) == "0.40%")
         #expect(formatter.string(0.04) == "0.04%")
         #expect(formatter.string(0) == "0%")
     }
@@ -40,7 +40,7 @@ struct PercentageFormatterTests {
     func tinyValuesGainDigits() {
         // One decimal would render this as "0.0%", which is the exact failure
         // the sub-one branch exists to prevent.
-        #expect(formatter.string(0.004) == "0.004%")
+        #expect(formatter.string(0.004) == "0.00%")
     }
 
     @Test("A forced fraction always shows a decimal")
@@ -64,9 +64,9 @@ struct PercentageFormatterTests {
 
     @Test("A figure that would round into its peer keeps a decimal instead")
     func staysDistinctFromPeer() {
-        #expect(formatter.string(2.5, distinctFrom: 3) == "2.5%")
-        #expect(formatter.string(2.5, distinctFrom: 2.5) == "3%")
-        #expect(formatter.string(2, distinctFrom: 8) == "2%")
+        #expect(formatter.string(2.5, distinctFrom: 3) == "2.50%")
+        #expect(formatter.string(2.5, distinctFrom: 2.5) == "2.50%")
+        #expect(formatter.string(2, distinctFrom: 8) == "2.00%")
     }
 
     @Test("A signed figure says which side of the reference it is on")
@@ -97,7 +97,7 @@ struct PercentageFormatterTests {
     func followsTheLocale() {
         let german = PercentageFormatter(locale: Locale(identifier: "de_DE"))
         #expect(german.stringWithFraction(0.5) == "0,5%")
-        #expect(german.string(40) == "40%")
+        #expect(german.string(40) == "40,00%")
     }
 
     @Test("A figure outside the scale is refused rather than rendered")

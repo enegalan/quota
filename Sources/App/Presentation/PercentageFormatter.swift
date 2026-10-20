@@ -41,18 +41,11 @@ struct PercentageFormatter: Sendable {
         self.locale = locale
     }
 
-    /// A percentage, rounded to the nearest whole point unless rounding would
-    /// erase it.
-    ///
-    /// Rounds half away from zero, so 0.5 shows as "1%" rather than "0%": a
-    /// provider that has met half its allowance should not read as having met
-    /// none of it.
+    /// A percentage, shown with two decimal places for non-zero values.
     func string(_ value: Double) -> String {
         guard value.isFinite else { return Self.unknown }
-        guard abs(value) < PercentageFormatting.wholePointThreshold, value != 0 else {
-            return "\(Int(value.rounded()))%"
-        }
-        return "\(smallDecimal(value))%"
+        if value == 0 { return "0%" }
+        return "\(decimal(value, digits: 2))%"
     }
 
     /// A percentage that may not have been measured.

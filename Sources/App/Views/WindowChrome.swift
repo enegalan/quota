@@ -257,12 +257,7 @@ struct OutlookRow: View {
     let reference: Date
     let calendar: Calendar
 
-    /// Whether this row carries the pacing verdict.
-    ///
-    /// Off where the verdict is already on screen: the popover shows it under
-    /// the quota's name, and a row that repeated it would say the same thing
-    /// twice on one card.
-    var showsPacing = true
+
 
     var body: some View {
         HStack(alignment: .top) {
@@ -270,9 +265,6 @@ struct OutlookRow: View {
                 Text("\(days) \(days == 1 ? "day" : "days") remaining")
             }
             Spacer()
-            if showsPacing {
-                PacingView(pacing: presentation.summary.pacing)
-            }
         }
         .font(.system(size: LayoutMetrics.footnoteSize))
     }

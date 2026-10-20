@@ -96,7 +96,6 @@ struct MainPopover: View {
                         MenuBarMarker()
                     }
                     Caption(presentation.accountCaption)
-                    PacingView(pacing: presentation.summary.pacing)
                 }
                 Spacer(minLength: 0)
                 UsageRing(
@@ -110,8 +109,7 @@ struct MainPopover: View {
             OutlookRow(
                 presentation: presentation,
                 reference: model.reference,
-                calendar: model.userCalendar,
-                showsPacing: false
+                calendar: model.userCalendar
             )
             if let reset = presentation.resetCaption(asOf: model.reference, calendar: model.userCalendar) {
                 Caption(text: reset)
