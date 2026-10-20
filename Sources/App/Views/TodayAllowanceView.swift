@@ -157,20 +157,33 @@ struct TodayAllowanceView: View {
 }
 
 /// Pacing state, as words.
-///
-/// The engine's phase, rendered rather than recomputed: a view that worked out
-/// the phase itself would be a second implementation of that could disagree
-/// with the first, and the disagreement would show as a user being told they
-/// are behind pace by a view rather than by their own usage.
 struct PacingView: View {
     let pacing: PacingStatus?
 
+    private let formatter = PercentageFormatter()
+
     var body: some View {
         if let pacing {
-            Text(pacing.phase.wording)
-                .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
-                .foregroundStyle(pacing.phase.tint)
+            VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
+                Text(pacing.phase.wording)
+                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
+                    .foregroundStyle(pacing.phase.tint)
+                Caption(text: figures(pacing))
+            }
         }
+    }
+
+    /// The two figures the verdict is about.
+    ///
+    /// A verdict on its own says a pace without saying what it is a pace of. A
+    /// user who has just changed plan and sees their usage at zero cannot tell
+    /// from "Ahead of Pace" alone whether the app believes they have spent
+    /// nothing, or believes they have spent less than it expected — and the
+    /// two are very different news.
+    private func figures(_ pacing: PacingStatus) -> String {
+        let used = formatter.preciseString(pacing.usagePercentage)
+        let planned = formatter.preciseString(pacing.expectedPercentage)
+        return "\(used) used · \(planned) planned"
     }
 }
 
