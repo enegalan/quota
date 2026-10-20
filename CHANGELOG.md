@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-10-20
+
+### Fixed
+
+- A provider's page now shows the result of an action taken from it. The page
+  reloaded while the app was still reading, so it read the provider list as it
+  was before the action — and an update pressed inside the page looked as
+  though it had done nothing.
+
 ## [1.3.6] - 2026-10-20
 
 ### Changed
