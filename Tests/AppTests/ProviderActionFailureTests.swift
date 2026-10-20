@@ -40,4 +40,90 @@ struct ProviderActionFailureTests {
 
         #expect(model.lastError != nil)
     }
+
+    @Test("A load is counted, so a view waiting for fresh data waits for it")
+    func loadsAreCounted() async {
+        let model = AppModel(
+            environment: AppEnvironment.preview(
+                store: CodableStore.inMemory(),
+                available: [],
+                fetcher: UnconnectedFetcher(),
+                now: SummaryFixture.reference,
+                calendar: SummaryFixture.calendar
+            )
+        )
+        let before = model.loadGeneration
+
+        await model.load()
+        #expect(model.loadGeneration == before + 1)
+
+        // And again: the count is what a view keys on to reload, so each load
+        // has to move it.
+        await model.load()
+        #expect(model.loadGeneration == before + 2)
+    }
+
+    @Test("The load is counted only after it has read everything")
+    func theCountComesAfterTheData() async throws {
+        let store = CodableStore.inMemory()
+        let environment = AppEnvironment.preview(
+            store: store,
+            available: [AvailableProvider(id: "mock", version: Version(major: 1, minor: 0, patch: 0))],
+            fetcher: UnconnectedFetcher(),
+            now: SummaryFixture.reference,
+            calendar: SummaryFixture.calendar
+        )
+        let model = AppModel(environment: environment)
+        await model.load()
+
+        // The provider is installed between two loads, so the list of providers
+        // is different after the second one than after the first.
+        try await installedProviderRepository(store).save(InstalledProvider(
+            id: "mock",
+            version: Version(major: 1, minor: 0, patch: 0),
+            relativePath: "mock/1.0.0",
+            state: .installed,
+            installedAt: SummaryFixture.reference,
+            contentHash: "hash"
+        ))
+
+        // What the model looked like at the moment the load was counted. A view
+        // that reloads then reads the data the load has just read; a view that
+        // reloads when the load *starts* reads what was there before it, which
+        // is how a provider's page kept showing the state its own update had
+        // just replaced.
+        let seen = Recorder()
+        withObservationTracking {
+            _ = model.loadGeneration
+        } onChange: {
+            // The change happens on the model's own actor, so the model can be
+            // read here.
+            MainActor.assumeIsolated {
+                seen.record(model.sections)
+            }
+        }
+        await model.load()
+
+        // The provider is installed in what the count saw: the count came after
+        // the load had read the store, not before it started.
+        #expect(seen.sections?.installed.contains { $0.id == "mock" } == true)
+    }
+}
+
+/// Remembers what the model looked like at the moment it was asked.
+private final class Recorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: ProviderSections?
+
+    func record(_ sections: ProviderSections) {
+        lock.lock()
+        defer { lock.unlock() }
+        stored = sections
+    }
+
+    var sections: ProviderSections? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
 }

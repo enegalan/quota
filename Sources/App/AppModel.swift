@@ -47,6 +47,16 @@ final class AppModel {
     /// computed after a re-render a minute later.
     private(set) var reference: Date
 
+    /// How many times everything has been re-read.
+    ///
+    /// Counted at the end of a load, not at its beginning, and that is the whole
+    /// point of it: a view that reloads when this changes reads the data the
+    /// load has just finished reading. A view keyed on the instant instead
+    /// reloads while the load is still running, and reads what was there before
+    /// it — which is how a provider's page kept showing the state its own
+    /// update had just replaced.
+    private(set) var loadGeneration = 0
+
     /// Whether any quota exists, which is what the first-launch screen keys on.
     var isEmpty: Bool {
         presentations.isEmpty
@@ -107,6 +117,9 @@ final class AppModel {
         } catch {
             report(error)
         }
+        // Counted here, at the end, so that a view waiting for fresh data waits
+        // for the load to have finished reading it.
+        loadGeneration += 1
     }
 
     /// Makes one quota the one the menu bar item speaks for.

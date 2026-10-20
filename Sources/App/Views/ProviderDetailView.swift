@@ -182,11 +182,12 @@ struct ProviderDetailSheet: View {
             maxHeight: LayoutMetrics.sheetMaxHeight,
             alignment: .top
         )
-        // Keyed by the instant every figure in the app is relative to, which
-        // moves on each load: an action taken from this page — an update, a
-        // sign-in, a removal — reloads the model, and the page reads the
-        // result of it rather than what it said before.
-        .task(id: model.reference) {
+        // Keyed by the load that has just finished, not by the instant the load
+        // started: a reload that runs while the load is still reading reads what
+        // was there before it, and the page would show the state its own action
+        // had just replaced — which is what made an update inside this page look
+        // as though it had done nothing.
+        .task(id: model.loadGeneration) {
             await reload()
         }
     }
