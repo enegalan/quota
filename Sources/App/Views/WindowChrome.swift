@@ -257,8 +257,6 @@ struct OutlookRow: View {
     let reference: Date
     let calendar: Calendar
 
-
-
     var body: some View {
         HStack(alignment: .top) {
             if let days = presentation.daysRemaining(asOf: reference, calendar: calendar) {

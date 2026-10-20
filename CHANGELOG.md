@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.11] - 2026-10-20
+
+### Changed
+
+- Pacing status is no longer shown in the popover or window; days remaining still show when the period resets.
+- Percentages are now shown with two decimal places, except zero which shows as `0%`.
+
 ## [1.3.10] - 2026-10-20
 
 ### Fixed

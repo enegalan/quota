@@ -155,5 +155,3 @@ struct TodayAllowanceView: View {
         dayFigure(remaining)
     }
 }
-
-

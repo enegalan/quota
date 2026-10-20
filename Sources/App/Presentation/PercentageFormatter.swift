@@ -44,7 +44,9 @@ struct PercentageFormatter: Sendable {
     /// A percentage, shown with two decimal places for non-zero values.
     func string(_ value: Double) -> String {
         guard value.isFinite else { return Self.unknown }
-        if value == 0 { return "0%" }
+        if value == 0 {
+            return "0%"
+        }
         return "\(decimal(value, digits: 2))%"
     }
 
