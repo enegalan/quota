@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-10-20
+
+### Changed
+
+- The pacing verdict now says what it is a verdict about: the usage and the
+  planned share it compares are written under it. "Ahead of Pace" on its own
+  says a pace without saying what it is a pace of, which is a puzzle to anyone
+  whose provider has just restarted its allowance.
+
 ## [1.3.5] - 2026-10-19
 
 ### Fixed
