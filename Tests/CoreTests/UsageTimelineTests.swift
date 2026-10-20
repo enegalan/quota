@@ -168,6 +168,73 @@ struct UsageTimelineTests {
         #expect(latest.usagePercentage == 30)
     }
 
+    /// The one rule for a day's usage, which the calendar cell and the today
+    /// block both read: exact when a reading from before the day exists.
+    @Test("A day with a baseline is measured exactly, whole day or not")
+    func usedDuringPastDay() throws {
+        let timeline = UsageTimeline(points: [
+            try TimelinePoint(
+                recordedAt: try quotaInstant(2026, 9, 14, hour: 12),
+                bucketID: "models",
+                usagePercentage: 20
+            ),
+            try point(17, 55),
+        ])
+        // Asked for the whole of the 14th, which the reference instant is past:
+        // both readings of that day fall inside it.
+        let day = try quotaInstant(2026, 9, 14)
+        #expect(timeline.usedDuring(
+            bucketID: "models",
+            day: day,
+            to: try quotaInstant(2026, 9, 15, hour: 18),
+            calendar: quotaCalendar
+        ) == nil)
+        // The 15th has a baseline from the 14th, and is measured from it.
+        #expect(timeline.usedDuring(
+            bucketID: "models",
+            day: try quotaInstant(2026, 9, 15),
+            to: try quotaInstant(2026, 9, 15, hour: 18),
+            calendar: quotaCalendar
+        ) == 35)
+    }
+
+    /// The case that produced the dash on today's calendar cell: the meter
+    /// started or reset during the day, so there is no reading from before it,
+    /// and the day is measured from the first reading the app did see.
+    @Test("A day whose meter started during it falls back to the first-reading floor")
+    func usedDuringFallsBackToTheFloor() throws {
+        let timeline = UsageTimeline(points: [try point(10, 40), try point(17, 41)])
+        #expect(timeline.usedDuring(
+            bucketID: "models",
+            day: try quotaInstant(2026, 9, 15),
+            to: try quotaInstant(2026, 9, 15, hour: 18),
+            calendar: quotaCalendar
+        ) == 1)
+    }
+
+    /// A day that has not begun has spent nothing. That is a fact the timeline
+    /// can state without readings, not a silence it should report as unknown.
+    @Test("A day that has not begun has used nothing")
+    func usedDuringFutureDayIsZero() throws {
+        let timeline = UsageTimeline(points: [try point(10, 40), try point(17, 55)])
+        #expect(timeline.usedDuring(
+            bucketID: "models",
+            day: try quotaInstant(2026, 9, 16),
+            to: try quotaInstant(2026, 9, 15, hour: 18),
+            calendar: quotaCalendar
+        ) == 0)
+    }
+
+    @Test("A day with no usable reading is unknown, not zero")
+    func usedDuringWithoutReadings() throws {
+        #expect(UsageTimeline(points: []).usedDuring(
+            bucketID: "models",
+            day: try quotaInstant(2026, 9, 15),
+            to: try quotaInstant(2026, 9, 15, hour: 18),
+            calendar: quotaCalendar
+        ) == nil)
+    }
+
     @Test("A point rejects an out-of-range percentage")
     func rejectsInvalidPercentage() {
         #expect(throws: QuotaDomainError.self) {

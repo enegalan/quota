@@ -53,7 +53,11 @@ struct CalendarDay: Sendable, Hashable, Identifiable {
     /// What was actually used, if it can be established.
     let actual: Double?
 
-    /// What is left of today's allowance, for today only.
+    /// What is left of the day's allowance.
+    ///
+    /// The whole share for a day that has not begun, today's remainder for
+    /// today, and what a day ended short by for one that has passed. Nil when
+    /// the day's usage is unknown.
     let remaining: Double?
 
     var id: LocalDate {
@@ -207,6 +211,8 @@ struct CalendarPresenter: Sendable {
         guard kind.isWithinPeriod else {
             return CalendarDay(date: date, kind: kind)
         }
+        let planned = kind == .zeroAllocation ? 0 : allocation
+        let actual = actual(on: date)
         return CalendarDay(
             date: date,
             kind: kind,
@@ -214,9 +220,9 @@ struct CalendarPresenter: Sendable {
             // policy either gave it nothing or said nothing about it, and to
             // the reader those are the same claim: a day of the month with
             // nothing set aside for it.
-            planned: kind == .zeroAllocation ? 0 : allocation,
-            actual: actual(on: date),
-            remaining: remaining(on: date, kind: kind)
+            planned: planned,
+            actual: actual,
+            remaining: remaining(on: date, kind: kind, planned: planned, actual: actual)
         )
     }
 
@@ -258,34 +264,41 @@ struct CalendarPresenter: Sendable {
 
     /// What was used on a day, or nil when that cannot be established.
     ///
-    /// Delegated to the timeline, which is the only thing that knows the
-    /// baseline. A day with no reading is unknown, not zero: both
-    /// turn on that distinction and the view must not have to re-derive it.
+    /// Delegated to the timeline's one rule for a day's usage, so this cell and
+    /// the today block cannot disagree about the same day: exact when a reading
+    /// from before the day exists, the day's first-reading floor when the meter
+    /// started or reset during it, and zero for a day that has not begun.
     private func actual(on date: LocalDate) -> Double? {
-        // A quota whose bucket could not be resolved has no history to read, and
-        // a fabricated bucket name would query the timeline for a bucket that
-        // does not exist rather than admitting there is nothing to show.
-        guard let timeline, let bucketID, let start = date.date(calendar: calendar) else {
-            return nil
+        guard let start = date.date(calendar: calendar) else { return nil }
+        // A day that has not begun has spent nothing, which is known without any
+        // history: the timeline can state it and so can this, and requiring one
+        // would make a day's spending depend on a reading that could not have
+        // happened yet.
+        guard let timeline, let bucketID else {
+            return calendar.startOfDay(for: reference) <= start ? 0 : nil
         }
-        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
-        return timeline.usedOn(
-            bucketID: bucketID,
-            from: start,
-            to: min(end, reference),
-            calendar: calendar
-        )
+        return timeline.usedDuring(bucketID: bucketID, day: start, to: reference, calendar: calendar)
     }
 
-    /// What is left of the day's allowance, for today.
+    /// What is left of the day's allowance.
     ///
-    /// Nil for every other day: a future day's remainder is the whole of its
-    /// allocation, which is the planned figure the calendar already shows, and
-    /// repeating it under a second label would invite the reader to treat the
-    /// two as different numbers.
-    private func remaining(on date: LocalDate, kind: CalendarDay.Kind) -> Double? {
-        guard kind == .today else { return nil }
-        guard let allowance, allowance.date == date else { return nil }
-        return allowance.remainingAfterToday
+    /// For today this is the summary's own figure, so the calendar cannot show a
+    /// remainder the today block disagrees with. For any other day it is the
+    /// part of the day's share that was not spent: the whole share for a day
+    /// that has not begun, and what the day ended short by for one that has.
+    /// Nil when the day's usage is unknown, because the subtraction cannot be
+    /// done without it.
+    private func remaining(
+        on date: LocalDate,
+        kind: CalendarDay.Kind,
+        planned: Double?,
+        actual: Double?
+    ) -> Double? {
+        if kind == .today, let allowance, allowance.date == date {
+            return allowance.remainingAfterToday
+        }
+        guard let planned, let actual else { return nil }
+        let remaining = planned - actual
+        return remaining > 0 ? remaining : 0
     }
 }

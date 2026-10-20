@@ -115,4 +115,38 @@ public struct UsageTimeline: Sendable, Hashable, Codable {
         guard used >= UsageConstants.minimumPercentage else { return nil }
         return (used, first.recordedAt)
     }
+
+    /// How much of a bucket was used during a whole day, as the summary and the
+    /// calendar must both report it.
+    ///
+    /// The one rule for a day's usage, so a day's calendar cell and the today
+    /// block cannot disagree about the same day: the exact figure when a reading
+    /// from before the day exists, the day's first-reading floor when the meter
+    /// started (or reset) during the day, and zero for a day that has not
+    /// begun — which is a fact rather than an estimate, because no reading could
+    /// attribute spending to an instant that has not happened.
+    ///
+    /// - Returns: nil when the day's usage cannot be established at all, which
+    ///   is a day with no usable reading in it, not a day with nothing spent on
+    ///   it.
+    public func usedDuring(
+        bucketID: String,
+        day: Date,
+        to reference: Date,
+        calendar: Calendar
+    ) -> Double? {
+        let start = calendar.startOfDay(for: day)
+        guard start <= reference else { return 0 }
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: start) ?? start
+        let end = min(dayEnd, reference)
+        if let used = usedOn(bucketID: bucketID, from: start, to: end, calendar: calendar) {
+            return used
+        }
+        return usedSinceFirstReadingOn(
+            bucketID: bucketID,
+            onOrAfter: start,
+            to: end,
+            calendar: calendar
+        )?.used
+    }
 }
