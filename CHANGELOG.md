@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-10-19
+
+### Fixed
+
+- A provider action that fails now says why. The reason was put up in the
+  banner and then wiped by the reload that followed the action, so pressing
+  Update on a provider that could not be updated did nothing at all.
+- The provider list is brought up to date even when the quota panels could not
+  be built, so a provider that was just updated does not keep offering the
+  action that was already taken.
+
 ## [1.3.3] - 2026-10-19
 
 ### Fixed
