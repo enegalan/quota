@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.10] - 2026-10-20
+
+### Fixed
+
+- A calendar day now says what it used and what it has left. Today showed a
+  dash for its usage when the meter had started or reset during the day, even
+  though the TODAY block beside it showed a real figure; a day that has not
+  begun showed a dash for both, though a day that has not happened has spent
+  nothing and still has its whole share.
+
 ## [1.3.9] - 2026-10-20
 
 ### Fixed
