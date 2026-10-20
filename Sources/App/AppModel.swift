@@ -95,11 +95,14 @@ final class AppModel {
             reference = environment.now()
             let preferences = try await environment.preferences.load()
             menuBarQuotaID = preferences.menuBarQuotaID
-            presentations = try await environment.presenter(at: reference).presentations()
-            // Attach provider failure captions so auth-expiry keeps the figure
-            // and says so.
-            presentations = await enrich(presentations)
+            // The provider list is read before the quota panels, and on its own:
+            // it depends on nothing but the store, and a panel that cannot be
+            // built must not leave the list showing a provider that was updated
+            // an hour ago — a provider whose state is stale is a provider the
+            // user is offered an action for that has already happened.
             sections = try await environment.manager.sections(preferences: preferences)
+            presentations = try await environment.presenter(at: reference).presentations()
+            presentations = await enrich(presentations)
             lastError = nil
         } catch {
             report(error)
@@ -216,6 +219,7 @@ final class AppModel {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
+        var failure: Error?
         do {
             let quotaIDs = try await environment.planner.plan(for: trigger)
             await environment.planner.begin(quotaIDs)
@@ -223,11 +227,14 @@ final class AppModel {
                 _ = try? await environment.coordinator.refresh(quotaID: quotaID)
             }
             await environment.planner.finish(quotaIDs)
-            lastError = nil
         } catch {
-            report(error)
+            failure = error
         }
         await load()
+        // After the reload, for the same reason `perform` puts its failure
+        // there: the reload clears the error, and a refresh that failed with no
+        // reason shown is a refresh that failed silently.
+        lastError = failure?.localizedDescription
     }
 
     /// A calendar over one quota, at the instant the last load used.
@@ -334,14 +341,20 @@ final class AppModel {
     /// Every provider action ends here so that a failure has exactly one way of
     /// reaching the user: a caption on the row that failed, not a silently
     /// unchanged list that leaves the button looking as though it had worked.
+    ///
+    /// The failure is put up after the reload rather than before it, because the
+    /// reload clears whatever error was on screen — and an action that failed
+    /// with the reason in the banner and then a reload that wiped it is an
+    /// action that failed with no reason at all.
     func perform(_ action: @escaping @Sendable () async throws -> Void) async {
+        var failure: Error?
         do {
             try await action()
-            lastError = nil
         } catch {
-            report(error)
+            failure = error
         }
         await load()
+        lastError = failure?.localizedDescription
     }
 
     /// `perform`, for an action that has a provider busy while it runs.

@@ -144,7 +144,10 @@ private struct TwoPoolFetcher: UsageFetching {
 /// a period holding no usage at all. A provider with no credentials is exactly
 /// what a created-but-not-yet-connected quota has, and `SyncFailure` is a value,
 /// so this is a quiet provider rather than a thrown error.
-private struct UnconnectedFetcher: UsageFetching {
+///
+/// Not private: other suites need a provider that answers nothing, and a
+/// second copy of it would be a second thing to keep in step.
+struct UnconnectedFetcher: UsageFetching {
     func fetchUsage(
         providerID: ProviderID,
         accountLabel: String,
