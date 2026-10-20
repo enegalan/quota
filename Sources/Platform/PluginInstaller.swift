@@ -10,8 +10,8 @@ import PluginKit
 /// have created does not exist at all. The property that makes a failed install
 /// harmless is that no step before the last one touches the active version.
 public struct PluginInstaller: Sendable {
-    private let pluginsDirectory: URL
-    private let repository: InstalledProviderRepository
+    let pluginsDirectory: URL
+    let repository: InstalledProviderRepository
     private let quotas: QuotaRepository
     private let archive: any ArchiveFormat
     private let bundled: any BundledArtifacts
@@ -129,79 +129,6 @@ public struct PluginInstaller: Sendable {
         }
         await host.shutdown()
         return descriptor
-    }
-
-    /// Puts a new version in place, keeping the old one if the new one fails.
-    ///
-    /// The previous symlink target is read before anything changes and restored if
-    /// the new version cannot answer a handshake, because a provider that will not
-    /// start is worse than one that is a version behind.
-    ///
-    /// The state the provider had is kept either way. The new version is the same
-    /// provider as the old one — the same account, still connected — and an
-    /// install that staged it did not know that: a provider that loses its
-    /// connection because its code was replaced is a provider the user has to
-    /// sign into again for nothing, and one whose update failed is still the
-    /// provider they had, working as it did.
-    public func update(
-        _ provider: AvailableProvider,
-        previous: InstalledProvider,
-        verify: @Sendable (InstalledProvider) async throws -> Void
-    ) async throws -> InstalledProvider {
-        let previousDirectory = PluginLayout.activeVersionDirectory(provider.id, in: pluginsDirectory)
-        let record: InstalledProvider
-        do {
-            record = try await install(provider)
-        } catch {
-            try await repository.update(provider.id) { _ in
-                replacing(previous, state: previous.state, lastError: .pluginError)
-            }
-            throw error
-        }
-        do {
-            try await verify(record)
-        } catch {
-            // Roll back to what was there: the directory is still intact, because
-            // activation added a symlink rather than replacing anything.
-            try restoreSymlink(provider.id, to: previousDirectory)
-            try? FileManager.default.removeItem(
-                at: PluginLayout.versionDirectory(provider.id, provider.version, in: pluginsDirectory)
-            )
-            // The old version is running and stays launchable, and the record
-            // says so: the user asked for something that did not happen, and a
-            // record reading "installed" would leave them wondering why the
-            // version in the interface never moved. The state it had is kept,
-            // because the provider it describes is still the one that works.
-            try await repository.save(
-                replacing(previous, state: previous.state, lastError: .pluginError)
-            )
-            throw error
-        }
-        let connected = replacing(record, state: previous.state, lastError: nil)
-        try await repository.save(connected)
-        return connected
-    }
-
-    /// The same record with a state and an error of its own.
-    ///
-    /// Built field by field rather than through `with`, whose nil means "keep
-    /// what was there": an update that succeeded must clear the failure the
-    /// last one recorded, and one that failed must record the failure it just
-    /// had.
-    private func replacing(
-        _ record: InstalledProvider,
-        state: ProviderState,
-        lastError: ProviderErrorCode?
-    ) -> InstalledProvider {
-        InstalledProvider(
-            id: record.id,
-            version: record.version,
-            relativePath: record.relativePath,
-            state: state,
-            installedAt: record.installedAt,
-            contentHash: record.contentHash,
-            lastError: lastError
-        )
     }
 
     /// Removes a provider's code, and only its code.
@@ -338,7 +265,7 @@ public struct PluginInstaller: Sendable {
     /// an error. A rollback that cannot find what it is rolling back to must not
     /// replace a working link with a dangling one, which would leave a provider
     /// that was launchable before the update unlaunchable after it.
-    private func restoreSymlink(_ id: String, to directory: URL?) throws {
+    func restoreSymlink(_ id: String, to directory: URL?) throws {
         guard let directory, FileManager.default.fileExists(atPath: directory.path) else { return }
         try replaceSymlink(id, to: directory)
     }

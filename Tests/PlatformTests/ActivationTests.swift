@@ -69,6 +69,54 @@ struct ActivationTests {
         )
     }
 
+    @Test("An update whose first check fails is tried once more")
+    func updateIsVerifiedTwice() async throws {
+        // A plugin that has just been unpacked is one the machine has never run,
+        // and the first run of a new binary can fail for reasons that have
+        // nothing to do with the binary. A second failure is a plugin that does
+        // not work.
+        let directory = try InstallerFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = try await InstallerFixture.installer(in: directory)
+        let previous = try await fixture.install()
+        let upgrade = try await InstallerFixture.installer(
+            version: Self.upgraded, in: directory
+        )
+        let attempts = Counter()
+        let updated = try await upgrade.installer.update(
+            upgrade.provider,
+            previous: previous
+        ) { _ in
+            if await attempts.next() == 1 {
+                throw VerificationFailed()
+            }
+        }
+        #expect(await attempts.count == 2)
+        #expect(updated.version == Self.upgraded)
+    }
+
+    @Test("An update of the version already in use is not a failure")
+    func updatingToTheVersionInUseIsANoOp() async throws {
+        // The button was pressed on a provider that was already up to date —
+        // perhaps because the list had not been refreshed yet. There is nothing
+        // to do, and saying so as though the update had been attempted and
+        // failed is what turned a button with nothing to do into an error.
+        let directory = try InstallerFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = try await InstallerFixture.installer(in: directory)
+        let previous = try await fixture.install()
+        let attempts = Counter()
+        let updated = try await fixture.installer.update(
+            fixture.provider,
+            previous: previous
+        ) { _ in
+            await attempts.next()
+        }
+        #expect(await attempts.count == 0)
+        #expect(updated.version == previous.version)
+        #expect(updated.state == previous.state)
+    }
+
     @Test("A failed update is recorded as an update failure, not an install one")
     func failedUpdateIsRecorded() async throws {
         let directory = try InstallerFixture.makeDirectory()
@@ -211,5 +259,17 @@ struct ActivationTests {
             PluginLayout.activeVersionDirectory(InstallerFixture.id, in: directory)?
                 .lastPathComponent == fixture.provider.version.description
         )
+    }
+}
+
+/// Counts how many times something was called, from code that may run anywhere.
+actor Counter {
+    private(set) var count = 0
+
+    /// The number of the call, counting from one.
+    @discardableResult
+    func next() -> Int {
+        count += 1
+        return count
     }
 }
