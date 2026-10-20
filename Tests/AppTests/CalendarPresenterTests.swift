@@ -127,6 +127,50 @@ struct CalendarPresenterTests {
         #expect(day.remaining == nil)
     }
 
+    @Test("Today is inside the period even when the period begins later in the day")
+    func todayIsInsideAPeriodThatBeginsLaterToday() throws {
+        // The provider reports the exact instant its allowance starts, which can
+        // be ten in the morning. Judged by the day's midnight, today would be a
+        // day outside the period — while the plan, which plans against days,
+        // includes it. The calendar must not contradict the plan it is drawn
+        // from.
+        let start = try #require(
+            SummaryFixture.calendar.date(
+                bySettingHour: 10,
+                minute: 7,
+                second: 0,
+                of: Self.date(15)
+            )
+        )
+        let end = try #require(
+            SummaryFixture.calendar.date(
+                byAdding: .month,
+                value: 1,
+                to: start
+            )
+        )
+        let period = try QuotaPeriod(start: start, end: end)
+        let plan = try AllocationEngine(calendar: SummaryFixture.calendar).plan(
+            quotaID: Self.quotaID,
+            policy: .even,
+            period: period,
+            totalRemaining: 100,
+            asOf: Self.date(15)
+        )
+        let presenter = CalendarPresenter(
+            plan: plan,
+            timeline: nil,
+            allowance: nil,
+            bucketID: SummaryFixture.bucketID,
+            calendar: SummaryFixture.calendar,
+            reference: try Self.date(15)
+        )
+
+        let today = presenter.day(try LocalDate(year: 2026, month: 3, day: 15))
+        #expect(today.kind == .today)
+        #expect(today.planned != nil)
+    }
+
     // MARK: - Month grids
 
     @Test("A 31-day month has 31 days, and the last one is the 31st")

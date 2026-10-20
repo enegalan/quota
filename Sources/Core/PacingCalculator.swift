@@ -46,7 +46,10 @@ public struct PacingCalculator: Sendable {
         let phase = phase(
             usage: bucket.usagePercentage,
             expected: expected,
-            periodStatus: plan.period.status(asOf: reference)
+            periodStatus: plan.period.status(
+                on: LocalDate(date: reference, calendar: calendar),
+                calendar: calendar
+            )
         )
 
         return PacingStatus(
@@ -62,7 +65,8 @@ public struct PacingCalculator: Sendable {
     /// - Returns: nil when the period has not started, since nothing is expected
     ///   of the user yet.
     public func elapsedFraction(plan: AllocationPlan, asOf reference: Date) -> Double? {
-        guard plan.period.status(asOf: reference) != .future else { return nil }
+        let today = LocalDate(date: reference, calendar: calendar)
+        guard plan.period.status(on: today, calendar: calendar) != .future else { return nil }
 
         let total = Double(plan.period.totalDays(calendar: calendar))
         guard total > UsageConstants.minimumPercentage else { return nil }

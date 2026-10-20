@@ -57,6 +57,29 @@ public struct QuotaPeriod: Sendable, Hashable, Codable {
         return .active
     }
 
+    /// Where the period sits for a local day, in part or in whole.
+    ///
+    /// A period that begins at ten in the morning still covers the morning of
+    /// its first day: the allowance is spent on local days, and the day a
+    /// period starts on is one of its days. Judged by the instant the day
+    /// begins, the first day of a period that does not begin at midnight would
+    /// be a day outside it — and the calendar would contradict the plan, which
+    /// plans against that day.
+    public func status(on day: LocalDate, calendar: Calendar) -> Status {
+        guard let first = day.date(calendar: calendar),
+              let after = day.adding(days: 1, calendar: calendar)?.date(calendar: calendar)
+        else { return .expired }
+        // The day ends where the next one begins, so a day that ends exactly
+        // when the period starts is a day before it.
+        if after <= start {
+            return .future
+        }
+        if first > end {
+            return .expired
+        }
+        return .active
+    }
+
     /// The count of full calendar days still ahead after today, through the last
     /// day of the period.
     ///
@@ -68,9 +91,9 @@ public struct QuotaPeriod: Sendable, Hashable, Codable {
     /// `elapsedDays` still counts today, so `elapsedDays + remainingDays ==
     /// totalDays` while the period is active.
     public func remainingDays(through reference: Date, calendar: Calendar) -> Int {
-        guard status(asOf: reference) == .active else { return 0 }
-        let lastDay = LocalDate(date: end, calendar: calendar)
         let today = LocalDate(date: reference, calendar: calendar)
+        guard status(on: today, calendar: calendar) == .active else { return 0 }
+        let lastDay = LocalDate(date: end, calendar: calendar)
         guard let daysAfterToday = today.distance(to: lastDay, calendar: calendar) else {
             return 0
         }
@@ -83,9 +106,9 @@ public struct QuotaPeriod: Sendable, Hashable, Codable {
     /// Shares its last day with the period's start of remaining days after today;
     /// see `remainingDays`.
     public func elapsedDays(since reference: Date, calendar: Calendar) -> Int {
-        guard status(asOf: reference) == .active else { return 0 }
-        let firstDay = LocalDate(date: start, calendar: calendar)
         let today = LocalDate(date: reference, calendar: calendar)
+        guard status(on: today, calendar: calendar) == .active else { return 0 }
+        let firstDay = LocalDate(date: start, calendar: calendar)
         return firstDay.inclusiveDayCount(through: today, calendar: calendar) ?? 0
     }
 

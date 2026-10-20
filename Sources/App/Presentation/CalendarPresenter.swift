@@ -244,23 +244,16 @@ struct CalendarPresenter: Sendable {
         return .future
     }
 
-    /// Whether a date falls inside the plan's period, and after its start.
+    /// Whether a date falls inside the plan's period, in part or in whole.
     ///
-    /// Both bounds are asked of the plan rather than compared against the
-    /// presenter's own `reference`: the calendar can be asked about any day,
-    /// and a day before the plan begins has nothing allocated to draw even
-    /// though it is in the past. A date that cannot be turned into an instant
-    /// at all is treated as outside the period, so it is greyed out rather
-    /// than drawn as a real day.
+    /// Asked of the day rather than of the day's first instant: a period that
+    /// begins at ten in the morning still covers the morning of its first day,
+    /// and asking at midnight would call that day outside the period — while the
+    /// plan, which plans against days, includes it. The calendar would then
+    /// contradict the plan it is drawn from.
     private func isWithinPeriod(_ date: LocalDate) -> Bool {
-        guard let plan, let instant = date.date(calendar: calendar) else { return false }
-        return plan.period.status(asOf: instant) != .future
-            && isSameOrBefore(instant, plan.period.end)
-    }
-
-    /// Compares two instants for "not later than".
-    private func isSameOrBefore(_ instant: Date, _ other: Date) -> Bool {
-        instant <= other
+        guard let plan else { return false }
+        return plan.period.status(on: date, calendar: calendar) == .active
     }
 
     /// What was used on a day, or nil when that cannot be established.

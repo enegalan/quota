@@ -33,6 +33,27 @@ private func instant(_ iso: String) throws -> Date {
 
 @Suite("QuotaPeriod")
 struct QuotaPeriodTests {
+    @Test("A period that begins in the middle of a day still covers that day")
+    func coversItsFirstDayWhicheverHourItBegins() throws {
+        // A provider that reports the exact instant its allowance starts — ten
+        // in the morning — still spends that allowance on the day it starts:
+        // the first day is a day of the period, and judging it by midnight
+        // would leave the plan and the calendar disagreeing about it.
+        let period = try QuotaPeriod(
+            start: try instant(2026, 9, 15, hour: 10, minute: 7),
+            end: try instant(2026, 10, 15, hour: 9, minute: 7)
+        )
+        let first = try LocalDate(iso: "2026-09-15")
+        let dayBefore = try LocalDate(iso: "2026-09-14")
+        let last = try LocalDate(iso: "2026-10-15")
+        let dayAfter = try LocalDate(iso: "2026-10-16")
+
+        #expect(period.status(on: first, calendar: fixedCalendar) == .active)
+        #expect(period.status(on: last, calendar: fixedCalendar) == .active)
+        #expect(period.status(on: dayBefore, calendar: fixedCalendar) == .future)
+        #expect(period.status(on: dayAfter, calendar: fixedCalendar) == .expired)
+    }
+
     @Test("A period that runs backwards is rejected")
     func rejectsInvertedPeriod() throws {
         let start = try instant("2026-09-01")
