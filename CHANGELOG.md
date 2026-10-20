@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.5] - 2026-10-19
+
+### Fixed
+
+- A provider's update is checked twice before it is called a failure. A plugin
+  that has just been unpacked is one the machine has never run, and the first
+  run of a new binary can fail for reasons that have nothing to do with the
+  binary — so an update that failed on the first attempt now tries again.
+- Updating a provider that is already on the version this build ships does
+  nothing, instead of being refused as a failure. The button had nothing to do
+  and said it had failed.
+
 ## [1.3.4] - 2026-10-19
 
 ### Fixed
