@@ -25,7 +25,7 @@ final class AppModel {
     private(set) var sections = ProviderSections(available: [], installed: [], connected: [])
 
     /// What the user is looking at, when something is wrong.
-    private(set) var lastError: String?
+    var lastError: String?
 
     /// Whether a refresh is in flight, so the interface can say so rather than
     /// appearing to ignore a click.
