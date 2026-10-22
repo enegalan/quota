@@ -57,25 +57,23 @@ struct QuotaListRow: View {
                 Label("Refresh", systemImage: "arrow.clockwise")
             }
             Divider()
-            if isConfirmingDelete {
-                Button(role: .destructive) {
-                    Task { await model?.deleteQuota(presentation.id) }
-                    isConfirmingDelete = false
-                } label: {
-                    Label("Confirm Delete", systemImage: "trash")
-                }
-                Button {
-                    isConfirmingDelete = false
-                } label: {
-                    Label("Cancel", systemImage: "xmark")
-                }
-            } else {
-                Button(role: .destructive) {
-                    isConfirmingDelete = true
-                } label: {
-                    Label("Delete Quota", systemImage: "trash")
-                }
+            Button(role: .destructive) {
+                isConfirmingDelete = true
+            } label: {
+                Label("Delete Quota", systemImage: "trash")
             }
+        }
+        .confirmationDialog(
+            "Delete \(presentation.summary.quota.name)?",
+            isPresented: $isConfirmingDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Quota", role: .destructive) {
+                Task { await model?.deleteQuota(presentation.id) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Its readings and plan are deleted. This cannot be undone.")
         }
     }
 }

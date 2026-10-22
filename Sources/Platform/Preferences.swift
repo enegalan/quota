@@ -57,6 +57,19 @@ public struct Preferences: Codable, Sendable, Equatable {
         self.notificationsEnabled = notificationsEnabled
     }
 
+    /// Older stored preferences omit `notificationsEnabled`; treat that as the
+    /// platform default rather than refusing to load the rest.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        defaultPolicyKind = try container.decode(String.self, forKey: .defaultPolicyKind)
+        hasCompletedOnboarding = try container.decode(Bool.self, forKey: .hasCompletedOnboarding)
+        refreshIntervalSeconds = try container.decode(TimeInterval.self, forKey: .refreshIntervalSeconds)
+        disabledProviders = try container.decode(Set<String>.self, forKey: .disabledProviders)
+        menuBarQuotaID = try container.decodeIfPresent(UUID.self, forKey: .menuBarQuotaID)
+        notificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .notificationsEnabled)
+            ?? PreferenceConstants.defaultNotificationsEnabled
+    }
+
     /// The same preferences pointing at a different quota.
     public func withMenuBarQuotaID(_ id: UUID?) -> Preferences {
         Preferences(

@@ -45,7 +45,10 @@ enum TokenResolver {
     /// with a rejection that says nothing about which of the two problems it
     /// was.
     private static func validate(_ json: String, now: Date) throws -> ClaudeCredential {
-        guard let credential = ClaudeCredentialReader.credential(in: json) else {
+        guard let credential = ClaudeCredentialReader.credential(
+            in: json,
+            accountLabel: CredentialStore.accountLabel()
+        ) else {
             throw ClaudeCredentialError.missingAccessToken
         }
         if credential.isExpired(now: now) {

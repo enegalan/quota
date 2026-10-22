@@ -76,6 +76,17 @@ struct CredentialTests {
         #expect(credential.accountLabel == "me@example.com")
     }
 
+    @Test("A supplied account label is preferred over an embedded email")
+    func prefersSuppliedAccountLabel() throws {
+        let credential = try #require(
+            ClaudeCredentialReader.credential(
+                in: #"{"claudeAiOauth":{"accessToken":"token","email":"embedded@example.com"}}"#,
+                accountLabel: "configured@example.com"
+            )
+        )
+        #expect(credential.accountLabel == "configured@example.com")
+    }
+
     @Test("A credential with no plan is still a credential")
     func toleratesAMissingPlan() throws {
         let credential = try #require(

@@ -289,4 +289,23 @@ struct RepositoryTests {
         try await repository.save(preferences)
         #expect(try await repository.load() == preferences)
     }
+
+    @Test("A missing notificationsEnabled key defaults rather than failing decode")
+    func preferencesMissingNotificationsDefault() throws {
+        let json = Data("""
+        {
+          "defaultPolicyKind": "monthly",
+          "hasCompletedOnboarding": true,
+          "refreshIntervalSeconds": 900,
+          "disabledProviders": []
+        }
+        """.utf8)
+        let preferences = try JSONDecoder().decode(Preferences.self, from: json)
+        #expect(preferences.notificationsEnabled == PreferenceConstants.defaultNotificationsEnabled)
+        #expect(preferences.defaultPolicyKind == "monthly")
+        #expect(preferences.hasCompletedOnboarding == true)
+        #expect(preferences.refreshIntervalSeconds == 900)
+        #expect(preferences.disabledProviders.isEmpty)
+        #expect(preferences.menuBarQuotaID == nil)
+    }
 }
