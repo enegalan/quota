@@ -307,5 +307,25 @@ struct RepositoryTests {
         #expect(preferences.refreshIntervalSeconds == 900)
         #expect(preferences.disabledProviders.isEmpty)
         #expect(preferences.menuBarQuotaID == nil)
+        #expect(
+            preferences.automaticUpdateChecksEnabled
+                == PreferenceConstants.defaultAutomaticUpdateChecksEnabled
+        )
+        #expect(preferences.lastUpdateCheckAt == nil)
+        #expect(preferences.announcedUpdateVersion == nil)
+    }
+
+    @Test("Update-check preference fields round-trip")
+    func preferencesUpdateFieldsRoundTrip() async throws {
+        let store = CodableStore.inMemory()
+        let repository = PreferencesRepository(store: store)
+        let checkedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let preferences = Preferences(
+            automaticUpdateChecksEnabled: false,
+            lastUpdateCheckAt: checkedAt,
+            announcedUpdateVersion: "1.4.0"
+        )
+        try await repository.save(preferences)
+        #expect(try await repository.load() == preferences)
     }
 }

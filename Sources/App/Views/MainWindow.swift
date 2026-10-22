@@ -25,6 +25,7 @@ struct MainWindow: View {
     enum SidebarItem: Hashable {
         case quotas
         case integrations
+        case settings
     }
 
     @State private var sidebar: SidebarItem = .quotas
@@ -38,6 +39,8 @@ struct MainWindow: View {
                     .tag(SidebarItem.quotas)
                 Label("Integrations", systemImage: "puzzlepiece.extension")
                     .tag(SidebarItem.integrations)
+                Label("Settings", systemImage: "gearshape")
+                    .tag(SidebarItem.settings)
             }
             .navigationTitle("Quota")
             .frame(minWidth: LayoutMetrics.sidebarWidth)
@@ -51,6 +54,8 @@ struct MainWindow: View {
                         quotasDetail
                     case .integrations:
                         integrationsDetail
+                    case .settings:
+                        settingsDetail
                     }
                 }
             }
@@ -204,6 +209,21 @@ struct MainWindow: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 refreshButton
             }
+        }
+    }
+
+    private var settingsDetail: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
+                Text("Settings")
+                    .font(.title2.weight(.semibold))
+                SettingsView(model: model)
+                if let lastError = model.lastError {
+                    ErrorBanner(message: lastError)
+                }
+            }
+            .padding(LayoutMetrics.windowPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

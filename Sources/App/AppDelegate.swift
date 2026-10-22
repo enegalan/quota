@@ -104,6 +104,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         quotaMenu.addItem(
             item(
+                title: "Settings…",
+                key: Shortcut.settingsKey,
+                action: #selector(openSettings),
+                keyEquivalent: Shortcut.settingsKeyEquivalent
+            )
+        )
+        quotaMenu.addItem(
+            item(
                 title: "Copy Diagnostic Dump",
                 key: "Diagnostics",
                 action: #selector(copyDiagnostics),
@@ -152,6 +160,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainWindowOpener.request()
     }
 
+    /// Opens the SwiftUI Settings scene.
+    ///
+    /// Routed through the selector AppKit already uses for Preferences, because
+    /// the custom menu replaces the system one and ⌘, would otherwise have
+    /// nowhere to land.
+    @objc private func openSettings() {
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     @objc private func togglePopover() {
         onTogglePopover?()
     }
@@ -196,6 +214,10 @@ enum Shortcut {
     static let refreshKeyEquivalent = "r"
     static let refreshKey = "⌘R"
 
+    /// ⌘, opens Settings, as every macOS application does.
+    static let settingsKeyEquivalent = ","
+    static let settingsKey = "⌘,"
+
     /// ⌘Q quits, and is expected to.
     static let quitKeyEquivalent = "q"
     static let quitKey = "⌘Q"
@@ -206,6 +228,11 @@ enum Shortcut {
         ShortcutBinding(
             key: refreshKey,
             keyEquivalent: refreshKeyEquivalent,
+            modifiers: commandModifierName
+        ),
+        ShortcutBinding(
+            key: settingsKey,
+            keyEquivalent: settingsKeyEquivalent,
             modifiers: commandModifierName
         ),
         ShortcutBinding(key: quitKey, keyEquivalent: quitKeyEquivalent, modifiers: commandModifierName),

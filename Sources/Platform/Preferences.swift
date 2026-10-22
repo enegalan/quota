@@ -41,13 +41,31 @@ public struct Preferences: Codable, Sendable, Equatable {
     /// Whether quota alerts are delivered as notifications.
     public let notificationsEnabled: Bool
 
+    /// Whether the app asks GitHub for a newer release on its own.
+    public let automaticUpdateChecksEnabled: Bool
+
+    /// When the last update check finished, or nil if none has run yet.
+    ///
+    /// Used to keep automatic checks to at most one per day, so a preference
+    /// save that reloads the model does not hammer the releases endpoint.
+    public let lastUpdateCheckAt: Date?
+
+    /// The release version the user was already told about, if any.
+    ///
+    /// An automatic check that finds the same version again must not reopen the
+    /// browser; a manual check still may.
+    public let announcedUpdateVersion: String?
+
     public init(
         defaultPolicyKind: String = PreferenceConstants.defaultPolicyKind,
         hasCompletedOnboarding: Bool = false,
         refreshIntervalSeconds: TimeInterval = RefreshConstants.defaultPollInterval,
         disabledProviders: Set<String> = [],
         menuBarQuotaID: UUID? = nil,
-        notificationsEnabled: Bool = PreferenceConstants.defaultNotificationsEnabled
+        notificationsEnabled: Bool = PreferenceConstants.defaultNotificationsEnabled,
+        automaticUpdateChecksEnabled: Bool = PreferenceConstants.defaultAutomaticUpdateChecksEnabled,
+        lastUpdateCheckAt: Date? = nil,
+        announcedUpdateVersion: String? = nil
     ) {
         self.defaultPolicyKind = defaultPolicyKind
         self.hasCompletedOnboarding = hasCompletedOnboarding
@@ -55,10 +73,13 @@ public struct Preferences: Codable, Sendable, Equatable {
         self.disabledProviders = disabledProviders
         self.menuBarQuotaID = menuBarQuotaID
         self.notificationsEnabled = notificationsEnabled
+        self.automaticUpdateChecksEnabled = automaticUpdateChecksEnabled
+        self.lastUpdateCheckAt = lastUpdateCheckAt
+        self.announcedUpdateVersion = announcedUpdateVersion
     }
 
-    /// Older stored preferences omit `notificationsEnabled`; treat that as the
-    /// platform default rather than refusing to load the rest.
+    /// Older stored preferences omit newer keys; treat those as the platform
+    /// defaults rather than refusing to load the rest.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         defaultPolicyKind = try container.decode(String.self, forKey: .defaultPolicyKind)
@@ -68,29 +89,69 @@ public struct Preferences: Codable, Sendable, Equatable {
         menuBarQuotaID = try container.decodeIfPresent(UUID.self, forKey: .menuBarQuotaID)
         notificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .notificationsEnabled)
             ?? PreferenceConstants.defaultNotificationsEnabled
+        automaticUpdateChecksEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .automaticUpdateChecksEnabled
+        ) ?? PreferenceConstants.defaultAutomaticUpdateChecksEnabled
+        lastUpdateCheckAt = try container.decodeIfPresent(Date.self, forKey: .lastUpdateCheckAt)
+        announcedUpdateVersion = try container.decodeIfPresent(
+            String.self,
+            forKey: .announcedUpdateVersion
+        )
     }
 
     /// The same preferences pointing at a different quota.
     public func withMenuBarQuotaID(_ id: UUID?) -> Preferences {
-        Preferences(
-            defaultPolicyKind: defaultPolicyKind,
-            hasCompletedOnboarding: hasCompletedOnboarding,
-            refreshIntervalSeconds: refreshIntervalSeconds,
-            disabledProviders: disabledProviders,
-            menuBarQuotaID: id,
-            notificationsEnabled: notificationsEnabled
-        )
+        copy(menuBarQuotaID: id)
     }
 
     /// The same preferences with notifications toggled.
     public func withNotificationsEnabled(_ enabled: Bool) -> Preferences {
+        copy(notificationsEnabled: enabled)
+    }
+
+    /// The same preferences with automatic update checks toggled.
+    public func withAutomaticUpdateChecksEnabled(_ enabled: Bool) -> Preferences {
+        copy(automaticUpdateChecksEnabled: enabled)
+    }
+
+    /// The same preferences after an update check finished.
+    public func withLastUpdateCheckAt(_ date: Date?) -> Preferences {
+        copy(lastUpdateCheckAt: date)
+    }
+
+    /// The same preferences after a release was announced to the user.
+    public func withAnnouncedUpdateVersion(_ version: String?) -> Preferences {
+        copy(announcedUpdateVersion: version)
+    }
+
+    /// The same preferences with a different refresh interval.
+    public func withRefreshIntervalSeconds(_ seconds: TimeInterval) -> Preferences {
+        copy(refreshIntervalSeconds: seconds)
+    }
+
+    private func copy(
+        defaultPolicyKind: String? = nil,
+        hasCompletedOnboarding: Bool? = nil,
+        refreshIntervalSeconds: TimeInterval? = nil,
+        disabledProviders: Set<String>? = nil,
+        menuBarQuotaID: UUID?? = nil,
+        notificationsEnabled: Bool? = nil,
+        automaticUpdateChecksEnabled: Bool? = nil,
+        lastUpdateCheckAt: Date?? = nil,
+        announcedUpdateVersion: String?? = nil
+    ) -> Preferences {
         Preferences(
-            defaultPolicyKind: defaultPolicyKind,
-            hasCompletedOnboarding: hasCompletedOnboarding,
-            refreshIntervalSeconds: refreshIntervalSeconds,
-            disabledProviders: disabledProviders,
-            menuBarQuotaID: menuBarQuotaID,
-            notificationsEnabled: enabled
+            defaultPolicyKind: defaultPolicyKind ?? self.defaultPolicyKind,
+            hasCompletedOnboarding: hasCompletedOnboarding ?? self.hasCompletedOnboarding,
+            refreshIntervalSeconds: refreshIntervalSeconds ?? self.refreshIntervalSeconds,
+            disabledProviders: disabledProviders ?? self.disabledProviders,
+            menuBarQuotaID: menuBarQuotaID ?? self.menuBarQuotaID,
+            notificationsEnabled: notificationsEnabled ?? self.notificationsEnabled,
+            automaticUpdateChecksEnabled: automaticUpdateChecksEnabled
+                ?? self.automaticUpdateChecksEnabled,
+            lastUpdateCheckAt: lastUpdateCheckAt ?? self.lastUpdateCheckAt,
+            announcedUpdateVersion: announcedUpdateVersion ?? self.announcedUpdateVersion
         )
     }
 

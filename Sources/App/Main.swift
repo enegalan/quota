@@ -36,6 +36,7 @@ struct Main: App {
                     delegate.model = model
                     delegate.onTogglePopover = { togglePopover() }
                     await model.load()
+                    await model.maybeCheckForUpdatesAutomatically()
                 }
         }
         .menuBarExtraStyle(.window)
@@ -47,6 +48,14 @@ struct Main: App {
             width: LayoutMetrics.mainWindowWidth,
             height: LayoutMetrics.mainWindowHeight
         )
+
+        Settings {
+            SettingsView(model: model)
+                .frame(
+                    minWidth: LayoutMetrics.settingsWindowWidth,
+                    minHeight: LayoutMetrics.settingsWindowHeight
+                )
+        }
     }
 
     /// Closes the popover by clicking the status item itself.

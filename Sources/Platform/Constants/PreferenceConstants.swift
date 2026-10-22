@@ -14,4 +14,7 @@ public enum PreferenceConstants {
 
     /// Whether quota alerts are delivered as notifications by default.
     public static let defaultNotificationsEnabled = true
+
+    /// Whether the app checks GitHub for a newer release on its own.
+    public static let defaultAutomaticUpdateChecksEnabled = true
 }

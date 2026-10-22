@@ -37,6 +37,12 @@ final class AppModel {
     /// and answers.
     var busyProviderID: String?
 
+    /// What the last update check found, for the settings surface.
+    var updateStatus: UpdateStatus = .idle
+
+    /// Whether an update check is already in flight.
+    var isCheckingForUpdates = false
+
     /// The user's calendar, resolved once.
     let userCalendar: Calendar
 
@@ -89,8 +95,17 @@ final class AppModel {
 
     let environment: AppEnvironment
 
-    init(environment: AppEnvironment) {
+    /// How the model asks GitHub for the latest release.
+    let releaseFetcher: any LatestReleaseFetching
+
+    init(
+        environment: AppEnvironment,
+        releaseFetcher: (any LatestReleaseFetching)? = nil
+    ) {
         self.environment = environment
+        self.releaseFetcher = releaseFetcher ?? GitHubLatestReleaseFetcher(
+            userAgent: "Quota/\(BundleConstants.applicationVersion)"
+        )
         userCalendar = environment.calendar
         reference = environment.now()
     }
@@ -396,4 +411,13 @@ final class AppModel {
     func report(_ error: Error) {
         lastError = error.localizedDescription
     }
+}
+
+/// What settings shows about asking GitHub for a newer build.
+enum UpdateStatus: Equatable, Sendable {
+    case idle
+    case checking
+    case upToDate
+    case available(version: String, url: URL)
+    case failed(String)
 }
