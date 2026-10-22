@@ -7,8 +7,9 @@ remaining days of the period.
 Status:
 
 - **Implemented** — already available in the app.
-- **Planned** — next provider to implement.
-- **Research** — depends on a public API or a local solution.
+- **Next** — the provider under investigation now.
+- **Candidate** — could be implemented; each one has to pass a discovery spike before it can be scheduled.
+- **Research** — depends on a public API or a local solution that is not known to work.
 
 ## IDEs with integrated AI
 
@@ -16,12 +17,12 @@ Status:
 | ---------------------- | ----------------------------------- | ----------- | ------------------------------------------------------------------ |
 | Cursor                 | https://cursor.com                  | Implemented | Plan usage, including per-action quotas if the editor exposes them |
 | Antigravity            | https://antigravity.google          | Research    | Antigravity platform AI credits and quota                          |
-| GitHub Copilot         | https://github.com/features/copilot | Planned     | Premium usage, requests per model, plan limits                     |
-| Windsurf               | https://windsurf.com                | Planned     | Credits and actions consumed during flows                          |
-| JetBrains AI Assistant | https://www.jetbrains.com/ai/       | Planned     | Plan credits per IDE and month                                     |
-| Sourcegraph Cody       | https://sourcegraph.com/cody        | Planned     | Usage and quotas per instance                                      |
-| Supermaven             | https://supermaven.com              | Planned     | Free/Pro plan usage                                                |
-| CodeGPT                | https://codegpt.co                  | Planned     | IDE plan quotas                                                    |
+| GitHub Copilot         | https://github.com/features/copilot | Candidate   | Premium usage, requests per model, plan limits                     |
+| Windsurf               | https://windsurf.com                | Candidate   | Credits and actions consumed during flows                          |
+| JetBrains AI Assistant | https://www.jetbrains.com/ai/       | Candidate   | Plan credits per IDE and month                                     |
+| Sourcegraph Cody       | https://sourcegraph.com/cody        | Candidate   | Usage and quotas per instance                                      |
+| Supermaven             | https://supermaven.com              | Candidate   | Free/Pro plan usage                                                |
+| CodeGPT                | https://codegpt.co                  | Candidate   | IDE plan quotas                                                    |
 | Zed AI                 | https://zed.dev                     | Research    | Zed assistant usage and limits                                     |
 | Xcode Intelligence     | https://developer.apple.com/xcode/  | Research    | Apple coding assistant usage                                       |
 | Visual Studio Copilot  | https://visualstudio.microsoft.com/ | Research    | GitHub Copilot usage inside Visual Studio                          |

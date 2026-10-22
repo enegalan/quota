@@ -1,5 +1,37 @@
 # Quota — Product & Technical Specification
 
+> **Status.** This document is the product contract. Where the implementation has
+> moved past a section, the section is **annotated rather than rewritten**, and the
+> annotation says what the truth is now — the same rule `spec/0003-milestones.md`
+> follows for its checklist. The amendments are collected at the top so the drift
+> is visible without reading the whole document.
+
+## Amendments
+
+- **§12 — providers ship inside the application, not from a download.** The
+  catalog is no longer a file fetched from a URL or read from `catalog.json`. A
+  provider is a plugin package built into the bundle, and the list of providers is
+  the list of packages the build produced. Everything the section asks for —
+  optional installation, versioning, compatibility, update without an application
+  update — still holds, and the distribution mechanism simply became the one the
+  implementation already had.
+- **§38 — the pacing verdict is computed but not shown.** The domain still
+  evaluates it and the summary still carries it, but the interface stopped showing
+  it in 1.3.11. The verdict is a ratio between two numbers the user has to hold
+  in their head at once, and the interface has a better answer in the figures
+  themselves. §57 item 28 is amended with it.
+- **§39 — the application is a window application with a menu bar item.** The
+  bundle is not `LSUIElement`; it has a Dock presence and a window, because the
+  management window of §40a is a window in its own right. The menu bar item is
+  the quickest way in, not the only surface.
+- **§40 — the popover has ten elements, not eleven.** Pacing is the one that
+  went, for the reason in §38.
+- **§57 item 28 — "pacing status is displayed" is no longer the requirement.** It
+  becomes "the pacing verdict is available to the interface", and the interface
+  is free not to use it.
+- **§58 — the priority list is the one in `spec/0003-milestones.md`.** The
+  phases below are the historical ordering; the milestones are the live one.
+
 ## 1. Product Overview
 
 Quota is a native macOS application that automatically monitors quota usage and plans the remaining quota across the remaining days of a billing or usage period.
@@ -287,6 +319,13 @@ A provider update must not require updating the entire Quota application unless 
 
 # 12. Provider Catalog Distribution
 
+> **Amended (1.3.11).** The catalog is no longer a file fetched from somewhere.
+> A provider now **ships inside the application bundle**, and the catalog is the
+> list of packaged providers the build produced. The requirements below all still
+> hold; only the mechanism of distribution changed, and it changed to the one the
+> implementation had already built. The detail is in
+> `spec/0002-architecture.md` §3.7 and `spec/0003-milestones.md` (M-10, M-18).
+
 The provider catalog must be separate from the Quota Core.
 
 The catalog should contain metadata such as:
@@ -303,7 +342,37 @@ Capabilities
 
 The architecture should allow new providers to become available without requiring changes to the allocation engine.
 
-The exact distribution mechanism for plugins must be selected during technical implementation.
+### 12.1 How a provider is distributed
+
+A provider is a plugin package under `Plugins/`, built as its own Swift package,
+and the build turns each one into an archive inside the application bundle:
+
+```text
+Quota.app/Contents/Resources/Providers/<id>.tar.gz
+```
+
+The application reads the directory, and that list *is* the catalog. There is no
+second list of providers anywhere — no `catalog.json`, no remote index — because a
+second list is a claim about which providers exist that the application cannot
+check, and a provider that is in one and not the other is a row in the interface
+that installs nothing.
+
+This has three consequences the rest of the specification depends on:
+
+- **A provider's version is the application's version.** A packaged provider has
+  no independent release cycle; what the user gets is what came in the bundle.
+  The directory it lands in is still versioned, so an application upgrade can
+  leave the older provider launchable for as long as it takes to roll back.
+- **A provider is updated by upgrading the application**, or by the application
+  updating the provider in place from the copy it already carries (§11). The
+  interface offers that action, and it does not require the application to be
+  reinstalled.
+- **A provider is trusted because the application shipped it.** There is no
+  download, so there is nothing to verify against a published hash and nothing to
+  check a signature on. The trust is the application's own, which is a claim the
+  user can check by looking at who published the application.
+
+### 12.2 What the MVP must establish
 
 The MVP must establish a mechanism that supports:
 
@@ -317,6 +386,13 @@ The MVP must establish a mechanism that supports:
 ---
 
 # 13. Provider Discovery Before Implementation
+
+> **Amended (1.3.11).** The investigation below is not a paragraph in a design
+> document; it is a milestone with an exit criterion. `spec/0003-milestones.md`
+> M-13 closed it for Cursor and the report is `spec/0004-cursor-spike-report.md`;
+> M-18 is the same gate for Claude Code and its plan is
+> `spec/0007-claude-spike-plan.md`. The decision is recorded either way, and a
+> provider that has not passed the gate is not implemented.
 
 Before implementing a provider plugin, Quota must determine how its usage information can be retrieved reliably.
 
@@ -892,6 +968,16 @@ The user does not enter the new usage manually.
 
 # 32. Actual Usage vs Planned Allocation
 
+> **Amended (1.3.11).** The separation below is not only a rule about the
+> interface; it is a rule about what the application can *know*. The allocation
+> plan is recomputed on every reading and balances the remaining allowance
+> across the remaining days, so **the plan of a past day does not exist** — it
+> was never a record, it is a current intention. A history view therefore cannot
+> compare a past day against a plan, and one that did would be comparing a past
+> day against today's plan, which is a comparison of two things that do not
+> belong together. The design is in `spec/0006-usage-history.md`, and the
+> milestone is M-21.
+
 These concepts must remain separate in the domain model and UI.
 
 Example:
@@ -1051,6 +1137,21 @@ Future allocation is a core product feature.
 
 # 38. Pacing Status
 
+> **Amended (1.3.11).** The verdict is still computed, still carried by the
+> summary, and still testable — but the interface no longer shows it, and the
+> requirement below has become "the verdict exists and is available" rather than
+> "the verdict is on screen". The reason is recorded here so it is not undone by
+> accident: a verdict compares two numbers that are each correct on their own
+> and reads as a third, larger claim — "Ahead of Pace" says something about a
+> pace without saying whose, and a user whose provider has just restarted its
+> allowance cannot tell what the comparison was against. The figures the
+> interface shows instead — what is planned, what is used, what is left, and when
+> the period turns over — are each true on their own, and a user can check them
+> against the provider's own dashboard.
+>
+> The rule that survives the amendment is the last one: pacing never changes the
+> policy, and the calculation never changes a plan.
+
 Quota should calculate a descriptive pacing state.
 
 Possible states:
@@ -1070,6 +1171,13 @@ Quota should not silently modify the user's allocation policy because of pacing 
 ---
 
 # 39. Menu Bar
+
+> **Amended (1.3.11).** The application is not a background-only bundle:
+> `LSUIElement` is **false**, the application has a Dock presence, and the
+> management window of §40a opens as a window. The menu bar item is the quickest
+> way to see the number and to open the window, and it is where the figures are
+> read most often — but it is one surface among two, not the only one. The
+> requirement that follows is unchanged.
 
 Quota operates primarily as a menu bar application. The menu bar is the primary
 entry; a management window handles editing (providers, quotas, calendars,
@@ -1104,39 +1212,53 @@ leave the indicator blank; another quota stands in until one is chosen again.
 
 # 40. Main Popover
 
+> **Amended (1.3.11).** The popover shows **ten** elements. Pacing is the one
+> that went, for the reason in §38; the rest are unchanged, and the figures are
+> the same figures the window shows for the same instant.
+>
+> The list below is what the popover actually carries. Two of the entries are
+> new since the section was written, and both are there because the popover has
+> more than one quota to answer for: **the account the provider reads as**, which
+> is how a user tells two quotas of the same provider apart, and **when the
+> period turns over**, which is the one date that decides how much of every
+> other figure is still available.
+
 The main popover should show:
 
-* Quota name
-* Provider
+* Quota name, marked when it is the one the menu bar speaks for
+* The account the provider reads as
 * Usage percentage
-* Remaining percentage
 * Today's planned allocation
 * Today's actual usage
 * Today's remaining allowance
 * Days remaining
-* Pacing status
+* When the period turns over
 * Last synchronization time
-* Calendar access
-* Settings access
+* Every other quota, and the way to choose which one the menu bar speaks for
 
 Example:
 
 ```text
-Cursor
+Cursor ●
+
+work@example.com
 
 26% used
-74% remaining
 
 TODAY
-Planned       6%
-Used          2%
-Remaining     4%
+6.00% planned
+
+▓▓▓▓▓░░░░░░░
+
+2.00% Used      4.00% Remaining
 
 18 days remaining
-
-On Pace
+Resets 14 October
 
 Updated 2 minutes ago
+─────────────────────────
+OTHER QUOTAS
+Claude                        71%
 ```
 
 The popover shows every quota, not only the one the menu bar indicator speaks
@@ -1144,30 +1266,6 @@ for. The chosen quota is shown in full and marked, and the others are listed
 beside it; selecting one of them makes it the one the indicator speaks for. The
 question the indicator's single number raises — *which of my quotas is that?* —
 cannot be answered from a panel that hides the rest.
-
-Example:
-
-```text
-Cursor  ●
-
-26% used
-74% remaining
-
-TODAY
-Planned       6%
-Used          2%
-Remaining     4%
-
-18 days remaining
-
-On Pace
-
-Updated 2 minutes ago
-─────────────────────────
-OTHER QUOTAS
-Claude                        71%
-OpenAI                        12%
-```
 
 ---
 
@@ -1189,7 +1287,7 @@ The window is a list of quotas beside the selected quota's detail.
 │                  │ Planned     6%      Used      2%          │
 │                  │ Remaining   4%                            │
 │                  │                                          │
-│                  │ 18 days remaining          On Pace        │
+│                  │ 18 days remaining   Resets 14 October    │
 │                  ├──────────────────────────────────────────┤
 │                  │ CALENDAR                                 │
 │                  │ September 2026                ‹     ›    │
@@ -1762,7 +1860,10 @@ The MVP is complete when:
 25. Today's allowance is clearly displayed.
 26. Future daily allocations are visible.
 27. A calendar displays the allocation plan.
-28. Pacing status is displayed.
+28. The pacing verdict is available to the interface. _(Amended 1.3.11: it was
+    "pacing status is displayed". The verdict is still computed and still
+    carried by the summary; the interface stopped showing it, and §38 says
+    why.)_
 29. Provider synchronization status is displayed.
 30. Stale provider data is clearly identified.
 31. The latest successful usage snapshot is cached locally.
@@ -1775,9 +1876,31 @@ The MVP is complete when:
 38. Adding another provider does not require changes to the allocation engine.
 39. No manual daily usage entry is required when automatic provider integration is available.
 
+### 57.1 Beyond the MVP
+
+The items below were added after the MVP's definition of done was met. They are
+not MVP requirements — the MVP closed on item 39 — and they are the requirements
+of the work that follows it. They are traced in `spec/0003-milestones.md`
+(Appendix B) like the items above.
+
+40. A second provider plugin exists, and the allocation engine needed no change
+    for it.
+41. A provider may report several windows, and each window has its own plan.
+42. The application remembers what it last told the user, and does not tell them
+    the same thing twice.
+43. Every condition that can be announced is visible in the application without a
+    notification ever being delivered.
+44. The application shows what it measured of the past, and says plainly what it
+    did not measure.
+
 ---
 
 # 58. Implementation Priority
+
+> **Amended (1.3.11).** The list below is the ordering the project was built in.
+> The live ordering is the milestone table in `spec/0003-milestones.md`, which
+> carries the phases that are actually open: the second provider, the
+> notification channel, and the usage history view.
 
 The implementation priority is:
 

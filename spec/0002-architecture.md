@@ -228,76 +228,107 @@ struct AllocationPlan: Sendable, Equatable {
 ### 3.5 Core — timeline
 
 ```swift
-/// Local accumulation of a provider's cumulative figure, so that "used today" can
-/// be derived. No provider reports daily consumption, so this is the only way to
-/// satisfy §32 and §36.
-struct UsageSample: Sendable, Equatable, Codable {
+/// One measurement of one bucket at a known moment.
+///
+/// Kept so that the change between two moments can be attributed to the days
+/// in between.
+struct TimelinePoint: Sendable, Hashable, Codable {
     let recordedAt: Date
-    let cumulativePercentage: Double
-}
-
-struct UsageTimeline: Sendable, Equatable, Codable {
-    let quotaID: UUID
     let bucketID: String
-    private(set) var samples: [UsageSample]   // ascending by date
-
-    mutating func record(_ percentage: Double, at: Date)
-    func baseline(forDayContaining date: Date, calendar: Calendar) -> UsageSample?
-    func usedToday(on date: Date, calendar: Calendar) -> TodayUsage
+    let usagePercentage: Double   // validated on construction
 }
 
-enum TodayUsage: Sendable, Equatable {
-    case known(Double)
-    case unknown(reason: UnknownReason)
+struct UsageTimeline: Sendable, Hashable, Codable {
+    let points: [TimelinePoint]   // ascending by date
 
-    enum UnknownReason: Sendable, Equatable {
-        case noBaseline          // first sync of the day: no honest value exists
-        case periodRollover      // cumulative went down: a new period began
-    }
+    func latestPoint(bucketID: String, asOf reference: Date) -> TimelinePoint?
+    func baselinePoint(bucketID: String, onOrBefore day: Date, calendar: Calendar) -> TimelinePoint?
+    func firstPoint(bucketID: String, onOrAfter day: Date, calendar: Calendar) -> TimelinePoint?
+    func usedOn(bucketID: String, from day: Date, to reference: Date, calendar: Calendar) -> Double?
+    func usedSinceFirstReadingOn(bucketID: String, onOrAfter day: Date, to reference: Date, calendar: Calendar) -> (used: Double, since: Date)?
+    func usedDuring(bucketID: String, day: Date, to reference: Date, calendar: Calendar) -> Double?
 }
 ```
 
-`unknown` is never collapsed to `0`. Showing zero would be a fabricated fact, and
-§55 requires the interface to be transparent.
+**The one rule for a day's usage.** `usedDuring` is it, and it has four answers
+rather than two:
+
+| Case                                      | What it returns                                                                                |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| There is a reading from before the day    | the day's use, exactly                                                                         |
+| The meter started or reset during the day | the day's **first-reading floor**: what has been measured since the app started watching       |
+| The day has not begun                     | zero — a fact, because no reading could attribute spending to an instant that has not happened |
+| There is no usable reading in the day     | `nil` — the day cannot be measured                                                             |
+
+The calendar's day cell, the today block and the history view all ask this one
+method, so they cannot disagree about the same day.
+
+**Absence carries the unknown.** `usedDuring` returns an optional rather than a
+`TodayUsage` enum: a day the application did not watch is **absent**, and is
+never collapsed to `0`. Showing zero would be a fabricated fact, and §55 requires
+the interface to be transparent. The same convention runs through
+`TodayAllowance.usedToday` (§3.6) and the daily rollup of
+`spec/0006-usage-history.md`.
 
 ### 3.6 Core — pacing and presentation values
 
 ```swift
-enum PacingStatus: Sendable, Equatable, Codable {
-    case onPace, aheadOfPace, behindPace, quotaExhausted, periodExpired
-}
-
-struct PacingResult: Sendable, Equatable {
-    let status: PacingStatus
+/// How actual spending compares with the plan.
+///
+/// Derived from a reading and a plan, never stored on either, so it cannot
+/// outlive the values it describes.
+struct PacingStatus: Sendable, Hashable, Codable {
+    enum Phase: String, Sendable, Codable {
+        case onTrack        // within tolerance: spending in step with the plan
+        case ahead          // using less than planned, which is not a problem
+        case behind         // using more than planned
+        case exhausted      // the allowance is used up while the period runs
+        case expired        // the period has ended
+    }
+    let phase: Phase
+    let usagePercentage: Double
     let expectedPercentage: Double
-    let actualPercentage: Double
-    let tolerance: Double
+    let difference: Double
 }
 
 /// The single value the interface consumes. Composes domain values; adds no
 /// calculation of its own.
-struct QuotaSummary: Sendable, Equatable {
+struct QuotaSummary: Sendable, Hashable, Identifiable {
     let quota: Quota
     let snapshot: UsageSnapshot?
     let plan: AllocationPlan?
-    let pacing: PacingResult?
-    let today: TodayAllowance
-    let upcoming: [FutureAllocation]
-    let isStale: Bool
+    let pacing: PacingStatus?
+    let todayAllowance: TodayAllowance?
+    let upcoming: [Allocation]
 }
 
-struct TodayAllowance: Sendable, Equatable {
-    let planned: Double
-    let used: TodayUsage        // unknown is representable and shown as such
-    var remaining: Double?      // nil when `used` is unknown
+struct TodayAllowance: Sendable, Hashable, Codable {
+    let date: LocalDate
+    let suggested: Double        // the day's planned share
+    /// The day's spending, as the app has measured it.
+    ///
+    /// The whole of the day when there is a reading from before it, and what
+    /// has been measured since the day's first reading otherwise. Nil when the
+    /// provider has not been read today at all, which is not the same as a day
+    /// with nothing spent on it.
+    let usedToday: Double?
+    var remainingAfterToday: Double?
 }
 
-struct FutureAllocation: Sendable, Equatable, Identifiable {
-    var id: LocalDate
+struct Allocation: Sendable, Hashable, Codable {
     let date: LocalDate
     let percentage: Double
 }
 ```
+
+Two of these carry the amendment of §38 of the definition. `PacingStatus` is
+still computed and is still carried by the summary, but the interface stopped
+showing it in 1.3.11, and the values it holds — an expected percentage and a
+difference — are the ones the interface shows as plain figures instead. And
+`TodayAllowance.usedToday` is optional rather than a `TodayUsage` enum with an
+`unknown` case: **absence carries it**, which is the same convention the
+timeline and the calendar use, so a day the application did not watch is absent
+rather than zero.
 
 ### 3.7 Contract — the plugin vocabulary
 
@@ -339,25 +370,35 @@ The nine cases are exactly §45. Their raw values cross the process boundary and
 are therefore frozen for the lifetime of protocol version 1.
 
 ```swift
-struct CatalogEntry: Sendable, Codable {
-    let id: ProviderID
-    let version: Version
-    let minimumAppVersion: Version
-    let protocolRange: ProtocolRange
-    let contentHash: String          // SHA-256, verified before extraction
-    let isUnofficial: Bool           // surfaced as a visible notice
-    let capabilities: ProviderCapabilities
+/// A provider this build can offer.
+///
+/// Read off the application bundle, not out of a catalog file: the bundle's
+/// provider directory is the catalog, and a second list of providers would be a
+/// claim the application cannot check.
+struct AvailableProvider: Sendable, Equatable, Identifiable {
+    let id: String                   // the provider's identifier, and the name
+                                     // of the packaged file it was read from
+    let version: Version             // the version it installs as
+    let described: ProviderDescriptor?   // nil until the provider has been asked
 }
 ```
 
-The catalog is the only description of a provider that ships as a file. There is
-no per-plugin manifest: a provider's executable is named by the convention
-`quota-provider-<id>` (`PluginLayout.executableName`), the host builds everything
-else it needs to launch from the catalog and the installed layout, and the
-installer refuses an archive that does not contain the executable that
-convention resolves to. A provider that declared its own name and version in an
-artifact would be a second source of truth for facts the host already holds, and
-one nothing in the type system would keep in step with the first.
+The descriptor is the only description of a provider that ships as a file. There
+is no per-plugin manifest and no catalog entry: a provider's executable is named
+by the convention `quota-provider-<id>` (`PluginLayout.executableName`), the host
+builds everything else it needs to launch from the packaged archive and the
+installed layout, and the installer refuses an archive that does not contain the
+executable that convention resolves to. A provider that declared its own name
+and version in an artifact would be a second source of truth for facts the host
+already holds, and one nothing in the type system would keep in step with the
+first.
+
+A provider that has never been run has no description, and that absence is
+answered for rather than papered over: `AvailableProvider.displayName` derives a
+readable name from the identifier, and everything else the interface shows comes
+from the descriptor once the provider has been asked. An invented summary for an
+unrun provider would outlive the real one and be shown as though the provider
+had said it.
 
 ### 3.8 Contract — the wire protocol
 
@@ -427,28 +468,34 @@ One JSON file per family, under `~/Library/Application Support/Quota/`.
 | ------------------ | ------------------ | --------------------------------- | ------------------------------------ |
 | `quotas.json`      | `[QuotaRecord]`    | `id`                              | `quotaRepository`                    |
 | `snapshots.json`   | `[SnapshotRecord]` | `quotaID + bucketID + accountKey` | `snapshotRepository`                 |
-| `timelines.json`   | `[TimelineRecord]` | `quotaID + bucketID`              | `timelineRepository`                 |
+| `timelines.json`   | `[TimelineRecord]` | `quotaID + bucketID + accountLabel` | `timelineRepository`                 |
 | `providers.json`   | `[ProviderRecord]` | `id`                              | `providerRepository`                 |
 | `preferences.json` | `Preferences`      | —                                 | `preferencesRepository`              |
-| `catalog.json`     | `[CatalogEntry]`   | `id`                              | shipped in the app bundle, read only |
 
-Every record carries the schema version it was written at, and every file is
-read through one migrator that knows how to move it forward before anything else
-looks at it. Version 2 exists because the period moved onto `UsageBucket`: a
-version 1 snapshot carried one `periodStart`/`periodEnd` pair for the whole
-reading and is rewritten with that window on every bucket it had. That is what it
-recorded — one provider, one window — so nothing it claims is falsified by the
-new shape; the file it was read from, not a guess about its buckets, is what
-chooses whether the copy happens.
+There is no `catalog.json`. The list of providers is read from the application
+bundle — `Contents/Resources/Providers` — and it is not a stored record, because
+a stored list of providers would be a second answer to a question the bundle
+answers.
+
+**The version travels in an envelope, not in the records.** Every file is
+`{ "version": Int, "payload": … }`, so a decoder can dispatch on the version
+before it tries to interpret anything inside it, and a record never carries a
+field that is the same in every entry of the file.
+
+Every file is read through one migrator that knows how to move it forward
+before anything else looks at it. Version 2 exists because the period moved
+onto `UsageBucket`: a version 1 snapshot carried one `periodStart`/`periodEnd`
+pair for the whole reading and is rewritten with that window on every bucket it
+had. That is what it recorded — one provider, one window — so nothing it claims
+is falsified by the new shape; the file it was read from, not a guess about its
+buckets, is what chooses whether the copy happens.
 
 ```swift
 struct QuotaRecord: Sendable, Codable {
-    var schemaVersion: Int
     var quota: Quota
 }
 
 struct SnapshotRecord: Sendable, Codable {
-    var schemaVersion: Int
     var quotaID: UUID
     var bucketID: String
     var accountKey: String?     // nil when the provider is account-agnostic
@@ -456,9 +503,9 @@ struct SnapshotRecord: Sendable, Codable {
 }
 
 struct TimelineRecord: Sendable, Codable {
-    var schemaVersion: Int
     var quotaID: UUID
     var bucketID: String
+    var accountLabel: String
     var timeline: UsageTimeline
 }
 
@@ -470,7 +517,6 @@ enum ProviderState: String, Sendable, Codable {
 }
 
 struct ProviderRecord: Sendable, Codable {
-    var schemaVersion: Int
     var id: ProviderID
     var version: Version
     var relativePath: String
@@ -489,34 +535,21 @@ struct ConnectionStatus: Sendable, Codable {
 }
 
 struct Preferences: Sendable, Codable {
-    var menuBarFormat: MenuBarFormat    // percentage, dot, icon
-    var refreshInterval: TimeInterval
-    var staleAfter: TimeInterval
-    var disabledProviders: Set<ProviderID>   // the per-provider kill switch
+    var defaultPolicyKind: String
+    var hasCompletedOnboarding: Bool
+    var refreshIntervalSeconds: TimeInterval
+    var disabledProviders: Set<String>   // the per-provider kill switch
+    var menuBarQuotaID: UUID?            // the quota the indicator speaks for
 }
 ````
 
-`catalog.json` entries, which are what the interface renders:
-
-```swift
-struct CatalogEntry: Sendable, Codable {
-    var id: ProviderID
-    var displayName: String
-    var summary: String
-    var version: Version
-    var minimumAppVersion: Version
-    var protocolRange: ProtocolRange
-    var source: PluginSource          // bundled, local file, or remote URL
-    var contentHash: String
-    var isUnofficial: Bool
-}
-```
-
-No capabilities here, on purpose. What a provider can do is a fact about the
-provider, so it is the provider that states it, in the descriptor it answers
-`describe` with (§3.8); a second copy in the catalog would be a claim about
-something nobody had asked yet, in a file nothing reads. A catalog written by an
-older build still loads: the extra key is ignored rather than refused.
+The provider list the interface renders is not a stored record either. It is
+computed from two facts: what the bundle packages, and what the machine has
+installed. The application reads the first by asking each packaged provider what
+it is — running it once for a handshake and throwing the process away — and the
+second from `providers.json`. A provider that has never been run contributes its
+identifier and nothing else, which is why the interface's list is rendered from
+metadata rather than from a branch per provider.
 
 ### 3.10 Platform — secrets
 
@@ -536,8 +569,8 @@ this account naming and nothing else. Secrets are never written to a
 
 ```swift
 @Observable final class AppModel {
-    private(set) var summaries: [QuotaSummary]
-    private(set) var catalog: [CatalogEntry]
+    private(set) var presentations: [QuotaPresentation]
+    private(set) var sections: ProviderSections   // available, installed, connected
     private(set) var connections: [ProviderID: ConnectionStatus]
     // plus commands, which mutate through Platform and never from a view
 }
@@ -548,7 +581,7 @@ enum AppEnvironment {
 }
 ```
 
-The interface reads `summaries` and issues commands. It never formats a
+The interface reads `presentations` and issues commands. It never formats a
 percentage, never computes a date, and never branches on a provider identity.
 
 ---
@@ -630,6 +663,15 @@ These are the rules whose violation is a defect. Each has a test.
 17. The quota the menu bar indicator speaks for is the user's own choice, is
     stored, and a choice naming a quota that no longer exists leaves the indicator
     showing some quota rather than nothing.
+18. A provider's code comes from the application bundle and from nowhere else. No
+    provider is ever fetched from a network, and none is ever read from a path
+    the bundle does not name.
+19. A provider is described as installed only when a record says so **and** the
+    executable that record names can be launched. The record and the disk are two
+    facts, and the interface is told about both.
+20. A provider that answers under a different identifier than the one it was
+    launched as is refused. The packaged name is the host's to trust; the
+    descriptor is the provider's own claim, and the two must agree.
 
 ---
 
@@ -715,19 +757,33 @@ freshness. Nothing is ever discarded and nothing is ever invented.
   justification is recorded in the readme.
 - **Keychain for everything secret.** Service `com.quota.app`. Never a
   preferences file, never a log line, never a diagnostic dump.
-- **Plugins are verified before execution.** Content hash, then static code
-  signature, then the presence of the executable the naming convention resolves
-  to, then activation. A failed check writes nothing.
+- **A provider's code comes from the bundle, and that is where its trust comes
+  from.** The archive is unpacked into a staging directory, checked for the
+  executable the naming convention resolves to, and only then moved into a
+  versioned directory and activated. Every step that can refuse happens before
+  the first write to the plugins directory, so a rejected artifact leaves no
+  trace. The SHA-256 of the archive is recorded with the install, which says
+  which bytes produced the record; **nothing compares it**, because there is no
+  second claim about the bytes for a digest to disagree with. A provider
+  distributed by download would need that check, and does not exist.
 - **Plugin execution is isolated.** A plugin is a child process with a sanitised
   environment, a bounded call timeout, and termination on hang. It cannot take the
   application down with it.
 - **Network egress belongs to the provider.** Quota itself has no backend, no
   account, and no storage of the user's usage (§54).
+- **The application is signed ad-hoc, and is not notarised.** There is no
+  Developer ID identity behind the release, so the bundle is signed with `-` and
+  macOS asks the user to confirm the first launch. This is a distribution
+  limitation, not a security one: the signature is still a signature, and the
+  application is still the only source of the providers it runs. It is recorded
+  here so that the security posture is not read as claiming more than the build
+  delivers.
 
 ## 11. Traceability
 
 The full Definition of Done trace, mapping all thirty-nine items of
-`spec/0001-definition.md` §57 to the milestone and task that closes each, is
-Appendix B of `spec/0003-milestones.md`. It is kept with the checklist rather than
-here, because it changes as the checklist is executed and this document changes
-only when the architecture does.
+`spec/0001-definition.md` §57 — and the four post-MVP items of §57.1 — to the
+milestone and task that closes each, is Appendix B of
+`spec/0003-milestones.md`. It is kept with the checklist rather than here,
+because it changes as the checklist is executed and this document changes only
+when the architecture does.
