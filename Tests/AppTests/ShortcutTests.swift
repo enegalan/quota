@@ -52,9 +52,11 @@ struct ShortcutTests {
             #expect(!seen.contains(shortcut.key), "\(shortcut.key) is claimed twice")
             seen.insert(shortcut.key)
         }
-        // ⌘Q is exempt because every application answers it with Quit; the rest
-        // must avoid the reserved set entirely.
-        for shortcut in Shortcut.all where shortcut.key != Shortcut.quitKey {
+        // ⌘Q and ⌘, are exempt: every application answers them with Quit and
+        // Settings. The rest must avoid the reserved set entirely.
+        for shortcut in Shortcut.all
+            where shortcut.key != Shortcut.quitKey && shortcut.key != Shortcut.settingsKey
+        {
             #expect(
                 !Self.reserved.contains(shortcut.key),
                 "\(shortcut.key) is already bound elsewhere"

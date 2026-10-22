@@ -82,35 +82,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The application's menu: the two shortcuts, diagnostics, and a way to quit.
     func makeMenu() -> NSMenu {
         let root = NSMenu()
-
         let quota = NSMenuItem()
         quota.title = "Quota"
-        let quotaMenu = NSMenu()
-        quotaMenu.addItem(
-            item(
-                title: "Open Quota",
-                key: Shortcut.openKey,
-                action: #selector(openMainWindow),
-                keyEquivalent: Shortcut.openKeyEquivalent
-            )
-        )
-        quotaMenu.addItem(
-            item(
-                title: "Refresh Now",
-                key: Shortcut.refreshKey,
-                action: #selector(refresh),
-                keyEquivalent: Shortcut.refreshKeyEquivalent
-            )
-        )
-        quotaMenu.addItem(
-            item(
-                title: "Copy Diagnostic Dump",
-                key: "Diagnostics",
-                action: #selector(copyDiagnostics),
-                keyEquivalent: "d"
-            )
-        )
-        quotaMenu.addItem(.separator())
+        quota.submenu = makeQuotaMenu()
+        root.addItem(quota)
+        return root
+    }
+
+    /// Items under the Quota menu title.
+    private func makeQuotaMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(item(
+            title: "Open Quota",
+            key: Shortcut.openKey,
+            action: #selector(openMainWindow),
+            keyEquivalent: Shortcut.openKeyEquivalent
+        ))
+        menu.addItem(item(
+            title: "Refresh Now",
+            key: Shortcut.refreshKey,
+            action: #selector(refresh),
+            keyEquivalent: Shortcut.refreshKeyEquivalent
+        ))
+        menu.addItem(item(
+            title: "Settings…",
+            key: Shortcut.settingsKey,
+            action: #selector(openSettings),
+            keyEquivalent: Shortcut.settingsKeyEquivalent
+        ))
+        menu.addItem(item(
+            title: "Copy Diagnostic Dump",
+            key: "Diagnostics",
+            action: #selector(copyDiagnostics),
+            keyEquivalent: "d"
+        ))
+        menu.addItem(.separator())
+        menu.addItem(quitMenuItem())
+        return menu
+    }
+
+    /// Quit with the platform-expected ⌘Q chord.
+    private func quitMenuItem() -> NSMenuItem {
         let quit = item(
             title: "Quit Quota",
             key: Shortcut.quitKey,
@@ -118,11 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: Shortcut.quitKeyEquivalent
         )
         quit.keyEquivalentModifierMask = Shortcut.quitModifiers
-        quotaMenu.addItem(quit)
-        quota.submenu = quotaMenu
-        root.addItem(quota)
-
-        return root
+        return quit
     }
 
     /// One menu item, wired to the delegate and carrying ⌘.
@@ -150,6 +158,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openMainWindow() {
         MainWindowOpener.request()
+    }
+
+    /// Opens the SwiftUI Settings scene.
+    ///
+    /// Routed through the selector AppKit already uses for Preferences, because
+    /// the custom menu replaces the system one and ⌘, would otherwise have
+    /// nowhere to land.
+    @objc private func openSettings() {
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc private func togglePopover() {
@@ -196,6 +214,10 @@ enum Shortcut {
     static let refreshKeyEquivalent = "r"
     static let refreshKey = "⌘R"
 
+    /// ⌘, opens Settings, as every macOS application does.
+    static let settingsKeyEquivalent = ","
+    static let settingsKey = "⌘,"
+
     /// ⌘Q quits, and is expected to.
     static let quitKeyEquivalent = "q"
     static let quitKey = "⌘Q"
@@ -206,6 +228,11 @@ enum Shortcut {
         ShortcutBinding(
             key: refreshKey,
             keyEquivalent: refreshKeyEquivalent,
+            modifiers: commandModifierName
+        ),
+        ShortcutBinding(
+            key: settingsKey,
+            keyEquivalent: settingsKeyEquivalent,
             modifiers: commandModifierName
         ),
         ShortcutBinding(key: quitKey, keyEquivalent: quitKeyEquivalent, modifiers: commandModifierName),

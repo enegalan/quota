@@ -89,12 +89,7 @@ extension AppModel {
             let clamped = RefreshConstants.clamped(seconds)
             let current = try await self.environment.preferences.load()
             try await self.environment.preferences.save(
-                Preferences(
-                    defaultPolicyKind: current.defaultPolicyKind,
-                    hasCompletedOnboarding: current.hasCompletedOnboarding,
-                    refreshIntervalSeconds: clamped,
-                    disabledProviders: current.disabledProviders
-                )
+                current.withRefreshIntervalSeconds(clamped)
             )
         }
     }
@@ -103,6 +98,20 @@ extension AppModel {
     func effectiveRefreshIntervalSeconds() async -> TimeInterval {
         let preferences = await (try? environment.preferences.load()) ?? .default
         return RefreshConstants.clamped(preferences.refreshIntervalSeconds)
+    }
+
+    /// Whether quota notifications are enabled.
+    func notificationsEnabled() async -> Bool {
+        let preferences = await (try? environment.preferences.load()) ?? .default
+        return preferences.notificationsEnabled
+    }
+
+    /// Enables or disables quota notifications.
+    func setNotificationsEnabled(_ enabled: Bool) async {
+        await perform {
+            let current = try await self.environment.preferences.load()
+            try await self.environment.preferences.save(current.withNotificationsEnabled(enabled))
+        }
     }
 
     /// A diagnostic dump of local state with no credentials.

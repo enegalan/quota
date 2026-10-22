@@ -1,3 +1,4 @@
+import AppKit
 import Core
 import SwiftUI
 
@@ -9,8 +10,16 @@ import SwiftUI
 /// save.
 struct QuotaListRow: View {
     let presentation: QuotaPresentation
+    let model: AppModel?
+
+    @State private var isConfirmingDelete = false
 
     private let formatter = PercentageFormatter()
+
+    init(presentation: QuotaPresentation, model: AppModel? = nil) {
+        self.presentation = presentation
+        self.model = model
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
@@ -41,5 +50,30 @@ struct QuotaListRow: View {
         }
         .padding(.vertical, LayoutMetrics.unit)
         .accessibilityElement(children: .combine)
+        .contextMenu {
+            Button {
+                Task { await model?.refreshAll() }
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            Divider()
+            Button(role: .destructive) {
+                isConfirmingDelete = true
+            } label: {
+                Label("Delete Quota", systemImage: "trash")
+            }
+        }
+        .confirmationDialog(
+            "Delete \(presentation.summary.quota.name)?",
+            isPresented: $isConfirmingDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Quota", role: .destructive) {
+                Task { await model?.deleteQuota(presentation.id) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Its readings and plan are deleted. This cannot be undone.")
+        }
     }
 }

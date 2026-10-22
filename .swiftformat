@@ -38,4 +38,4 @@
 # an autoclosure: a helper that compiles becomes a test file that does not.
 --disable hoistTry
 
---exclude .build,Plugins/.*/\.build,Package\.resolved
+--exclude .build,Integrations/.*/\.build,Package\.resolved

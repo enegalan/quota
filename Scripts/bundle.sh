@@ -70,31 +70,31 @@ done
 
 swift build --package-path "${REPO_ROOT}" -c "${configuration}" --product "${APP_NAME}"
 
-# A bundled provider ships as a gzipped tar rather than a directory: the app
+# A bundled integration ships as a gzipped tar rather than a directory: the app
 # bundle is read-only, and packaging it means the install path for a bundled
-# provider and a downloaded one is the same code.
+# integration and a downloaded one is the same code.
 #
-# The list of providers is the list of plugin packages, and the file each one is
-# discovered as is the executable's own name. A provider whose package did not
-# build is a packaging failure, not something to ship quietly, so this fails
-# rather than skipping.
+# The list of integrations is the list of integration packages, and the file each
+# one is discovered as is the executable's own name. An integration whose package
+# did not build is a packaging failure, not something to ship quietly, so this
+# fails rather than skipping.
 readonly PROVIDERS_DIR_NAME="Providers"
 readonly ARTIFACT_FILE_EXTENSION="tar.gz"
 readonly PROVIDER_LOGOS_DIR_NAME="ProviderLogos"
 readonly PROVIDER_LOGO_FILE_NAME="logo.png"
 
-# Each provider ships its own logo inside its package, and it is filed in the
-# bundle under the provider's identifier so the interface can find it by id. A
-# provider without one is a packaging failure, not a row that quietly falls back.
+# Each integration ships its own logo inside its package, and it is filed in the
+# bundle under the integration's identifier so the interface can find it by id.
+# An integration without one is a packaging failure, not a row that quietly falls back.
 copy_provider_logos() {
     local logos_dir="$1"
     mkdir -p "${logos_dir}"
     shopt -s nullglob
-    for plugin_dir in "${REPO_ROOT}"/Plugins/*/; do
+    for integration_dir in "${REPO_ROOT}"/Integrations/*/; do
         local id
-        id="$(basename "${plugin_dir}")"
-        local logo="${plugin_dir}${PROVIDER_LOGO_FILE_NAME}"
-        [[ -f "${logo}" ]] || fail "Plugins/${id} ships no ${PROVIDER_LOGO_FILE_NAME}"
+        id="$(basename "${integration_dir}")"
+        local logo="${integration_dir}${PROVIDER_LOGO_FILE_NAME}"
+        [[ -f "${logo}" ]] || fail "Integrations/${id} ships no ${PROVIDER_LOGO_FILE_NAME}"
         cp "${logo}" "${logos_dir}/${id}.png"
     done
     shopt -u nullglob
@@ -107,18 +107,18 @@ package_bundled_providers() {
     rm -rf "${scratch}"
     mkdir -p "${scratch}"
     shopt -s nullglob
-    for plugin_dir in "${REPO_ROOT}"/Plugins/*/; do
+    for integration_dir in "${REPO_ROOT}"/Integrations/*/; do
         local id
-        id="$(basename "${plugin_dir}")"
+        id="$(basename "${integration_dir}")"
         local executable="quota-provider-${id}"
-        log "Packaging bundled provider ${id}"
-        swift build --package-path "${plugin_dir}" -c "${configuration}" \
+        log "Packaging bundled integration ${id}"
+        swift build --package-path "${integration_dir}" -c "${configuration}" \
             --scratch-path "${scratch}/${id}" >/dev/null
         local bin_path
-        bin_path="$(swift build --package-path "${plugin_dir}" -c "${configuration}" \
+        bin_path="$(swift build --package-path "${integration_dir}" -c "${configuration}" \
             --scratch-path "${scratch}/${id}" --show-bin-path)"
         [[ -f "${bin_path}/${executable}" ]] \
-            || fail "Plugins/${id} built no executable named ${executable}"
+            || fail "Integrations/${id} built no executable named ${executable}"
         # The staged directory is named for the executable the host looks for, so
         # the archive installs to a version directory the host can start.
         local staged="${scratch}/stage-${id}/${executable}"

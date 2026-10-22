@@ -14,7 +14,7 @@ BUNDLE := .build/Quota.app
 SIGNING_IDENTITY ?=
 SIGNING_IDENTITY := $(if $(strip $(SIGNING_IDENTITY)),$(SIGNING_IDENTITY),-)
 
-.PHONY: help bootstrap format format-check lint test build plugins bundle run verify clean
+.PHONY: help bootstrap format format-check lint test build integrations integration-tests plugins plugin-tests bundle run verify clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -54,19 +54,35 @@ bundle: ## Assemble Quota.app (set SIGNING_IDENTITY for a distributable build)
 run: bundle ## Build, then launch
 	@open $(BUNDLE)
 
-# Every provider under Plugins/, each built as its own package so the boundary
-# holds: a plugin can only see PluginKit, and cannot reach anything the
+# Every integration under Integrations/, each built as its own package so the boundary
+# holds: an integration can only see PluginKit, and cannot reach anything the
 # application happens to have on its classpath. Scratch paths are outside the
 # repository so build products never end up among ours to lint, format, or commit.
 PLUGIN_SCRATCH := $(TMPDIR)/quota-plugins
+INTEGRATION_SCRATCH := $(TMPDIR)/quota-integrations
 
-plugins: ## Build every provider plugin as its own package
-	@for plugin in Plugins/*/; do \
-		echo "==> $$plugin"; \
-		swift build --package-path "$$plugin" --scratch-path "$(PLUGIN_SCRATCH)/$$(basename $$plugin)"; \
+integrations: ## Build every provider integration as its own package
+	@set -e; for integration in Integrations/*/; do \
+		if [ ! -d "$$integration" ]; then continue; fi; \
+		echo "==> $$integration"; \
+		swift build --package-path "$$integration" --scratch-path "$(INTEGRATION_SCRATCH)/$$(basename $$integration)"; \
 	done
 
-verify: lint test plugins bundle ## Everything CI runs
+plugins: integrations ## Build every provider integration as its own package
+
+# The integrations' own suites, for the integrations that ship any.
+integration-tests: ## Run the provider integrations' own test suites
+	@set -e; for integration in Integrations/*/; do \
+		if [ ! -d "$$integration" ]; then continue; fi; \
+		if [[ -d "$$integration/Tests" ]]; then \
+			echo "==> $$integration"; \
+			swift test --package-path "$$integration" --scratch-path "$(INTEGRATION_SCRATCH)/$$(basename $$integration)"; \
+		fi; \
+	done
+
+plugin-tests: integration-tests ## Run the provider integrations' own test suites
+
+verify: lint test integration-tests integrations bundle ## Everything CI runs
 	@echo "verified"
 
 clean: ## Remove build products

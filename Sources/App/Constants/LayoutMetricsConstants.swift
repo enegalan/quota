@@ -63,6 +63,13 @@ enum LayoutMetrics {
     static let mainWindowWidth: CGFloat = 1000
     static let mainWindowHeight: CGFloat = 680
 
+    /// Size of the macOS Settings scene.
+    static let settingsWindowWidth: CGFloat = 480
+    static let settingsWindowHeight: CGFloat = 360
+
+    /// Width of the explanation popover next to a settings control.
+    static let settingsInfoPopoverWidth: CGFloat = 280
+
     /// Sidebar and quota list column widths inside the main window.
     static let sidebarWidth: CGFloat = 160
     static let quotaListWidth: CGFloat = 200

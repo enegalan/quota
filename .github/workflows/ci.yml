@@ -52,6 +52,9 @@ jobs:
       - name: Lint
         run: make lint
 
+      - name: Test the provider plugins
+        run: make plugin-tests
+
       - name: Build provider plugins
         run: make plugins
 

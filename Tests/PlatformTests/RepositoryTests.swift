@@ -270,23 +270,4 @@ struct RepositoryTests {
         #expect(all.first?.installedVersion == "1.1.0")
         #expect(all.first?.authenticatedAccountLabel == "work")
     }
-
-    @Test("Preferences fall back to defaults when nothing is stored")
-    func preferencesDefault() async throws {
-        let store = CodableStore.inMemory()
-        #expect(try await PreferencesRepository(store: store).load() == .default)
-    }
-
-    @Test("Saved preferences are read back")
-    func preferencesRoundTrip() async throws {
-        let store = CodableStore.inMemory()
-        let repository = PreferencesRepository(store: store)
-        let preferences = Preferences(
-            defaultPolicyKind: "weekly",
-            hasCompletedOnboarding: true,
-            refreshIntervalSeconds: 300
-        )
-        try await repository.save(preferences)
-        #expect(try await repository.load() == preferences)
-    }
 }

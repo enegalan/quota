@@ -52,6 +52,16 @@
 					<key>NSMenuItemTitle</key>
 					<string>Refresh Now</string>
 				</dict>
+				<dict>
+					<key>NSMenuItemAction</key>
+					<string>openSettings:</string>
+					<key>NSMenuItemKeyEquivalent</key>
+					<string>,</string>
+					<key>NSMenuItemKeyEquivalentModifierMask</key>
+					<string>command</string>
+					<key>NSMenuItemTitle</key>
+					<string>Settings…</string>
+				</dict>
 			</array>
 		</dict>
 	</dict>
