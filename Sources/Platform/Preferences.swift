@@ -38,18 +38,23 @@ public struct Preferences: Codable, Sendable, Equatable {
     /// and a choice silently forgotten would not.
     public let menuBarQuotaID: UUID?
 
+    /// Whether quota alerts are delivered as notifications.
+    public let notificationsEnabled: Bool
+
     public init(
         defaultPolicyKind: String = PreferenceConstants.defaultPolicyKind,
         hasCompletedOnboarding: Bool = false,
         refreshIntervalSeconds: TimeInterval = RefreshConstants.defaultPollInterval,
         disabledProviders: Set<String> = [],
-        menuBarQuotaID: UUID? = nil
+        menuBarQuotaID: UUID? = nil,
+        notificationsEnabled: Bool = PreferenceConstants.defaultNotificationsEnabled
     ) {
         self.defaultPolicyKind = defaultPolicyKind
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.refreshIntervalSeconds = refreshIntervalSeconds
         self.disabledProviders = disabledProviders
         self.menuBarQuotaID = menuBarQuotaID
+        self.notificationsEnabled = notificationsEnabled
     }
 
     /// The same preferences pointing at a different quota.
@@ -59,7 +64,20 @@ public struct Preferences: Codable, Sendable, Equatable {
             hasCompletedOnboarding: hasCompletedOnboarding,
             refreshIntervalSeconds: refreshIntervalSeconds,
             disabledProviders: disabledProviders,
-            menuBarQuotaID: id
+            menuBarQuotaID: id,
+            notificationsEnabled: notificationsEnabled
+        )
+    }
+
+    /// The same preferences with notifications toggled.
+    public func withNotificationsEnabled(_ enabled: Bool) -> Preferences {
+        Preferences(
+            defaultPolicyKind: defaultPolicyKind,
+            hasCompletedOnboarding: hasCompletedOnboarding,
+            refreshIntervalSeconds: refreshIntervalSeconds,
+            disabledProviders: disabledProviders,
+            menuBarQuotaID: menuBarQuotaID,
+            notificationsEnabled: enabled
         )
     }
 

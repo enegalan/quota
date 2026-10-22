@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Claude provider plugin for Claude Code usage tracking (5-hour, weekly, model-specific windows, and extra usage credits).
+- User-toggleable notifications setting (enabled by default).
+
+### Changed
+
+- Renamed "Providers" to "Integrations" throughout the UI.
+- Added right-click context menu to quota list rows with refresh and delete actions.
+
 ## [1.3.11] - 2026-10-20
 
 ### Changed

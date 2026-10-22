@@ -25,6 +25,9 @@ struct ProviderManagementView: View {
     @State private var opened: ProviderListing?
     @State private var searchQuery = ""
 
+    /// Whether quota notifications are enabled, loaded from preferences.
+    @State private var notificationsEnabled = false
+
     private var filtered: ProviderSections {
         ProviderSearch.filter(sections, query: searchQuery)
     }
@@ -46,6 +49,7 @@ struct ProviderManagementView: View {
                     onCancel: { pendingRemoval = nil }
                 )
             } else {
+                notificationsToggle
                 ProviderSearchField(query: $searchQuery)
                 listingBody
             }
@@ -60,7 +64,21 @@ struct ProviderManagementView: View {
                 }
             )
         }
+        .task {
+            notificationsEnabled = await model.notificationsEnabled()
+        }
         .frame(maxWidth: LayoutMetrics.providerListWidth, alignment: .leading)
+    }
+
+    /// Toggle for enabling or disabling quota notifications.
+    ///
+    /// Shown at the top of the integrations screen so the user can opt in or
+    /// out of being alerted when a quota nears its limit.
+    private var notificationsToggle: some View {
+        Toggle("Enable notifications", isOn: $notificationsEnabled)
+            .onChange(of: notificationsEnabled) { _, newValue in
+                Task { await model.setNotificationsEnabled(newValue) }
+            }
     }
 
     @ViewBuilder

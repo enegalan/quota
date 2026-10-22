@@ -1236,7 +1236,7 @@ Welcome to Quota
 Connect a service to automatically
 track your quota usage.
 
-[ Browse Providers ]
+[ Browse Integrations ]
 ```
 
 The user then chooses and installs the required provider plugin.

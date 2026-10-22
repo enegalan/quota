@@ -24,7 +24,7 @@ struct MainWindow: View {
 
     enum SidebarItem: Hashable {
         case quotas
-        case providers
+        case integrations
     }
 
     @State private var sidebar: SidebarItem = .quotas
@@ -36,8 +36,8 @@ struct MainWindow: View {
             List(selection: $sidebar) {
                 Label("Quotas", systemImage: "chart.bar")
                     .tag(SidebarItem.quotas)
-                Label("Providers", systemImage: "puzzlepiece.extension")
-                    .tag(SidebarItem.providers)
+                Label("Integrations", systemImage: "puzzlepiece.extension")
+                    .tag(SidebarItem.integrations)
             }
             .navigationTitle("Quota")
             .frame(minWidth: LayoutMetrics.sidebarWidth)
@@ -49,8 +49,8 @@ struct MainWindow: View {
                     switch sidebar {
                     case .quotas:
                         quotasDetail
-                    case .providers:
-                        providersDetail
+                    case .integrations:
+                        integrationsDetail
                     }
                 }
             }
@@ -125,7 +125,7 @@ struct MainWindow: View {
     private var quotaList: some View {
         List(selection: $selectedQuotaID) {
             ForEach(model.presentations) { presentation in
-                QuotaListRow(presentation: presentation)
+                QuotaListRow(presentation: presentation, model: model)
                     .tag(presentation.id)
             }
         }
@@ -187,10 +187,10 @@ struct MainWindow: View {
         return model.presentations.first { $0.id == selectedQuotaID }
     }
 
-    private var providersDetail: some View {
+    private var integrationsDetail: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
-                Text("Providers")
+                Text("Integrations")
                     .font(.title2.weight(.semibold))
                 ProviderManagementView(sections: model.sections, model: model)
                 if let lastError = model.lastError {

@@ -11,4 +11,7 @@ import Foundation
 public enum PreferenceConstants {
     /// The policy a new quota gets when the user has not picked one.
     public static let defaultPolicyKind = AllocationPolicy.even.kind
+
+    /// Whether quota alerts are delivered as notifications by default.
+    public static let defaultNotificationsEnabled = true
 }

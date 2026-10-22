@@ -1,3 +1,4 @@
+import AppKit
 import Core
 import SwiftUI
 
@@ -9,8 +10,16 @@ import SwiftUI
 /// save.
 struct QuotaListRow: View {
     let presentation: QuotaPresentation
+    let model: AppModel?
+
+    @State private var isConfirmingDelete = false
 
     private let formatter = PercentageFormatter()
+
+    init(presentation: QuotaPresentation, model: AppModel? = nil) {
+        self.presentation = presentation
+        self.model = model
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
@@ -41,5 +50,32 @@ struct QuotaListRow: View {
         }
         .padding(.vertical, LayoutMetrics.unit)
         .accessibilityElement(children: .combine)
+        .contextMenu {
+            Button {
+                Task { await model?.refreshAll() }
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            Divider()
+            if isConfirmingDelete {
+                Button(role: .destructive) {
+                    Task { await model?.deleteQuota(presentation.id) }
+                    isConfirmingDelete = false
+                } label: {
+                    Label("Confirm Delete", systemImage: "trash")
+                }
+                Button {
+                    isConfirmingDelete = false
+                } label: {
+                    Label("Cancel", systemImage: "xmark")
+                }
+            } else {
+                Button(role: .destructive) {
+                    isConfirmingDelete = true
+                } label: {
+                    Label("Delete Quota", systemImage: "trash")
+                }
+            }
+        }
     }
 }

@@ -18,9 +18,9 @@ struct OnboardingView: View {
     var body: some View {
         NoticeCard(
             title: "Welcome to Quota",
-            message: "Connect a service to automatically track your quota usage."
+            message: "Connect an integration to automatically track your quota usage."
         ) {
-            Button("Browse Providers", action: onBrowseProviders)
+            Button("Browse Integrations", action: onBrowseProviders)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
         }

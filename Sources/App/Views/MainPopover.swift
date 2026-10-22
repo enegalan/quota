@@ -129,7 +129,7 @@ struct MainPopover: View {
     private var emptyState: some View {
         NoticeCard(
             title: "Welcome to Quota",
-            message: "Connect a provider and create a quota to start tracking usage."
+            message: "Connect an integration and create a quota to start tracking usage."
         )
     }
 
