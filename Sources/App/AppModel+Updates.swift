@@ -28,7 +28,9 @@ extension AppModel {
     ///   for a version that has not been announced yet.
     func checkForUpdates(force: Bool) async {
         guard !isCheckingForUpdates else { return }
-        let preferences = await (try? environment.preferences.load()) ?? .default
+        guard let preferences = await loadPreferencesForUpdateCheck(force: force) else {
+            return
+        }
         let now = environment.now()
         guard force || shouldCheckAutomatically(preferences: preferences, now: now) else {
             return
@@ -42,8 +44,7 @@ extension AppModel {
             current: BundleConstants.applicationVersion,
             fetcher: releaseFetcher
         )
-        await saveLastUpdateCheck(at: now)
-        await applyUpdateOutcome(outcome, force: force, preferences: preferences)
+        await applyUpdateOutcome(outcome, force: force, preferences: preferences, checkedAt: now)
     }
 
     /// Opens the release page for the update currently shown in settings.
@@ -55,6 +56,19 @@ extension AppModel {
     /// Runs an automatic update check after the interface has loaded.
     func maybeCheckForUpdatesAutomatically() async {
         await checkForUpdates(force: false)
+    }
+
+    /// Loads preferences for an update check, or nil when the check must stop.
+    ///
+    /// Automatic checks bail out when the store cannot be read. A manual check
+    /// continues with defaults so Check Now still asks GitHub.
+    private func loadPreferencesForUpdateCheck(force: Bool) async -> Preferences? {
+        do {
+            return try await environment.preferences.load()
+        } catch {
+            report(error)
+            return force ? .default : nil
+        }
     }
 
     private func shouldCheckAutomatically(preferences: Preferences, now: Date) -> Bool {
@@ -75,13 +89,16 @@ extension AppModel {
     private func applyUpdateOutcome(
         _ outcome: UpdateCheckOutcome,
         force: Bool,
-        preferences: Preferences
+        preferences: Preferences,
+        checkedAt: Date
     ) async {
         switch outcome {
         case .upToDate:
             updateStatus = .upToDate
+            await saveLastUpdateCheck(at: checkedAt)
         case .available(let version, let releaseURL):
             updateStatus = .available(version: version.description, url: releaseURL)
+            await saveLastUpdateCheck(at: checkedAt)
             let shouldOpen = force
                 || preferences.announcedUpdateVersion != version.description
             if shouldOpen {

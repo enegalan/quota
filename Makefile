@@ -62,7 +62,7 @@ PLUGIN_SCRATCH := $(TMPDIR)/quota-plugins
 INTEGRATION_SCRATCH := $(TMPDIR)/quota-integrations
 
 integrations: ## Build every provider integration as its own package
-	@for integration in Integrations/*/; do \
+	@set -e; for integration in Integrations/*/; do \
 		if [ ! -d "$$integration" ]; then continue; fi; \
 		echo "==> $$integration"; \
 		swift build --package-path "$$integration" --scratch-path "$(INTEGRATION_SCRATCH)/$$(basename $$integration)"; \
@@ -72,7 +72,7 @@ plugins: integrations ## Build every provider integration as its own package
 
 # The integrations' own suites, for the integrations that ship any.
 integration-tests: ## Run the provider integrations' own test suites
-	@for integration in Integrations/*/; do \
+	@set -e; for integration in Integrations/*/; do \
 		if [ ! -d "$$integration" ]; then continue; fi; \
 		if [[ -d "$$integration/Tests" ]]; then \
 			echo "==> $$integration"; \

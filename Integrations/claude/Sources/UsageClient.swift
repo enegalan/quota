@@ -13,7 +13,7 @@ enum UsageClient {
         userAgent: ClaudeConstants.userAgent
     )
 
-    private static let redirectRefusingSession: URLSession = .init(
+    private static let redirectRefusingSession = URLSession(
         configuration: .ephemeral,
         delegate: RedirectRefusingDelegate.shared,
         delegateQueue: nil
