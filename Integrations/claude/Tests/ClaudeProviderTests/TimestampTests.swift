@@ -42,4 +42,12 @@ struct TimestampTests {
         #expect(ClaudeTimestamp.instant(from: "") == nil)
         #expect(ClaudeTimestamp.instant(from: "2026-04-08") == nil)
     }
+
+    @Test("A malformed offset is refused")
+    func refusesMalformedOffset() {
+        #expect(ClaudeTimestamp.instant(from: "2026-04-08T13:59:59+junk01:00") == nil)
+        #expect(ClaudeTimestamp.instant(from: "2026-04-08T13:59:59+01:0a") == nil)
+        #expect(ClaudeTimestamp.instant(from: "2026-04-08T13:59:59+01:") == nil)
+        #expect(ClaudeTimestamp.instant(from: "2026-04-08T13:59:59+٠١:٠٠") == nil)
+    }
 }

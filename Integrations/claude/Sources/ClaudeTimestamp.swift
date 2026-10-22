@@ -76,7 +76,21 @@ enum ClaudeTimestamp {
     /// understood it would have to fail on the second. The sign is the
     /// caller's, because the text after the sign carries only the magnitude.
     private static func parseOffset(from text: String, negative: Bool) -> Int? {
-        let digits = text.filter(\.isNumber)
+        let digits: String
+        if let colon = text.firstIndex(of: ":") {
+            let hours = text[..<colon]
+            let minutes = text[text.index(after: colon)...]
+            guard hours.count == 2,
+                  minutes.count == 2,
+                  hours.allSatisfy(isASCIIDigit),
+                  minutes.allSatisfy(isASCIIDigit)
+            else { return nil }
+            digits = String(hours) + String(minutes)
+        } else {
+            guard text.allSatisfy(isASCIIDigit) else { return nil }
+            digits = text
+        }
+
         let magnitude: Int
         switch digits.count {
         case 2:
@@ -89,5 +103,9 @@ enum ClaudeTimestamp {
             return nil
         }
         return negative ? -magnitude : magnitude
+    }
+
+    private static func isASCIIDigit(_ character: Character) -> Bool {
+        character.isASCII && character.isNumber
     }
 }
