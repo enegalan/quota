@@ -43,6 +43,10 @@ not close the milestone.
 | M-15      | Reliability                   | `[x]`  |
 | M-16      | Documentation                 | `[x]`  |
 | M-17      | Several windows on a provider | `[x]`  |
+| M-18      | Claude Code feasibility spike | `[ ]`  |
+| M-19      | Claude Code provider plugin   | `[ ]`  |
+| M-20      | Notifications                 | `[ ]`  |
+| M-21      | Usage history view            | `[ ]`  |
 
 ## Amendments
 
@@ -62,6 +66,34 @@ says what closed the milestone.
   replaces `PluginManifest` as the host's launch record, and TASK-206's
   "validate the manifest" step is now "refuse an archive with no executable at
   that name".
+
+- **The catalog file is gone.** `Resources/catalog.json` and `CatalogEntry` were
+  removed, and so were TASK-202 and TASK-203. A provider now ships **inside the
+  application bundle** as `Resources/Providers/<id>.tar.gz`, and the directory is
+  the catalog: the list of providers is read from the bundle, and the
+  availability of a provider is the bundle's own business. TASK-207's hash
+  comparison and TASK-208's signature check were removed with it — a hash is
+  still _recorded_ with the install, so the record says which bytes produced it,
+  but nothing compares it, because there is no second claim about the bytes for
+  a digest to disagree with. The refusal in TASK-206 that survives is the one
+  that still means something: an archive with no executable at the expected name
+  is refused.
+
+- **The pacing verdict is no longer displayed.** M-06 and M-12 built it, and
+  §57 item 28 asked for it on screen. In 1.3.11 the verdict stopped being
+  shown: the summary still carries it and the domain still computes it, but the
+  interface shows the figures instead, each of which is true on its own. TASK-274
+  is annotated in M-12, and `spec/0001-definition.md` §38 says why, so the
+  decision is not undone by accident.
+
+- **The application is signed ad-hoc.** There is no Developer ID identity behind
+  the release, so the bundle is signed with `-` and macOS asks the user to
+  confirm the first launch. This is a **distribution** limitation and not a
+  security one, and it has one architectural consequence worth stating: a
+  capability that depends on a registered bundle — the system notification
+  channel — must be optional and must degrade. That is why M-20 is built around
+  an in-app channel that always works, with the system channel as an addition
+  to it.
 
 ---
 
@@ -1253,6 +1285,310 @@ swift test --filter MultiWindowQuotaTests
 
 ---
 
+## M-18 · Claude Code feasibility spike
+
+**Spec:** §13, §18
+**Depends on:** M-17
+**Gate:** this milestone is a **decision**, not construction, in the same sense
+M-13 was. A no-go leaves everything above untouched and changes the subject of
+M-19.
+
+**Spec:** `spec/0007-claude-spike-plan.md` · **Report:** `spec/0008-claude-spike-report.md`
+
+**Status:** not started.
+
+**The difference from M-13, and it shapes every task below:** the project owner
+has no Claude account and does not use Claude Code. The spike therefore cannot
+do what M-13 did — watch a live service for twenty-four hours — and is not
+allowed to pretend otherwise. It separates what can be settled on this machine
+from what cannot, writes the second list down precisely enough to be closed
+later, and builds the plugin against synthetic fixtures. The outcome is a
+three-way decision: **go**, **conditional go**, or **no-go**.
+
+### Tasks
+
+- [ ] **TASK-411** Record the local layout of Claude Code's data: where the
+      transcripts live, how a project path becomes a directory name, and which
+      files carry the configuration. Every claim tagged with the tier it belongs
+      to — verified, assumed, or unknown.
+- [ ] **TASK-412** Record the transcript format: the fields that carry the model,
+      the usage counters and the timestamp, and the fields that carry the user's
+      content and are therefore never read.
+- [ ] **TASK-413** Decide and record how a message is attributed to a day and to
+      a window, including the boundary cases: midnight, and the start of a new
+      five-hour window.
+- [ ] **TASK-414** Build the synthetic fixture corpus of §6 of the spike plan:
+      a plain session, tool calls, caching, two models, a session crossing
+      midnight, a session crossing a window boundary, a truncated final line, an
+      empty file, a hostile project directory, a skewed clock, and an unknown
+      field. Every fixture marked as synthetic, in a file that says so.
+- [ ] **TASK-415** Determine how the plugin identifies the account, and what it
+      reports as the account label when the identity cannot be read.
+- [ ] **TASK-416** Determine the plugin's own configuration: the allowance
+      override the user sets, where it lives, and its format.
+- [ ] **TASK-417** Establish the allowance table of §4.1 of the spike plan, with
+      each entry cited, and mark the entries that rest on an assumption.
+- [ ] **TASK-418** Write down the questions that cannot be answered without an
+      account — U-01 to U-07 of the spike plan — each with what would close it
+      and what would change in the design if the answer went either way.
+- [ ] **TASK-419** Confirm that the transcripts can be read with a read-only
+      handle while Claude Code is running, and that the plugin never copies,
+      indexes or caches a transcript.
+- [ ] **TASK-420** Decide the mechanism: the local transcript, the account's
+      endpoint, or both, with the seam that lets the second replace the first
+      without touching the host.
+- [ ] **TASK-421** Take an explicit decision — go, conditional go, or no-go — and
+      record it, with the conditions attached to a conditional go and the
+      replacement provider named on a no-go.
+
+### Exit criterion
+
+```sh
+swift test --filter ClaudeProviderTests
+```
+
+A report exists at `spec/0008-claude-spike-report.md` with the layout, the
+format, the corpus, the three tiers of confidence, the open questions, and the
+decision. The fixture corpus parses into valid snapshots. On a no-go, the report
+names the replacement provider and M-19's subject is updated.
+
+### Tests
+
+- `Tests/ClaudeProviderTests/TranscriptParsingTests.swift` — a plain session; a
+  session with tool calls, where the tool results carry no usage; a session with
+  cache tokens; a session with two models; a truncated final line; an empty
+  file; an unknown field that must be ignored rather than refused.
+- `Tests/ClaudeProviderTests/WindowAttributionTests.swift` — a message at
+  midnight; a message on the boundary of a five-hour window; a session after a
+  long gap; a message whose timestamp is in the future.
+- `Tests/ClaudeProviderTests/ProjectPathTests.swift` — a path with spaces, dots,
+  non-ASCII characters, and two paths differing only in case.
+- `Tests/ClaudeProviderTests/AllowanceTests.swift` — the allowance table's
+  entries; a user override that wins over the table; a missing allowance that
+  refuses rather than guessing.
+
+---
+
+## M-19 · Claude Code provider plugin
+
+**Spec:** §4, §12, §13, §14, §21, §44, §45, §49, §52, §53, §54
+**Depends on:** M-18
+**Spec §57 items closed here:** 12 (a second real provider plugin), 13 (a real
+provider retrieves usage automatically), 14 (normalised snapshot), 15 (period
+detected automatically), 36 (a real provider has integration tests), 38 (adding a
+provider does not require engine changes)
+
+**Status:** not started. The subject is Claude Code, unless M-18 was a no-go, in
+which case it is the replacement provider the report named.
+
+### Tasks
+
+- [ ] **TASK-431** Implement the transcript reader: project directories are
+      discovered, files are read line by line with a read-only handle, and the
+      usage fields are extracted. No other field is read, and there is no code
+      path that copies one.
+- [ ] **TASK-432** Implement the window derivation of TASK-413, producing one
+      bucket per model per window, each carrying the window it was derived from.
+- [ ] **TASK-433** Apply the allowance of §4.1 of the spike plan, and mark every
+      figure derived from the built-in table as an estimate, in the provider's
+      report and in the bucket's description.
+- [ ] **TASK-434** Normalise the reading into a `UsageSnapshot` with one bucket
+      per model per window, and refuse rather than guess when the denominator
+      cannot be established.
+- [ ] **TASK-435** Re-read the transcripts on every refresh and never cache a
+      transcript, per §53.
+- [ ] **TASK-436** Never log a transcript line, a message body, or a prompt, and
+      make no network request at all under the local mechanism, per §54.
+- [ ] **TASK-437** Map a missing directory, an unreadable file, a truncated
+      transcript and an unparseable line to the error states of §45, distinguishing
+      "there is nothing to read yet" from "the reading failed".
+- [ ] **TASK-438** Implement `connect` as a check that Claude Code's data is
+      present and readable, and `disconnect` as the removal of the plugin's
+      configuration, leaving the transcripts untouched.
+- [ ] **TASK-439** Declare the provider unofficial, and mark every estimated
+      figure as an estimate, so the interface can show both notices.
+- [ ] **TASK-440** Add the per-provider kill switch entry, so a change in
+      Claude Code's format can disable the provider without an application
+      release.
+- [ ] **TASK-441** Remove every provider-specific identifier from `Core`,
+      `Platform` and `App`, and prove it with the same fictional-provider test
+      M-14 used.
+- [ ] **TASK-442** Add integration tests asserting that a fixture transcript
+      becomes a valid `UsageSnapshot`, per §52.
+- [ ] **TASK-443** Confirm that no quota data leaves the machine other than to
+      the provider itself, and that the plugin reads nothing outside the
+      directories it names.
+
+### Exit criterion
+
+```sh
+swift test --filter ClaudeProviderTests
+```
+
+All fixture tests pass. Provider names stay out of `Sources/` by the plugin
+boundary and review.
+
+### Tests
+
+- `Tests/ClaudeProviderTests/TranscriptParsingTests.swift` — the corpus of
+  TASK-414, each fixture producing the snapshot it is expected to produce.
+- `Tests/ClaudeProviderTests/WindowAttributionTests.swift` — the boundary cases,
+  and the rule that a window's start comes from the transcript and not from the
+  clock at read time.
+- `Tests/ClaudeProviderTests/SnapshotNormalisationTests.swift` — two models, two
+  windows, four buckets; an estimate marked as an estimate; a missing allowance
+  refused.
+- `Tests/ClaudeProviderTests/ErrorMappingTests.swift` — each of the nine error
+  states reachable from a fixture.
+- `Tests/ClaudeProviderTests/PrivacyTests.swift` — no transcript content appears
+  in any log line, and the plugin opens no path outside the directories it
+  names.
+
+---
+
+## M-20 · Notifications
+
+**Spec:** §21, §45, §55, §57
+**Depends on:** M-17
+**Spec §57 items closed here:** 42, 43 (the post-MVP items of §57.1)
+
+**Spec:** `spec/0005-notifications.md`
+
+**Status:** not started.
+
+**The shape of this milestone is set by one fact:** the application is signed
+ad-hoc and has no Developer ID identity, so a capability that depends on a
+registered bundle cannot be required. The **in-app channel is the primary one**
+and the system notification channel is an optional addition to it. A build
+without the system channel is a complete build.
+
+### Tasks
+
+- [ ] **TASK-451** Define the notification kinds and the policy that decides
+      what is said, as a pure function in `Core` that takes the instant as a
+      parameter and touches no framework.
+- [ ] **TASK-452** Implement the four kinds: `limitReached`,
+      `providerNeedsAction`, `dailyShareNearlySpent` and `readingIsStale`, with
+      the first two on by default and the last two off.
+- [ ] **TASK-453** Implement the rules that forbid: nothing from a stale reading,
+      nothing twice for a condition that still holds, nothing about a failure
+      that is not the provider asking for the user, nothing about a provider the
+      user switched off, nothing about pacing, and nothing the user cannot act
+      on.
+- [ ] **TASK-454** Implement the quiet hours: a condition arising inside them is
+      deferred rather than dropped, and fires afterwards only if it still holds.
+- [ ] **TASK-455** Add the sixth record family, `notifications.json`, holding the
+      condition last announced per kind, written **after** a delivery succeeds
+      and never before.
+- [ ] **TASK-456** Implement the delivery seam, with one implementation that
+      talks to the system and one that records what it was given, and a
+      capability check that reports the system channel as unavailable when the
+      platform refuses it.
+- [ ] **TASK-457** Show every condition that can notify in the popover, without
+      the system channel, so the two channels cannot disagree and so a user who
+      dismissed a notification has not lost the information.
+- [ ] **TASK-458** Ask for notification permission only when the user turns the
+      channel on, never at first launch, and say plainly when it is refused.
+- [ ] **TASK-459** Make the notification carry its own context: the quota it is
+      about, the figures it is quoting, what can be done, and when the last good
+      reading was.
+- [ ] **TASK-460** Give the user a way to choose the threshold for
+      `dailyShareNearlySpent`, as a share of the day's own allocation.
+
+### Exit criterion
+
+```sh
+swift test --filter NotificationPolicyTests
+swift test --filter NotificationStateTests
+```
+
+### Tests
+
+- `Tests/CoreTests/NotificationPolicyTests.swift` — each kind fires on its own
+  condition and only on that condition; a condition already announced produces
+  nothing; a stale reading produces no event; a provider switched off produces
+  nothing; a condition arising in the quiet hours is deferred and fires
+  afterwards if it still holds.
+- `Tests/PlatformTests/NotificationStateTests.swift` — a refused delivery does
+  not mark the condition as announced; a condition that clears and returns
+  notifies again.
+- `Tests/AppTests/NotificationChannelTests.swift` — the in-app channel shows the
+  same conditions as the system channel; every kind that can notify is visible
+  in the popover without the system channel.
+
+---
+
+## M-21 · Usage history view
+
+**Spec:** §32, §34, §35, §58
+**Depends on:** M-17
+**Spec §57 items closed here:** 44 (the post-MVP item of §57.1)
+
+**Spec:** `spec/0006-usage-history.md`
+
+**Status:** not started.
+
+**Two constraints shape this milestone.** The timeline keeps 5 000 points, which
+at the default poll is about seventeen days — too short to draw a month, so a
+**daily rollup** is added. And the allocation plan is **rebalanced on every
+reading**, so yesterday's plan no longer exists and "planned versus actual" for
+a past day **cannot** be computed from what the application has; the view
+therefore shows what it can state truthfully and does not compare against a plan.
+
+### Tasks
+
+- [ ] **TASK-471** Add `UsageTimeline.dailyUsage`, deriving every day's measured
+      use through `usedDuring` — the same rule the calendar and the today block
+      use — so the three cannot disagree about a day, and keeping the rule's
+      four answers apart: exact, floor, not yet begun, and unknown.
+- [ ] **TASK-472** Add the daily rollup family, `dailyusage.json`, holding one
+      row per day per pool, written when the day ends, written once, and
+      storing the day's measurement as it is: unknown for a day the application
+      could not measure, and a floor for a day whose meter reset during it.
+- [ ] **TASK-473** Write the rollup at the moment the coordinator notices that a
+      day has ended, which it already has to notice for the timeline's day
+      boundary to be correct.
+- [ ] **TASK-474** Build the presentation: one bar per elapsed day of the
+      period, scaled to the largest measured day and labelled as such, with a
+      day the application could not measure drawn as a gap rather than an empty
+      bar.
+- [ ] **TASK-475** Write the caption: the average per day, the number of
+      measured days, the number that could not be, and — when the application
+      has only been watching for a short time — the date it started watching.
+- [ ] **TASK-476** Place the section between TODAY and CALENDAR in the quota's
+      detail, and make a bar selectable, selecting that day in the calendar
+      below it.
+- [ ] **TASK-477** Draw nothing that is not measured: no future days, no
+      cumulative line, no forecast, and no second copy of the plan.
+- [ ] **TASK-478** State the decision about the plan comparison in the
+      specification, and do not ship one: the plan of a past day does not exist,
+      and a comparison against the current plan would be a comparison of two
+      things that do not belong together.
+
+### Exit criterion
+
+```sh
+swift test --filter DailyUsageTests
+swift test --filter UsageHistoryPresenterTests
+```
+
+### Tests
+
+- `Tests/CoreTests/DailyUsageTests.swift` — a day with a baseline is measured
+  exactly; a day with no baseline is unknown and never zero; a day that has not
+  happened is zero; a day the application could not watch is unknown.
+- `Tests/PlatformTests/DailyUsageRollupTests.swift` — a day is written once,
+  when it ends, and is not rewritten; a day the application could not measure is
+  written as unknown.
+- `Tests/AppTests/UsageHistoryPresenterTests.swift` — the caption states the
+  average, the measured days and the gaps; the caption says when the
+  application started watching; the history view and the calendar report the
+  same figure for the same day.
+- `Tests/AppTests/UsageHistoryInteractionTests.swift` — selecting a bar selects
+  that day in the calendar.
+
+---
+
 ## Appendix A · Milestone dependencies
 
 ```
@@ -1261,55 +1597,70 @@ M-01 ──┬──> M-02 ──> M-03 ──┬──> M-04 ──> M-05 ─�
        │                     └──> M-08
        └──> M-09 ──> M-10 ──> M-11 ──> M-12 ──> M-13 ──> M-14 ──> M-15 ──> M-16
                                                                               └──> M-17
+                                                                                   ├──> M-18 ──> M-19
+                                                                                   ├──> M-20
+                                                                                   └──> M-21
 ```
 
 M-02 through M-08 and M-09 through M-12 can proceed in parallel once M-01 closes.
 M-13 is the single go/no-go gate for the rest of the project.
 M-17 changes the shape of what a provider reports, so it lands after M-16 rather than beside it: every milestone above it was written against a reading that carried one window.
 
+M-18 through M-21 are the work that follows the MVP, and they branch from M-17
+because they are all written against a provider that may report several windows
+and against an application whose build is ad-hoc signed. M-20 and M-21 do not
+depend on each other and do not depend on M-18: neither is about a provider.
+M-19 depends on M-18 alone, because M-18 is a decision and the subject of M-19
+is whatever that decision names.
+
 ## Appendix B · Definition of Done coverage
 
-| §57 item | Milestone  | Tasks                                  |
-| -------- | ---------- | -------------------------------------- |
-| 1        | M-12       | TASK-273                               |
-| 2        | M-09       | TASK-188, TASK-196                     |
-| 3        | M-10       | TASK-218                               |
-| 4        | M-16       | TASK-378                               |
-| 5        | M-10, M-12 | TASK-203, TASK-282                     |
-| 6        | M-10, M-12 | TASK-206, TASK-281                     |
-| 7        | M-10, M-12 | TASK-213, TASK-283                     |
-| 8        | M-10       | TASK-204, TASK-219                     |
-| 9        | M-10       | TASK-205, TASK-212, TASK-216           |
-| 10       | M-15       | TASK-351                               |
-| 11       | M-10       | TASK-220                               |
-| 12       | M-14       | TASK-321                               |
-| 13       | M-14       | TASK-324, TASK-325                     |
-| 14       | M-03, M-14 | TASK-063, TASK-324                     |
-| 15       | M-14       | TASK-326                               |
-| 16       | M-11       | TASK-246                               |
-| 17       | M-11       | TASK-068                               |
-| 18       | M-10       | TASK-181, TASK-203, TASK-206, TASK-213 |
-| 19       | M-05       | TASK-101                               |
-| 20       | M-04, M-05 | TASK-085, TASK-104                     |
-| 21       | M-04, M-05 | TASK-082, TASK-105                     |
-| 22       | M-04, M-05 | TASK-086, TASK-106                     |
-| 23       | M-03, M-12 | TASK-066, TASK-275                     |
-| 24       | M-11       | TASK-246                               |
-| 25       | M-12       | TASK-275                               |
-| 26       | M-12       | TASK-277                               |
-| 27       | M-12       | TASK-278                               |
-| 28       | M-06, M-12 | TASK-121, TASK-274                     |
-| 29       | M-12       | TASK-285                               |
-| 30       | M-12       | TASK-286                               |
-| 31       | M-08, M-11 | TASK-164, TASK-247                     |
-| 32       | M-08, M-14 | TASK-171, TASK-323                     |
-| 33       | M-09, M-15 | TASK-192, TASK-355                     |
-| 34       | M-05       | TASK-107                               |
-| 35       | M-10       | TASK-206 to TASK-216                   |
-| 36       | M-14       | TASK-339                               |
-| 37       | M-15       | TASK-357                               |
-| 38       | M-14       | TASK-338                               |
-| 39       | M-11, M-12 | TASK-246, TASK-275                     |
+| §57 item | Milestone        | Tasks                                  |
+| -------- | ---------------- | -------------------------------------- |
+| 1        | M-12             | TASK-273                               |
+| 2        | M-09             | TASK-188, TASK-196                     |
+| 3        | M-10             | TASK-218                               |
+| 4        | M-16             | TASK-378                               |
+| 5        | M-10, M-12       | TASK-203, TASK-282                     |
+| 6        | M-10, M-12       | TASK-206, TASK-281                     |
+| 7        | M-10, M-12       | TASK-213, TASK-283                     |
+| 8        | M-10             | TASK-204, TASK-219                     |
+| 9        | M-10             | TASK-205, TASK-212, TASK-216           |
+| 10       | M-15             | TASK-351                               |
+| 11       | M-10             | TASK-220                               |
+| 12       | M-14, M-19       | TASK-321, TASK-431                     |
+| 13       | M-14, M-19       | TASK-324, TASK-325, TASK-434           |
+| 14       | M-03, M-14, M-19 | TASK-063, TASK-324, TASK-434           |
+| 15       | M-14, M-19       | TASK-326, TASK-432                     |
+| 16       | M-11             | TASK-246                               |
+| 17       | M-11             | TASK-068                               |
+| 18       | M-10             | TASK-181, TASK-203, TASK-206, TASK-213 |
+| 19       | M-05             | TASK-101                               |
+| 20       | M-04, M-05       | TASK-085, TASK-104                     |
+| 21       | M-04, M-05       | TASK-082, TASK-105                     |
+| 22       | M-04, M-05       | TASK-086, TASK-106                     |
+| 23       | M-03, M-12       | TASK-066, TASK-275                     |
+| 24       | M-11             | TASK-246                               |
+| 25       | M-12             | TASK-275                               |
+| 26       | M-12             | TASK-277                               |
+| 27       | M-12             | TASK-278                               |
+| 28       | M-06, M-12       | TASK-121, TASK-274                     |
+| 29       | M-12             | TASK-285                               |
+| 30       | M-12             | TASK-286                               |
+| 31       | M-08, M-11       | TASK-164, TASK-247                     |
+| 32       | M-08, M-14       | TASK-171, TASK-323                     |
+| 33       | M-09, M-15       | TASK-192, TASK-355                     |
+| 34       | M-05             | TASK-107                               |
+| 35       | M-10             | TASK-206 to TASK-216                   |
+| 36       | M-14, M-19       | TASK-339, TASK-442                     |
+| 37       | M-15             | TASK-357                               |
+| 38       | M-14, M-19       | TASK-338, TASK-441                     |
+| 39       | M-11, M-12       | TASK-246, TASK-275                     |
+| 40       | M-19             | TASK-441                               |
+| 41       | M-19             | TASK-432                               |
+| 42       | M-20             | TASK-455                               |
+| 43       | M-20             | TASK-457                               |
+| 44       | M-21             | TASK-474                               |
 
 ## Appendix C · Task numbering
 
@@ -1332,3 +1683,7 @@ M-17 changes the shape of what a provider reports, so it lands after M-16 rather
 | TASK-351 to TASK-363 | M-15      |
 | TASK-371 to TASK-381 | M-16      |
 | TASK-391 to TASK-402 | M-17      |
+| TASK-411 to TASK-421 | M-18      |
+| TASK-431 to TASK-443 | M-19      |
+| TASK-451 to TASK-460 | M-20      |
+| TASK-471 to TASK-478 | M-21      |

@@ -31,7 +31,7 @@ If you have one or more AI subscriptions and want to pace your daily usage to re
 
 1. **Connect your providers.** Install the plugins for the services you use and configure each quota with its renewal date.
 2. **Quota calculates your daily allowance.** It reads how much you have consumed and determines how much you can use each day until the next cycle.
-3. **Check the menu bar every day.** Your daily quota and pacing status are there, at a glance.
+3. **Check the menu bar every day.** Your daily allowance and the days you have left are there, at a glance.
 
 ## Requirements
 
