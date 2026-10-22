@@ -12,9 +12,13 @@ public enum UpdateConstants {
     public static let repositoryName = "quota"
 
     /// GitHub API endpoint for the newest published release.
-    public static let latestReleaseURL = URL(
-        string: "https://api.github.com/repos/\(repositoryOwner)/\(repositoryName)/releases/latest"
-    )!
+    public static let latestReleaseURL: URL = {
+        let path = "/repos/\(repositoryOwner)/\(repositoryName)/releases/latest"
+        guard let url = URL(string: "https://api.github.com\(path)") else {
+            preconditionFailure("UpdateConstants.latestReleaseURL is not a valid URL.")
+        }
+        return url
+    }()
 
     /// Shortest gap between two automatic update checks.
     public static let minimumCheckInterval: TimeInterval = 24 * 60 * 60

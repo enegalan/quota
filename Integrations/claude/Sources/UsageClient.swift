@@ -13,13 +13,11 @@ enum UsageClient {
         userAgent: ClaudeConstants.userAgent
     )
 
-    private static let redirectRefusingSession: URLSession = {
-        URLSession(
-            configuration: .ephemeral,
-            delegate: RedirectRefusingDelegate.shared,
-            delegateQueue: nil
-        )
-    }()
+    private static let redirectRefusingSession: URLSession = .init(
+        configuration: .ephemeral,
+        delegate: RedirectRefusingDelegate.shared,
+        delegateQueue: nil
+    )
 
     /// The usage the account's subscription reports.
     static func fetchUsage(credential: ClaudeCredential, localDate: String) throws -> UsageResult {
