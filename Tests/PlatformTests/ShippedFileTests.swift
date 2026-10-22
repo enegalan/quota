@@ -30,9 +30,9 @@ struct ShippedFileTests {
     /// listed is not offered, and one removed but still listed is a row in the
     /// interface for code the build no longer ships.
     private static func packagedProviders() throws -> [String] {
-        let plugins = repositoryRoot.appendingPathComponent("Plugins", isDirectory: true)
+        let integrations = repositoryRoot.appendingPathComponent("Integrations", isDirectory: true)
         return try FileManager.default
-            .subpathsOfDirectory(atPath: plugins.path)
+            .subpathsOfDirectory(atPath: integrations.path)
             .filter { $0.hasSuffix("Package.swift") }
             // The directory the package sits in is the id discovery will file its
             // artifact under.
@@ -44,7 +44,7 @@ struct ShippedFileTests {
     func packagedProvidersBuildTheExpectedExecutable() throws {
         for id in try Self.packagedProviders() {
             let package = Self.repositoryRoot
-                .appendingPathComponent("Plugins", isDirectory: true)
+                .appendingPathComponent("Integrations", isDirectory: true)
                 .appendingPathComponent(id, isDirectory: true)
                 .appendingPathComponent("Package.swift")
             // The name of the executable is a convention rather than a file, so
@@ -55,7 +55,7 @@ struct ShippedFileTests {
                 declared.contains(
                     ".executable(name: \"\(PluginLayout.executableName(for: id))\""
                 ),
-                "Plugins/\(id) does not build \(PluginLayout.executableName(for: id))"
+                "Integrations/\(id) does not build \(PluginLayout.executableName(for: id))"
             )
         }
     }
@@ -65,7 +65,7 @@ struct ShippedFileTests {
         for id in try Self.packagedProviders() {
             #expect(
                 (try? ProviderID(id)) != nil,
-                "Plugins/\(id) cannot be the name of a packaged artifact"
+                "Integrations/\(id) cannot be the name of a packaged artifact"
             )
         }
     }
@@ -74,7 +74,7 @@ struct ShippedFileTests {
     func packagedProvidersShipALogo() throws {
         for id in try Self.packagedProviders() {
             let logo = Self.repositoryRoot
-                .appendingPathComponent("Plugins", isDirectory: true)
+                .appendingPathComponent("Integrations", isDirectory: true)
                 .appendingPathComponent(id, isDirectory: true)
                 .appendingPathComponent(BundleConstants.providerLogoSourceFileName)
             // The logo lives with the provider rather than in a central folder,
@@ -82,7 +82,7 @@ struct ShippedFileTests {
             // script would refuse — and this is where that is caught first.
             #expect(
                 FileManager.default.fileExists(atPath: logo.path),
-                "Plugins/\(id) ships no \(BundleConstants.providerLogoSourceFileName)"
+                "Integrations/\(id) ships no \(BundleConstants.providerLogoSourceFileName)"
             )
         }
     }

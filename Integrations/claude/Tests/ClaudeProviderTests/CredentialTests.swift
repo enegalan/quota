@@ -1,6 +1,6 @@
-@testable import QuotaPluginClaude
 import Foundation
 import Testing
+@testable import QuotaPluginClaude
 
 @Suite("Claude credentials")
 struct CredentialTests {

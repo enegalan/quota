@@ -22,7 +22,7 @@ public enum BundleConstants {
 
     /// What a provider's logo is called inside its own package.
     ///
-    /// The build script reads it from `Plugins/<id>/` and files it in the bundle
+    /// The build script reads it from `Integrations/<id>/` and files it in the bundle
     /// under the provider's identifier, so nothing at runtime reads the source
     /// package and this name exists only to keep the script and the check that
     /// keeps it in step.

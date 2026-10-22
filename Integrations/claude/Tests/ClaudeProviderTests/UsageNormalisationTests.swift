@@ -1,7 +1,7 @@
-@testable import QuotaPluginClaude
 import Foundation
 import PluginKit
 import Testing
+@testable import QuotaPluginClaude
 
 @Suite("Claude usage normalisation")
 struct UsageNormalisationTests {

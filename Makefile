@@ -14,7 +14,7 @@ BUNDLE := .build/Quota.app
 SIGNING_IDENTITY ?=
 SIGNING_IDENTITY := $(if $(strip $(SIGNING_IDENTITY)),$(SIGNING_IDENTITY),-)
 
-.PHONY: help bootstrap format format-check lint test build plugins plugin-tests bundle run verify clean
+.PHONY: help bootstrap format format-check lint test build integrations integration-tests plugins plugin-tests bundle run verify clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \

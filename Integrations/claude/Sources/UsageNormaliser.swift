@@ -97,11 +97,13 @@ enum UsageNormaliser {
               let reset = resetInstant(in: payload)
         else { return nil }
         return makeUsage(
-            bucketID: limit.bucketID,
-            displayName: limit.displayName,
-            utilization: utilization,
-            window: limit.window,
-            reset: reset,
+            MeasuredBucket(
+                bucketID: limit.bucketID,
+                displayName: limit.displayName,
+                window: limit.window,
+                utilization: utilization,
+                reset: reset
+            ),
             updatedAtDay: updatedAtDay
         )
     }
@@ -129,11 +131,13 @@ enum UsageNormaliser {
             else { continue }
             usages.append(
                 makeUsage(
-                    bucketID: scopedBucketID(for: name),
-                    displayName: "Weekly \(name)",
-                    utilization: utilization,
-                    window: ClaudeConstants.sevenDayWindow,
-                    reset: reset,
+                    MeasuredBucket(
+                        bucketID: scopedBucketID(for: name),
+                        displayName: "Weekly \(name)",
+                        window: ClaudeConstants.sevenDayWindow,
+                        utilization: utilization,
+                        reset: reset
+                    ),
                     updatedAtDay: updatedAtDay
                 )
             )
@@ -162,7 +166,9 @@ enum UsageNormaliser {
                 character.isLetter || character.isNumber ? character : "-"
             }
             .reduce(into: "") { result, character in
-                if result.last == "-" && character == "-" { return }
+                if result.last == "-", character == "-" {
+                    return
+                }
                 result.append(character)
             }
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
@@ -227,28 +233,30 @@ enum UsageNormaliser {
         return ClaudeTimestamp.instant(from: text)
     }
 
+    /// A limit measured over a rolling window that ends at a known reset.
+    private struct MeasuredBucket {
+        let bucketID: String
+        let displayName: String
+        let window: TimeInterval
+        let utilization: Double
+        let reset: Date
+    }
+
     /// One bucket, from a figure and the window it is measured over.
     ///
     /// The window ends where the limit turns over, and runs back for as long
     /// as the limit lasts: Claude's windows are rolling, so the period is a
     /// window that ends at the reset rather than a calendar period that
     /// contains it.
-    private static func makeUsage(
-        bucketID: String,
-        displayName: String,
-        utilization: Double,
-        window: TimeInterval,
-        reset: Date,
-        updatedAtDay: String
-    ) -> ProviderUsage {
+    private static func makeUsage(_ bucket: MeasuredBucket, updatedAtDay: String) -> ProviderUsage {
         ProviderUsage(
-            externalID: bucketID,
-            displayName: displayName,
-            bucketID: bucketID,
-            bucketDisplayName: displayName,
-            usagePercentage: Percentage.clamp(utilization),
-            periodStart: DayFormat.instantString(from: reset.addingTimeInterval(-window)),
-            periodEnd: DayFormat.instantString(from: reset),
+            externalID: bucket.bucketID,
+            displayName: bucket.displayName,
+            bucketID: bucket.bucketID,
+            bucketDisplayName: bucket.displayName,
+            usagePercentage: Percentage.clamp(bucket.utilization),
+            periodStart: DayFormat.instantString(from: bucket.reset.addingTimeInterval(-bucket.window)),
+            periodEnd: DayFormat.instantString(from: bucket.reset),
             updatedAt: updatedAtDay
         )
     }

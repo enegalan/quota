@@ -22,8 +22,8 @@ enum ClaudeTimestamp {
     static func instant(from value: String) -> Date? {
         let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let separator = text.firstIndex(of: "T") else { return nil }
-        let day = dayComponents(String(text[text.startIndex ..< separator]))
-        guard let day else { return nil }
+        guard var components = dayComponents(String(text[text.startIndex ..< separator]))
+        else { return nil }
 
         var clock = String(text[text.index(after: separator)...])
         var offsetSeconds = 0
@@ -49,10 +49,6 @@ enum ClaudeTimestamp {
         let parts = clock.split(separator: ":").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
 
-        var components = DateComponents()
-        components.year = day.year
-        components.month = day.month
-        components.day = day.day
         components.hour = parts[0]
         components.minute = parts[1]
         components.second = parts[2]
@@ -63,10 +59,14 @@ enum ClaudeTimestamp {
     }
 
     /// The date half of a timestamp.
-    private static func dayComponents(_ text: String) -> (year: Int, month: Int, day: Int)? {
+    private static func dayComponents(_ text: String) -> DateComponents? {
         let parts = text.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
-        return (parts[0], parts[1], parts[2])
+        var components = DateComponents()
+        components.year = parts[0]
+        components.month = parts[1]
+        components.day = parts[2]
+        return components
     }
 
     /// An offset in seconds, from the text after its sign.
@@ -76,7 +76,7 @@ enum ClaudeTimestamp {
     /// understood it would have to fail on the second. The sign is the
     /// caller's, because the text after the sign carries only the magnitude.
     private static func parseOffset(from text: String, negative: Bool) -> Int? {
-        let digits = text.filter { $0.isNumber }
+        let digits = text.filter(\.isNumber)
         let magnitude: Int
         switch digits.count {
         case 2:
