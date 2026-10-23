@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-10-23
+
+### Added
+
+- Pin to Menu Bar on the quota list context menu, with a pin mark on the
+  pinned row. The action is disabled when that quota is already the one in
+  the menu bar.
+
+### Fixed
+
+- Days remaining and reset captions only appear when a provider reading has
+  produced a plan. A hand-configured period with no reading behind it no
+  longer reads as if the provider had announced those figures.
+- Without a plan, the calendar no longer invents daily shares by splitting
+  100% across the period. The month pager still uses the quota's own period
+  so it has bounds instead of a bare date picker.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added
