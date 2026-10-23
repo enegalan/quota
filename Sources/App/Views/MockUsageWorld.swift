@@ -57,13 +57,11 @@ enum MockUsageWorld {
         var calendar = calendar
         calendar.timeZone = timeZone
         guard let date = try? LocalDate(
-            year: MockUsageInstant.year,
-            month: MockUsageInstant.month,
-            day: MockUsageInstant.day
-        ) else {
-            return Date(timeIntervalSince1970: 0)
-        }
-        guard let midnight = date.date(calendar: calendar),
+                  year: MockUsageInstant.year,
+                  month: MockUsageInstant.month,
+                  day: MockUsageInstant.day
+              ),
+              let midnight = date.date(calendar: calendar),
               let noon = calendar.date(
                   bySettingHour: MockUsageInstant.hour,
                   minute: 0,

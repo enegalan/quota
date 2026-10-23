@@ -104,8 +104,7 @@ struct PercentageFormatter: Sendable {
     /// keeps a decimal instead.
     func string(_ value: Double, distinctFrom peer: Double) -> String {
         let rendered = string(value)
-        guard value.isFinite, peer.isFinite, value != peer else { return rendered }
-        guard rendered == string(peer) else { return rendered }
+        guard value.isFinite, peer.isFinite, value != peer, rendered == string(peer) else { return rendered }
         return stringWithFraction(value)
     }
 

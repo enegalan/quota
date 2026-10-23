@@ -67,11 +67,11 @@ public struct UsageTimeline: Sendable, Hashable, Codable {
         to reference: Date,
         calendar: Calendar
     ) -> Double? {
-        guard let latest = latestPoint(bucketID: bucketID, asOf: reference) else { return nil }
-        guard let baseline = baselinePoint(bucketID: bucketID, onOrBefore: day, calendar: calendar) else {
-            return nil
-        }
-        guard baseline.recordedAt < latest.recordedAt else { return nil }
+        guard let latest = latestPoint(bucketID: bucketID, asOf: reference), let baseline = baselinePoint(
+            bucketID: bucketID,
+            onOrBefore: day,
+            calendar: calendar
+        ), baseline.recordedAt < latest.recordedAt else { return nil }
 
         let used = latest.usagePercentage - baseline.usagePercentage
         return used >= UsageConstants.minimumPercentage ? used : nil
@@ -105,11 +105,10 @@ public struct UsageTimeline: Sendable, Hashable, Codable {
         to reference: Date,
         calendar: Calendar
     ) -> (used: Double, since: Date)? {
-        guard let first = firstPoint(bucketID: bucketID, onOrAfter: day, calendar: calendar) else {
-            return nil
-        }
-        guard let latest = latestPoint(bucketID: bucketID, asOf: reference) else { return nil }
-        guard first.recordedAt < latest.recordedAt else { return nil }
+        guard let first = firstPoint(bucketID: bucketID, onOrAfter: day, calendar: calendar), let latest = latestPoint(
+            bucketID: bucketID,
+            asOf: reference
+        ), first.recordedAt < latest.recordedAt else { return nil }
 
         let used = latest.usagePercentage - first.usagePercentage
         guard used >= UsageConstants.minimumPercentage else { return nil }

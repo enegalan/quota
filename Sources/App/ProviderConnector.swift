@@ -87,16 +87,11 @@ enum ProviderConnector {
         for providerID: ProviderID,
         environment: AppEnvironment
     ) async throws -> (PluginHost, AvailableProvider) {
-        guard let provider = environment.manager.provider(id: providerID.rawValue) else {
-            throw ProviderError(code: .notInstalled)
-        }
-        guard let record = try await environment.installed.provider(provider.id) else {
-            throw ProviderError(code: .notInstalled)
-        }
-        guard
-            let launch = PluginLayout.installedLaunch(
-                for: provider, version: record.version, in: environment.pluginsDirectory
-            )
+        guard let provider = environment.manager.provider(id: providerID.rawValue),
+              let record = try await environment.installed.provider(provider.id),
+              let launch = PluginLayout.installedLaunch(
+                  for: provider, version: record.version, in: environment.pluginsDirectory
+              )
         else {
             throw ProviderError(code: .notInstalled)
         }

@@ -92,8 +92,8 @@ enum UsageNormaliser {
         in json: [String: Any],
         updatedAtDay: String
     ) -> ProviderUsage? {
-        guard let payload = json[limit.key] as? [String: Any] else { return nil }
-        guard let utilization = JSONAccess.double(payload, key: "utilization"),
+        guard let payload = json[limit.key] as? [String: Any],
+              let utilization = JSONAccess.double(payload, key: "utilization"),
               let reset = resetInstant(in: payload)
         else { return nil }
         return makeUsage(
@@ -123,9 +123,8 @@ enum UsageNormaliser {
         guard let limits = json[ClaudeConstants.limitsKey] as? [[String: Any]] else { return [] }
         var usages: [ProviderUsage] = []
         for limit in limits {
-            guard let kind = limit["kind"] as? String, kind == ClaudeConstants.scopedLimitKind
-            else { continue }
-            guard let utilization = JSONAccess.double(limit, key: "percent"),
+            guard let kind = limit["kind"] as? String, kind == ClaudeConstants.scopedLimitKind,
+                  let utilization = JSONAccess.double(limit, key: "percent"),
                   let reset = resetInstant(in: limit),
                   let name = scopedName(limit)
             else { continue }
@@ -188,8 +187,8 @@ enum UsageNormaliser {
         updatedAtDay: String,
         now: Date
     ) -> ProviderUsage? {
-        guard let extra = json[ClaudeConstants.extraUsageKey] as? [String: Any] else { return nil }
-        guard (extra["is_enabled"] as? Bool) ?? false else { return nil }
+        guard let extra = json[ClaudeConstants.extraUsageKey] as? [String: Any],
+              (extra["is_enabled"] as? Bool) ?? false else { return nil }
 
         let utilization: Double? = if let used = JSONAccess.double(extra, key: "used_credits"),
                                       let limit = JSONAccess.double(extra, key: "monthly_limit"),
@@ -199,9 +198,7 @@ enum UsageNormaliser {
         } else {
             JSONAccess.double(extra, key: "utilization")
         }
-        guard let utilization else { return nil }
-
-        guard let window = month(containing: now) else { return nil }
+        guard let utilization, let window = month(containing: now) else { return nil }
         return ProviderUsage(
             externalID: ClaudeConstants.extraUsageBucketID,
             displayName: ClaudeConstants.extraUsageDisplayName,

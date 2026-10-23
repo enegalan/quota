@@ -57,8 +57,7 @@ enum MainWindowOpener {
     /// Titled document windows only — not the MenuBarExtra panel.
     @MainActor
     private static func isManagementWindow(_ window: NSWindow) -> Bool {
-        guard !(window is NSPanel) else { return false }
-        guard window.styleMask.contains(.titled) else { return false }
+        guard !(window is NSPanel), window.styleMask.contains(.titled) else { return false }
         return window.level == .normal
     }
 }

@@ -21,8 +21,8 @@ enum ClaudeTimestamp {
     /// The instant in a timestamp, or nil when the text is not one.
     static func instant(from value: String) -> Date? {
         let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let separator = text.firstIndex(of: "T") else { return nil }
-        guard var components = dayComponents(String(text[text.startIndex ..< separator]))
+        guard let separator = text.firstIndex(of: "T"),
+              var components = dayComponents(String(text[text.startIndex ..< separator]))
         else { return nil }
 
         var clock = String(text[text.index(after: separator)...])

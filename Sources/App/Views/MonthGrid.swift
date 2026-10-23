@@ -44,8 +44,10 @@ struct MonthGrid: View {
             // A selection made elsewhere — a day listed under the grid, a month
             // the user paged back to — has to bring the grid with it, or the
             // selected day is on a page the user cannot see.
-            guard let newValue, let date = newValue.date(calendar: calendar) else { return }
-            guard let start = calendar.dateInterval(of: .month, for: date)?.start else { return }
+            guard let newValue, let date = newValue.date(calendar: calendar), let start = calendar.dateInterval(
+                of: .month,
+                for: date
+            )?.start else { return }
             if MonthLayout.monthStart(of: shown, calendar: calendar) != start {
                 visibleMonth = date
             }
@@ -97,8 +99,8 @@ struct MonthGrid: View {
 
     /// Every month start inside the period, so the menu never offers a blank page.
     private var monthsInRange: [Date] {
-        guard let range = monthRange else { return [] }
-        guard var current = MonthLayout.monthStart(of: range.earliest, calendar: calendar),
+        guard let range = monthRange,
+              var current = MonthLayout.monthStart(of: range.earliest, calendar: calendar),
               let end = MonthLayout.monthStart(of: range.latest, calendar: calendar)
         else { return [] }
         var months: [Date] = []
@@ -117,8 +119,8 @@ struct MonthGrid: View {
     /// can only ever lead somewhere useless.
     private var canGoBack: Bool {
         guard let range = monthRange,
-              let shown = MonthLayout.monthStart(of: shown, calendar: calendar) else { return true }
-        guard let earliest = MonthLayout.monthStart(of: range.earliest, calendar: calendar) else { return true }
+              let shown = MonthLayout.monthStart(of: shown, calendar: calendar),
+              let earliest = MonthLayout.monthStart(of: range.earliest, calendar: calendar) else { return true }
         return shown > earliest
     }
 
@@ -130,8 +132,8 @@ struct MonthGrid: View {
     /// which end of the range it was standing at.
     private var canGoForward: Bool {
         guard let range = monthRange,
-              let shown = MonthLayout.monthStart(of: shown, calendar: calendar) else { return true }
-        guard let latest = MonthLayout.monthStart(of: range.latest, calendar: calendar) else { return true }
+              let shown = MonthLayout.monthStart(of: shown, calendar: calendar),
+              let latest = MonthLayout.monthStart(of: range.latest, calendar: calendar) else { return true }
         return shown < latest
     }
 

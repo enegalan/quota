@@ -27,8 +27,7 @@ extension AppModel {
     ///   on and the last check is older than a day, and opens the browser only
     ///   for a version that has not been announced yet.
     func checkForUpdates(force: Bool) async {
-        guard !isCheckingForUpdates else { return }
-        guard let preferences = await loadPreferencesForUpdateCheck(force: force) else {
+        guard !isCheckingForUpdates, let preferences = await loadPreferencesForUpdateCheck(force: force) else {
             return
         }
         let now = environment.now()

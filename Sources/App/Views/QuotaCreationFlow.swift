@@ -238,8 +238,7 @@ struct QuotaCreationFlow: View {
     /// The limits only settle once the provider has answered, so this is also the
     /// place that decides whether every one of them is spoken for.
     private var canCreate: Bool {
-        guard let selected else { return false }
-        guard !model.hasUnboundQuota(forProviderID: selected.id) else { return false }
+        guard let selected, !model.hasUnboundQuota(forProviderID: selected.id) else { return false }
         // Empty means the provider could not be read, which is not the same as
         // every limit being taken: there is then nothing to have ruled out.
         return buckets.isEmpty || buckets.count > takenBucketIDs.count

@@ -85,10 +85,9 @@ struct PluginUsageFetcher: UsageFetching {
         localDate: LocalDate
     ) async -> UsageFetchOutcome {
         let now = Date()
-        guard let provider = manager.provider(id: providerID.rawValue) else {
-            return .failure(Self.failure(.notInstalled, at: now))
-        }
-        guard let record = try? await installed.provider(provider.id) else {
+        guard let provider = manager.provider(id: providerID.rawValue),
+              let record = try? await installed.provider(provider.id)
+        else {
             return .failure(Self.failure(.notInstalled, at: now))
         }
         let launch = PluginLayout.installedLaunch(

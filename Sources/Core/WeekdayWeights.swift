@@ -15,13 +15,10 @@ public struct WeekdayWeights: Sendable, Hashable, Codable {
     ///   a weight falls outside the range a calendar can express, or every
     ///   weight is zero, which would leave the policy with nothing to divide.
     public init(weights: [Int: Int]) throws {
-        guard !weights.values.contains(where: { $0 < 0 }) else {
-            throw QuotaDomainError.invalidWeights
-        }
-        guard weights.values.allSatisfy({ $0 <= WeekdayConstants.maximumWeight }) else {
-            throw QuotaDomainError.invalidWeights
-        }
-        guard weights.values.contains(where: { $0 > 0 }) else {
+        guard !weights.values.contains(where: { $0 < 0 }),
+              weights.values.allSatisfy({ $0 <= WeekdayConstants.maximumWeight }),
+              weights.values.contains(where: { $0 > 0 })
+        else {
             throw QuotaDomainError.invalidWeights
         }
 
