@@ -144,6 +144,9 @@ final class AppModel {
     /// morning would make the number beside it untrustworthy, and a number the
     /// user cannot rely on is the one thing a menu bar item is for.
     ///
+    /// Pinning one quota unpins the previous one — there is no separate unpin
+    /// action, because picking another quota is itself the way to change it.
+    ///
     /// Not routed through `perform`, which reloads everything: the choice touches
     /// no reading, no plan, and no quota, and a popover that re-read the whole
     /// store on every click would make choosing look like waiting.

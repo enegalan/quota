@@ -123,19 +123,16 @@ struct CalendarPresenter: Sendable {
     private let bucketID: String?
     private let calendar: Calendar
     private let reference: Date
+    private let quotaPeriod: QuotaPeriod?
 
-    /// - Parameter allowance: today's allowance as the summary resolved it. It
-    ///   is passed in rather than recomputed because the remaining figure needs
-    ///   the day's actual usage, which is the timeline's to answer, and two
-    ///   places each subtracting it would be two chances to disagree about
-    ///   whether today has a baseline at all.
     init(
         plan: AllocationPlan?,
         timeline: UsageTimeline?,
         allowance: TodayAllowance?,
         bucketID: String?,
         calendar: Calendar,
-        reference: Date
+        reference: Date,
+        quotaPeriod: QuotaPeriod? = nil
     ) {
         self.plan = plan
         self.timeline = timeline
@@ -143,6 +140,7 @@ struct CalendarPresenter: Sendable {
         self.bucketID = bucketID
         self.calendar = calendar
         self.reference = reference
+        self.quotaPeriod = quotaPeriod
     }
 
     /// The instant every day in this presenter is classified against.
@@ -161,9 +159,12 @@ struct CalendarPresenter: Sendable {
         return Set(plan.period.localDates(in: calendar))
     }
 
-    /// The plan's period, which bounds the months a calendar may be paged to.
+    /// The plan's period, or the quota's own period when there is no plan yet.
+    ///
+    /// A quota that has never been read still has a window, and the month pager
+    /// needs its bounds instead of a bare date picker.
     var period: QuotaPeriod? {
-        plan?.period
+        plan?.period ?? quotaPeriod
     }
 
     /// Every day of the month containing `date`, classified and filled in.

@@ -66,20 +66,18 @@ struct MainPopover: View {
         }
     }
 
-    /// Every quota the menu bar item is not speaking for, as a clickable row.
+    /// Every quota the menu bar item is not speaking for, as a clickable row each.
     @ViewBuilder
     private var otherRows: some View {
         let others = model.presentations.filter { $0.id != model.primaryPresentation?.id }
         if !others.isEmpty {
-            VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
-                if model.primaryPresentation != nil {
-                    Divider()
-                }
-                Caption(text: model.presentations.count > 1 ? "Other quotas" : "Quota")
+            VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
+                SectionTitle(model.presentations.count > 1 ? "Other quotas" : "Quota")
                 ForEach(others) { presentation in
                     row(for: presentation)
                 }
             }
+            .padding(.horizontal, LayoutMetrics.unit)
         }
     }
 
@@ -144,27 +142,34 @@ struct MainPopover: View {
         Button {
             Task { await model.showInMenuBar(presentation) }
         } label: {
-            HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.rowSpacing) {
-                VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
-                    Text(presentation.summary.quota.name)
-                        .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
-                        .lineLimit(1)
-                    Caption(presentation.accountCaption)
+            VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
+                HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.rowSpacing) {
+                    VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
+                        Text(presentation.summary.quota.name)
+                            .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
+                            .lineLimit(1)
+                        Caption(presentation.accountCaption)
+                    }
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: LayoutMetrics.lineSpacing) {
+                        HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.lineSpacing) {
+                            Circle()
+                                .fill(ShareTint.color(for: presentation.usagePercentage, of: 100))
+                                .frame(width: 6, height: 6)
+                            Text(formatter.string(presentation.usagePercentage))
+                                .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("Show")
+                            .font(.system(size: LayoutMetrics.captionSize))
+                            .foregroundStyle(Color.accentColor)
+                            .opacity(isHovered(presentation) ? 1 : 0)
+                    }
                 }
-                Spacer(minLength: 0)
-                Circle()
-                    .fill(ShareTint.color(for: presentation.usagePercentage, of: 100))
-                    .frame(width: 6, height: 6)
-                Text(formatter.string(presentation.usagePercentage))
-                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                Text("Show")
-                    .font(.system(size: LayoutMetrics.captionSize))
-                    .foregroundStyle(Color.accentColor)
-                    .opacity(isHovered(presentation) ? 1 : 0)
             }
-            .padding(.vertical, LayoutMetrics.lineSpacing)
+            .padding(.vertical, LayoutMetrics.unit)
+            .padding(.horizontal, LayoutMetrics.unit)
             .contentShape(Rectangle())
         }
         .buttonStyle(MenuBarRowButtonStyle(isHovered: isHovered(presentation)))

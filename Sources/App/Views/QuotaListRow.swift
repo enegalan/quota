@@ -16,6 +16,21 @@ struct QuotaListRow: View {
 
     private let formatter = PercentageFormatter()
 
+    /// Whether this quota is the one pinned to the menu bar.
+    ///
+    /// Compared against the stored id, not against `primaryPresentation`, because
+    /// when nothing is pinned `primaryPresentation` falls back to the first quota
+    /// and that must not read as pinned.
+    private var isPinned: Bool {
+        menuBarQuotaID.map { presentation.id == $0 } ?? false
+    }
+
+    /// The stored menu bar quota id, so the row can show its own pin mark without
+    /// waiting on the summary resolution.
+    private var menuBarQuotaID: UUID? {
+        model?.menuBarQuotaID
+    }
+
     init(presentation: QuotaPresentation, model: AppModel? = nil) {
         self.presentation = presentation
         self.model = model
@@ -24,9 +39,16 @@ struct QuotaListRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
             HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.unit) {
-                Text(presentation.summary.quota.name)
-                    .font(.system(size: LayoutMetrics.bodySize, weight: .semibold))
-                    .lineLimit(1)
+                HStack(spacing: LayoutMetrics.lineSpacing) {
+                    Text(presentation.summary.quota.name)
+                        .font(.system(size: LayoutMetrics.bodySize, weight: .semibold))
+                        .lineLimit(1)
+                    if isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: LayoutMetrics.captionSize - 1))
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
                 Spacer(minLength: 0)
                 Text(formatter.string(presentation.usagePercentage))
                     .font(.system(size: LayoutMetrics.captionSize, weight: .medium))
@@ -56,6 +78,13 @@ struct QuotaListRow: View {
             } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
             }
+            Divider()
+            Button {
+                Task { await model?.showInMenuBar(presentation) }
+            } label: {
+                Label("Pin to Menu Bar", systemImage: "pin")
+            }
+            .disabled(isPinned)
             Divider()
             Button(role: .destructive) {
                 isConfirmingDelete = true

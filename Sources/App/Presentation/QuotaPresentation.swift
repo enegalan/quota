@@ -83,7 +83,8 @@ struct QuotaPresentation: Identifiable, Hashable {
             allowance: summary.todayAllowance,
             bucketID: bucketID,
             calendar: calendar,
-            reference: reference
+            reference: reference,
+            quotaPeriod: summary.quota.period
         )
     }
 
@@ -93,24 +94,28 @@ struct QuotaPresentation: Identifiable, Hashable {
         let period = summary.plan?.period ?? summary.quota.period
         var byDate: [LocalDate: Double] = [:]
 
-        // What the quota's policy prescribed for every day when the allowance was
-        // whole: the only source of a past day's plan once the live plan has
-        // moved on past it.
-        if let whole = try? AllocationEngine(calendar: calendar).plan(
-            quotaID: summary.quota.id,
-            policy: summary.quota.policy,
-            period: period,
-            totalRemaining: UsageConstants.percentageScale,
-            asOf: period.start
-        ) {
-            for allocation in whole.allocations {
-                byDate[allocation.date] = allocation.percentage
-            }
-        }
-
-        // The current plan wins for the days it still names: its figures already
-        // account for everything spent up to now.
+        // A "whole period" picture is only worth drawing when there is an actual
+        // plan to anchor it to: without one there is no allowance the user has
+        // committed to, so splitting 100 % from the start of the period would
+        // invent daily shares for a limit that does not exist.
         if let plan = summary.plan {
+            // What the quota's policy prescribed for every day when the allowance was
+            // whole: the only source of a past day's plan once the live plan has
+            // moved on past it.
+            if let whole = try? AllocationEngine(calendar: calendar).plan(
+                quotaID: summary.quota.id,
+                policy: summary.quota.policy,
+                period: period,
+                totalRemaining: UsageConstants.percentageScale,
+                asOf: period.start
+            ) {
+                for allocation in whole.allocations {
+                    byDate[allocation.date] = allocation.percentage
+                }
+            }
+
+            // The current plan wins for the days it still names: its figures already
+            // account for everything spent up to now.
             for allocation in plan.allocations {
                 byDate[allocation.date] = allocation.percentage
             }
@@ -166,15 +171,25 @@ struct QuotaPresentation: Identifiable, Hashable {
 
     /// How many days the period has left, counted in the user's calendar.
     ///
+    /// Only reported when there is an actual plan from a provider reading. A
+    /// quota whose period was configured by hand but never read has no real
+    /// allowance to count down, so showing "X days remaining" would read as if
+    /// the provider were telling the user that — and it cannot.
+    ///
     /// Counted against the user's calendar rather than any fixed one, because a
     /// day boundary set elsewhere reports a day still to run at an hour when the
     /// user's own day has already turned over.
     func daysRemaining(asOf reference: Date, calendar: Calendar) -> Int? {
-        period.remainingDays(through: reference, calendar: calendar)
+        guard summary.plan != nil else { return nil }
+        return period.remainingDays(through: reference, calendar: calendar)
     }
 
     /// When the provider resets this quota's usage, as a caption, while a
     /// reset is still ahead.
+    ///
+    /// Only reported when there is an actual plan from a provider reading, for
+    /// the same reason as `daysRemaining`: a hand-configured period with no
+    /// reading behind it is not a reset the provider announced.
     ///
     /// The period's own end rather than a provider field of its own: the window
     /// the provider reports *is* the reset, and a second source for the same
@@ -182,7 +197,8 @@ struct QuotaPresentation: Identifiable, Hashable {
     /// `ResetCaption`'s, so the quota panel and the provider panel say the same
     /// thing about the same kind of instant.
     func resetCaption(asOf reference: Date, calendar: Calendar) -> String? {
-        ResetCaption.caption(for: period, asOf: reference, calendar: calendar)
+        guard summary.plan != nil else { return nil }
+        return ResetCaption.caption(for: period, asOf: reference, calendar: calendar)
     }
 
     /// The line that says when the figures were last fetched.
