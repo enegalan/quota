@@ -7,12 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-10-23
+
+### Fixed
+
+- CI and bootstrap now `brew update` and refuse any SwiftFormat other than
+  0.64.1. Runners were linting with a cached 0.62/0.63 bottle, so 1.4.1 and
+  1.4.2 failed release lint after local verify had passed.
+
 ## [1.4.2] - 2026-10-23
 
 ### Fixed
 
 - Release lint under SwiftFormat 0.64. The 1.4.1 tag failed the arm64 job
   and only published an Intel zip; that incomplete GitHub Release was removed.
+  Superseded by 1.4.3 — the runner bottle was still stale.
 
 ## [1.4.1] - 2026-10-23
 
