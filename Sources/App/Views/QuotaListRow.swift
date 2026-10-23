@@ -23,10 +23,13 @@ struct QuotaListRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
-            HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.unit) {
+            HStack(alignment: .center, spacing: LayoutMetrics.lineSpacing) {
                 Text(presentation.summary.quota.name)
                     .font(.system(size: LayoutMetrics.bodySize, weight: .semibold))
                     .lineLimit(1)
+                if model?.primaryPresentation?.id == presentation.id {
+                    MenuBarMarker()
+                }
                 Spacer(minLength: 0)
                 Text(formatter.string(presentation.usagePercentage))
                     .font(.system(size: LayoutMetrics.captionSize, weight: .medium))
