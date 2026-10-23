@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-10-23
+
+### Fixed
+
+- Release lint under SwiftFormat 0.64. The 1.4.1 tag failed the arm64 job
+  and only published an Intel zip; that incomplete GitHub Release was removed.
+
 ## [1.4.1] - 2026-10-23
 
 ### Added

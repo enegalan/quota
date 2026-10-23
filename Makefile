@@ -25,8 +25,8 @@ bootstrap: ## Install swiftformat, swiftlint and prettier
 		echo "error: Homebrew is required. Install it from https://brew.sh and re-run 'make bootstrap'." >&2; \
 		exit 1; \
 	fi
-	@command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
-	@command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
+	@if command -v swiftformat >/dev/null 2>&1; then brew upgrade swiftformat; else brew install swiftformat; fi
+	@if command -v swiftlint >/dev/null 2>&1; then brew upgrade swiftlint; else brew install swiftlint; fi
 	@command -v npm >/dev/null 2>&1 || brew install node
 	@npm install --global --silent prettier
 	@echo "toolchain ready"
