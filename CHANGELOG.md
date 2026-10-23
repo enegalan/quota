@@ -5,7 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-23
+
+### Added
+
+- Claude provider plugin for Claude Code usage tracking (5-hour, weekly, model-specific windows, and extra usage credits).
+- User-toggleable notifications setting (enabled by default).
+
+### Changed
+
+- Renamed "Providers" to "Integrations" throughout the UI.
+- Added right-click context menu to quota list rows with refresh and delete actions.
+- Show menu bar pin in quota list rows.
+
 ## [Unreleased]
+
+
 
 ## [1.4.3] - 2026-10-23
 
