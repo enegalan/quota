@@ -83,8 +83,8 @@ enum UsageNormaliser {
         }
         if let used = JSONAccess.double(plan, key: "includedSpend")
             ?? JSONAccess.double(plan, key: "used"),
-            let limit = JSONAccess.double(plan, key: "limit"),
-            let share = Percentage.of(used: used, limit: limit)
+           let limit = JSONAccess.double(plan, key: "limit"),
+           let share = Percentage.of(used: used, limit: limit)
         {
             return share
         }
