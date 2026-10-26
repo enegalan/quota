@@ -81,6 +81,10 @@ struct ProviderActionFailureTests {
 
         #expect(model.isUpdatingAll == false)
         #expect(model.lastError != nil)
+        let alphaRecord = try await installedProviderRepository(store).provider("alpha")
+        let betaRecord = try await installedProviderRepository(store).provider("beta")
+        #expect(alphaRecord?.lastError != nil)
+        #expect(betaRecord?.lastError != nil)
     }
 
     @Test("Update All does nothing when no provider has an update waiting")

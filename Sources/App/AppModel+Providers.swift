@@ -56,6 +56,7 @@ extension AppModel {
     /// everything has been re-read. Providers that are already current are
     /// skipped by `update`, so this only ever changes something that is behind.
     func updateAll() async {
+        guard !isUpdatingAll else { return }
         let updatable = sections.all.filter { $0.state == .updateAvailable }
         guard !updatable.isEmpty else { return }
         isUpdatingAll = true
