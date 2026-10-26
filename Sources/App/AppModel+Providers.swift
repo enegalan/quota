@@ -46,4 +46,31 @@ extension AppModel {
     func uninstall(_ listing: ProviderListing) async {
         await perform { try await self.environment.installer.uninstall(listing.provider.id) }
     }
+
+    /// Replaces every installed provider this build packages that has an update
+    /// available, one at a time.
+    ///
+    /// The installer serialises them anyway, and a user watching the rows flip
+    /// one at a time can tell which is which. A failure on one provider does not
+    /// stop the rest — each is attempted, and the first failure is shown once
+    /// everything has been re-read. Providers that are already current are
+    /// skipped by `update`, so this only ever changes something that is behind.
+    func updateAll() async {
+        let updatable = sections.all.filter { $0.state == .updateAvailable }
+        guard !updatable.isEmpty else { return }
+        isUpdatingAll = true
+        defer { isUpdatingAll = false }
+        var failures: [String] = []
+        for listing in updatable {
+            // `update` reports its own result in `lastError` (the reload it runs
+            // clears it on success and records the failure otherwise), so a
+            // failure here is visible right after the call without `update`
+            // itself throwing.
+            await update(listing)
+            if let error = lastError {
+                failures.append(error)
+            }
+        }
+        lastError = failures.first
+    }
 }

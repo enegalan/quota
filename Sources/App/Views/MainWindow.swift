@@ -208,6 +208,13 @@ struct MainWindow: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 refreshButton
+                Button {
+                    Task { await model.updateAll() }
+                } label: {
+                    Label("Update All", systemImage: "arrow.down.circle")
+                }
+                .disabled(model.isUpdatingAll || !model.hasUpdatesAvailable)
+                .help("Install the latest version of every integration")
             }
         }
     }
