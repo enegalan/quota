@@ -22,6 +22,9 @@ node_modules/
 .DS_Store
 
 # Provider plugins are separate packages and build independently
+Integrations/*/.build/
+Integrations/*/.swiftpm/
+Integrations/*/Package.resolved
 Plugins/*/.build/
 Plugins/*/.swiftpm/
 Plugins/*/Package.resolved

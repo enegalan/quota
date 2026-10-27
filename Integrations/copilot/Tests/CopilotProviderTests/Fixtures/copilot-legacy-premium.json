@@ -1,0 +1,32 @@
+{
+  "login": "fixture-user",
+  "copilot_plan": "pro",
+  "quota_reset_date": "2025-02-15T00:00:00Z",
+  "quota_reset_date_utc": "2025-02-15T00:00:00.000Z",
+  "quota_snapshots": {
+    "premium_interactions": {
+      "percent_remaining": 80,
+      "entitlement": 300,
+      "remaining": 240,
+      "quota_id": "premium",
+      "has_quota": true,
+      "unlimited": false
+    },
+    "chat": {
+      "percent_remaining": 95,
+      "entitlement": 1000,
+      "remaining": 950,
+      "quota_id": "chat",
+      "has_quota": true,
+      "unlimited": false
+    },
+    "completions": {
+      "percent_remaining": 100,
+      "entitlement": 0,
+      "remaining": 0,
+      "quota_id": "completions",
+      "has_quota": false,
+      "unlimited": true
+    }
+  }
+}

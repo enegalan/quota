@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.7] - 2026-10-27
+
+### Added
+
+- GitHub Copilot provider integration for premium requests, chat, completions,
+  and plan limits (via the same internal quota endpoint editors use).
+
+### Fixed
+
+- Remove the empty Antigravity `Tests` directory that made `make verify` fail
+  with "no tests found" after the test target was dropped in 1.4.6.
+- Ignore `Integrations/*/.build` in git the same way `Plugins/` was ignored.
+
 ## [1.4.6] - 2026-10-27
 
 ### Fixed

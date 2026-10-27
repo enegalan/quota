@@ -17,7 +17,7 @@ Status:
 | ---------------------- | ----------------------------------- | ----------- | ------------------------------------------------------------------ |
 | Cursor                 | https://cursor.com                  | Implemented | Plan usage, including per-action quotas if the editor exposes them |
 | Antigravity            | https://antigravity.google          | Implemented | Antigravity platform AI credits and quota                          |
-| GitHub Copilot         | https://github.com/features/copilot | Candidate   | Premium usage, requests per model, plan limits                     |
+| GitHub Copilot         | https://github.com/features/copilot | Implemented | Premium usage, requests per model, plan limits                     |
 | Windsurf               | https://windsurf.com                | Candidate   | Credits and actions consumed during flows                          |
 | JetBrains AI Assistant | https://www.jetbrains.com/ai/       | Candidate   | Plan credits per IDE and month                                     |
 | Sourcegraph Cody       | https://sourcegraph.com/cody        | Candidate   | Usage and quotas per instance                                      |
