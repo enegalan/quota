@@ -19,13 +19,5 @@ let package = Package(
                 .product(name: "ProviderSupport", package: "Quota"),
             ]
         ),
-        .testTarget(
-            name: "AntigravityProviderTests",
-            dependencies: [
-                "QuotaPluginAntigravity",
-                .product(name: "PluginKit", package: "Quota"),
-            ],
-            resources: [.copy("Fixtures")]
-        ),
     ]
 )

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.6] - 2026-10-27
+
+### Fixed
+
+- Antigravity provider package builds in CI: drop the empty test target that overlapped Sources, and rename the quota helper that shadowed the local array.
+
 ## [1.4.5] - 2026-10-27
 
 ### Added

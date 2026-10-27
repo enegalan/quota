@@ -6,11 +6,11 @@ import ProviderSupport
 enum UsageNormaliser {
     static func usageResult(from json: [String: Any], updatedAtDay: String) throws -> UsageResult {
         var quotas: [ProviderUsage] = []
-        quotas.append(contentsOf: quotas(from: json, updatedAtDay: updatedAtDay))
+        quotas.append(contentsOf: extractQuotas(from: json, updatedAtDay: updatedAtDay))
 
         if quotas.isEmpty {
-            quotas.append(contentsOf: quotas(from: json["usage"] as? [String: Any], updatedAtDay: updatedAtDay))
-            quotas.append(contentsOf: quotas(from: json["quota"] as? [String: Any], updatedAtDay: updatedAtDay))
+            quotas.append(contentsOf: extractQuotas(from: json["usage"] as? [String: Any], updatedAtDay: updatedAtDay))
+            quotas.append(contentsOf: extractQuotas(from: json["quota"] as? [String: Any], updatedAtDay: updatedAtDay))
         }
 
         guard !quotas.isEmpty else {
@@ -20,7 +20,7 @@ enum UsageNormaliser {
         return UsageResult(quotas: quotas, supportsHistorical: false)
     }
 
-    private static func quotas(from json: [String: Any]?, updatedAtDay: String) -> [ProviderUsage] {
+    private static func extractQuotas(from json: [String: Any]?, updatedAtDay: String) -> [ProviderUsage] {
         guard let json else { return [] }
         var result: [ProviderUsage] = []
         if let credits = extractCredits(from: json, updatedAtDay: updatedAtDay) {
