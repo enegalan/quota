@@ -14,7 +14,11 @@ struct ProviderActions: View {
 
     var body: some View {
         HStack(spacing: LayoutMetrics.actionSpacing) {
-            if model.busyProviderID == listing.id {
+            if model.isUpdatingAll {
+                Text("Updating…")
+                    .font(.system(size: LayoutMetrics.captionSize))
+                    .foregroundStyle(.secondary)
+            } else if model.busyProviderID == listing.id {
                 Text("Working…")
                     .font(.system(size: LayoutMetrics.captionSize))
                     .foregroundStyle(.secondary)
