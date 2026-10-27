@@ -19,7 +19,7 @@ Status:
 | Antigravity            | https://antigravity.google          | Implemented | Antigravity platform AI credits and quota                          |
 | GitHub Copilot         | https://github.com/features/copilot | Implemented | Premium usage, requests per model, plan limits                     |
 | Windsurf               | https://windsurf.com                | Candidate   | Credits and actions consumed during flows                          |
-| JetBrains AI Assistant | https://www.jetbrains.com/ai/       | Candidate   | Plan credits per IDE and month                                     |
+| JetBrains AI Assistant | https://www.jetbrains.com/ai/       | Implemented | Plan credits per IDE and month                                     |
 | Sourcegraph Cody       | https://sourcegraph.com/cody        | Candidate   | Usage and quotas per instance                                      |
 | Supermaven             | https://supermaven.com              | Candidate   | Free/Pro plan usage                                                |
 | CodeGPT                | https://codegpt.co                  | Candidate   | IDE plan quotas                                                    |

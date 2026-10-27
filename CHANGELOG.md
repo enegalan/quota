@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- JetBrains AI Assistant provider integration for monthly plan credits and
+  top-up credits, read from the IDE's local quota cache.
+
 ## [1.4.8] - 2026-10-27
 
 ### Fixed
