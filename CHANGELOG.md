@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.5] - 2026-10-27
+
+### Added
+
+- Add Antigravity provider integration for Google Antigravity AI credits and quota tracking.
+
 ## [1.4.4] - 2026-10-23
 
 ### Changed

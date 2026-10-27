@@ -16,7 +16,7 @@ Status:
 | Provider               | Website                             | Status      | What Quota paces                                                   |
 | ---------------------- | ----------------------------------- | ----------- | ------------------------------------------------------------------ |
 | Cursor                 | https://cursor.com                  | Implemented | Plan usage, including per-action quotas if the editor exposes them |
-| Antigravity            | https://antigravity.google          | Research    | Antigravity platform AI credits and quota                          |
+| Antigravity            | https://antigravity.google          | Implemented | Antigravity platform AI credits and quota                          |
 | GitHub Copilot         | https://github.com/features/copilot | Candidate   | Premium usage, requests per model, plan limits                     |
 | Windsurf               | https://windsurf.com                | Candidate   | Credits and actions consumed during flows                          |
 | JetBrains AI Assistant | https://www.jetbrains.com/ai/       | Candidate   | Plan credits per IDE and month                                     |
