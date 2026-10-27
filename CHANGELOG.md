@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-10-27
+
+### Fixed
+
+- Pin SwiftFormat to 0.64.4. The 1.4.7 release jobs failed bootstrap after
+  Homebrew moved past 0.64.3 on the runners.
+
 ## [1.4.7] - 2026-10-27
 
 ### Added
