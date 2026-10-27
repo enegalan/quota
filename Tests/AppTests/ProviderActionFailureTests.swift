@@ -41,6 +41,75 @@ struct ProviderActionFailureTests {
         #expect(model.lastError != nil)
     }
 
+    @Test("Update All updates every provider that has an update waiting")
+    func updateAllUpdatesEveryOutdatedProvider() async throws {
+        let store = CodableStore.inMemory()
+        try await installedProviderRepository(store).save(InstalledProvider(
+            id: "alpha",
+            version: Version(major: 0, minor: 9, patch: 0),
+            relativePath: "alpha/0.9.0",
+            state: .installed,
+            installedAt: SummaryFixture.reference,
+            contentHash: "hash"
+        ))
+        try await installedProviderRepository(store).save(InstalledProvider(
+            id: "beta",
+            version: Version(major: 0, minor: 9, patch: 0),
+            relativePath: "beta/0.9.0",
+            state: .installed,
+            installedAt: SummaryFixture.reference,
+            contentHash: "hash"
+        ))
+        let environment = AppEnvironment.preview(
+            store: store,
+            available: [
+                AvailableProvider(id: "alpha", version: Version(major: 1, minor: 0, patch: 0)),
+                AvailableProvider(id: "beta", version: Version(major: 1, minor: 0, patch: 0)),
+            ],
+            fetcher: UnconnectedFetcher(),
+            now: SummaryFixture.reference,
+            calendar: SummaryFixture.calendar
+        )
+        let model = AppModel(environment: environment)
+        await model.load()
+
+        #expect(model.hasUpdatesAvailable == true)
+        #expect(model.sections.all.contains { $0.id == "alpha" && $0.state == .updateAvailable })
+        #expect(model.sections.all.contains { $0.id == "beta" && $0.state == .updateAvailable })
+
+        await model.updateAll()
+
+        #expect(model.isUpdatingAll == false)
+        #expect(model.lastError != nil)
+        let alphaRecord = try await installedProviderRepository(store).provider("alpha")
+        let betaRecord = try await installedProviderRepository(store).provider("beta")
+        #expect(alphaRecord?.lastError != nil)
+        #expect(betaRecord?.lastError != nil)
+    }
+
+    @Test("Update All does nothing when no provider has an update waiting")
+    func updateAllDoesNothingWhenCurrent() async {
+        let model = AppModel(
+            environment: AppEnvironment.preview(
+                store: CodableStore.inMemory(),
+                available: [],
+                fetcher: UnconnectedFetcher(),
+                now: SummaryFixture.reference,
+                calendar: SummaryFixture.calendar
+            )
+        )
+        await model.load()
+
+        #expect(model.hasUpdatesAvailable == false)
+        #expect(model.isUpdatingAll == false)
+        #expect(model.lastError == nil)
+
+        await model.updateAll()
+
+        #expect(model.isUpdatingAll == false)
+        #expect(model.lastError == nil)
+    }
+
     @Test("A load is counted, so a view waiting for fresh data waits for it")
     func loadsAreCounted() async {
         let model = AppModel(

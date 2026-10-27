@@ -16,7 +16,7 @@ SIGNING_IDENTITY := $(if $(strip $(SIGNING_IDENTITY)),$(SIGNING_IDENTITY),-)
 
 # The formatter version the tree is written for. CI and bootstrap refuse a
 # different one so a stale runner bottle cannot fail a release that passed locally.
-SWIFTFORMAT_VERSION ?= 0.64.1
+SWIFTFORMAT_VERSION ?= 0.64.3
 
 .PHONY: help bootstrap format format-check lint test build integrations integration-tests plugins plugin-tests bundle run verify clean
 

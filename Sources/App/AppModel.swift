@@ -31,6 +31,18 @@ final class AppModel {
     /// appearing to ignore a click.
     private(set) var isRefreshing = false
 
+    /// Whether "update all" is in flight, so its button can disable itself while
+    /// the integrations are being replaced one at a time.
+    var isUpdatingAll = false
+
+    /// Whether any packaged provider this build offers has an update waiting.
+    ///
+    /// Used to disable "Update All" when there is nothing to do, so the button
+    /// is never a no-op the user has to discover is a no-op.
+    var hasUpdatesAvailable: Bool {
+        sections.all.contains { $0.state == .updateAvailable }
+    }
+
     /// The provider currently connecting or disconnecting, if any.
     ///
     /// Shown on the row so Connect is not a silent wait while the plugin starts
