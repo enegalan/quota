@@ -224,7 +224,7 @@ struct QuotaCreationFlow: View {
 
     private var canAdvance: Bool {
         switch step {
-        case .chooseProvider: selected != nil && canCreate
+        case .chooseProvider: selected != nil && canCreate && !isWorking
         case .install, .connect: !isWorking
         case .policy: false
         }
@@ -280,6 +280,29 @@ struct QuotaCreationFlow: View {
         case .authentication:
             beginConnect(current.id)
         case .none:
+            // Already connected: still ask which limits it meters before the
+            // policy step. Skipping that left `buckets` empty, hid the picker
+            // for providers that meter several windows, and created an unbound
+            // quota on the primary limit alone — which then closed the provider
+            // off from a second quota on the weekly (or other) window.
+            beginPolicy(afterLoadingBucketsFor: current.id)
+        }
+    }
+
+    /// Loads the provider's limits, then opens the policy step.
+    ///
+    /// Used when the provider is already connected, so there is no Connect step
+    /// to hang the load on. The policy step is opened only after the limits are
+    /// in hand: opening it empty would hide the picker for a multi-window
+    /// provider and create an unbound quota on the primary limit alone.
+    private func beginPolicy(afterLoadingBucketsFor providerID: String) {
+        isWorking = true
+        Task {
+            if let updated = refreshedListing(id: providerID) {
+                selected = updated
+            }
+            await loadBuckets()
+            isWorking = false
             step = .policy
         }
     }
@@ -315,12 +338,15 @@ struct QuotaCreationFlow: View {
         isWorking = true
         Task {
             await model.connect(providerID: providerID)
-            isWorking = false
             if let updated = refreshedListing(id: providerID) {
                 selected = updated
             }
-            guard model.lastError == nil else { return }
+            guard model.lastError == nil else {
+                isWorking = false
+                return
+            }
             await loadBuckets()
+            isWorking = false
             step = .policy
         }
     }

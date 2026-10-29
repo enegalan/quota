@@ -4,9 +4,10 @@ import ProviderSupport
 
 /// Where Codex keeps its ChatGPT sign-in.
 ///
-/// Two places, in the order Codex itself prefers them when `auto` storage is
-/// configured: the macOS keychain, then `auth.json` under `CODEX_HOME`. Nothing
-/// here is written — the credential belongs to Codex.
+/// Two places when `auto` storage is configured: `auth.json` under
+/// `CODEX_HOME`, and the macOS keychain. The resolver prefers the file so a
+/// machine that has both is never asked for keychain consent on every refresh.
+/// Nothing here is written — the credential belongs to Codex.
 enum CredentialStore {
     /// Codex's home directory (`CODEX_HOME`, or `~/.codex`).
     static var homeDirectoryURL: URL {

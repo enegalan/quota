@@ -42,10 +42,25 @@ struct BucketPicker: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            if buckets.allSatisfy({ takenIDs.contains($0.id) }) {
-                Caption(text: "Every limit this provider meters already has a quota.")
-            }
+            Caption(text: advice)
         }
+    }
+
+    /// What the picker says under the menu about how many quotas this provider needs.
+    ///
+    /// A multi-limit provider is one quota per limit: the picker chooses which
+    /// window this quota watches, and the remaining ones stay open for another
+    /// pass through creation. Saying that here is what stops a user leaving with
+    /// only the five-hour window and wondering where the weekly one went.
+    private var advice: String {
+        if buckets.allSatisfy({ takenIDs.contains($0.id) }) {
+            return "Every limit this provider meters already has a quota."
+        }
+        let free = buckets.filter { !takenIDs.contains($0.id) }.count
+        if free == buckets.count {
+            return "This provider meters \(buckets.count) limits. Create one quota per limit you want to track."
+        }
+        return "\(free) of \(buckets.count) limits still need a quota. Create one per limit you want to track."
     }
 
     /// Describes one limit as the picker shows it: name, and what is left.

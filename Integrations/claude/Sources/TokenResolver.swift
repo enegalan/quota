@@ -30,11 +30,15 @@ enum TokenResolver {
         credential.accountLabel ?? credential.subscriptionType
     }
 
-    /// The sources, in the order Claude Code writes them.
+    /// The sources Claude Code leaves on disk or in the keychain.
+    ///
+    /// The credentials file is tried first: it holds the same JSON the keychain
+    /// does, and reading it never asks the OS for consent. The keychain is the
+    /// fallback for installations that only wrote there.
     private static func credentialSources() -> [(CredentialSource, () throws -> String?)] {
         [
-            (.keychain, { CredentialStore.keychainCredentialJSON() }),
             (.credentialsFile, { CredentialStore.fileCredentialJSON() }),
+            (.keychain, { CredentialStore.keychainCredentialJSON() }),
         ]
     }
 

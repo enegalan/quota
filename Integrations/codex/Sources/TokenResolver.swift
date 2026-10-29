@@ -28,11 +28,15 @@ enum TokenResolver {
         credential.accountLabel ?? credential.planType
     }
 
-    /// The sources, in the order Codex writes them under `auto` storage.
+    /// The sources Codex leaves under `auto` storage.
+    ///
+    /// The credentials file is tried first: it holds the same JSON the keychain
+    /// does, and reading it never asks the OS for consent. The keychain is the
+    /// fallback for installations that only wrote there.
     private static func credentialSources() -> [(CredentialSource, () throws -> String?)] {
         [
-            (.keychain, { CredentialStore.keychainCredentialJSON() }),
             (.credentialsFile, { CredentialStore.fileCredentialJSON() }),
+            (.keychain, { CredentialStore.keychainCredentialJSON() }),
         ]
     }
 
