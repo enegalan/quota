@@ -35,7 +35,7 @@ struct CredentialTests {
     @Test("A credential whose JWT expiry has passed is expired")
     func expiredCredential() throws {
         // Header/payload for exp=1000, signature ignored by the reader.
-        let token = makeUnsignedJWT(claims: ["exp": 1000])
+        let token = try makeUnsignedJWT(claims: ["exp": 1000])
         let credential = try #require(
             CodexCredentialReader.credential(
                 in: #"{"tokens":{"access_token":"\#(token)"}}"#
@@ -47,7 +47,7 @@ struct CredentialTests {
 
     @Test("The account is the email the ID token names")
     func readsTheAccount() throws {
-        let idToken = makeUnsignedJWT(claims: ["email": "me@example.com"])
+        let idToken = try makeUnsignedJWT(claims: ["email": "me@example.com"])
         let credential = try #require(
             CodexCredentialReader.credential(
                 in: #"{"tokens":{"access_token":"atk","id_token":"\#(idToken)"}}"#
@@ -65,14 +65,14 @@ struct CredentialTests {
     }
 
     /// A JWT the reader can parse without verifying a signature.
-    private func makeUnsignedJWT(claims: [String: Any]) -> String {
-        func encode(_ object: [String: Any]) -> String {
-            let data = try! JSONSerialization.data(withJSONObject: object)
+    private func makeUnsignedJWT(claims: [String: Any]) throws -> String {
+        func encode(_ object: [String: Any]) throws -> String {
+            let data = try JSONSerialization.data(withJSONObject: object)
             return data.base64EncodedString()
                 .replacingOccurrences(of: "+", with: "-")
                 .replacingOccurrences(of: "/", with: "_")
                 .replacingOccurrences(of: "=", with: "")
         }
-        return "\(encode(["alg": "none"])).\(encode(claims)).sig"
+        return try "\(encode(["alg": "none"])).\(encode(claims)).sig"
     }
 }
