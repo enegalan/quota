@@ -35,7 +35,7 @@ Status:
 | Provider           | Website                             | Status      | What Quota paces                              |
 | ------------------ | ----------------------------------- | ----------- | --------------------------------------------- |
 | Claude Code        | https://claude.com/code             | Implemented | Claude subscription or API usage while coding |
-| OpenAI Codex CLI   | https://openai.com/codex            | Planned     | Codex plan usage and limits                   |
+| OpenAI Codex CLI   | https://openai.com/codex            | Implemented | Codex plan usage and limits                   |
 | Gemini CLI         | https://gemini.google.com           | Planned     | Gemini usage for terminal development         |
 | GitHub Copilot CLI | https://github.com/features/copilot | Planned     | Copilot usage from terminal                   |
 | Amazon Q Developer | https://aws.amazon.com/q/developer  | Planned     | Per-user and per-team quotas                  |
