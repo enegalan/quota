@@ -81,6 +81,15 @@ struct CredentialTests {
         )
     }
 
+    @Test("A quoted storage mode ignores a trailing inline comment")
+    func credentialsStoreModeIgnoresInlineComment() {
+        #expect(
+            CredentialStore.parseCredentialsStoreMode(
+                from: #"cli_auth_credentials_store = "keyring" # prefer keychain"#
+            ) == .keyring
+        )
+    }
+
     @Test("A table-scoped storage key is not Codex's setting")
     func credentialsStoreModeIgnoresTables() {
         let nested = """

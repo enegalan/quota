@@ -80,10 +80,28 @@ enum CredentialStore {
             guard parts.count == 2, parts[0] == CodexConstants.credentialsStoreConfigKey else {
                 continue
             }
-            let raw = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-            return CredentialsStoreMode(rawValue: raw)
+            return CredentialsStoreMode(rawValue: tomlScalarValue(parts[1]))
         }
         return nil
+    }
+
+    /// TOML scalar text before any trailing inline comment.
+    ///
+    /// Quoted values keep the text through the matching closer; unquoted values
+    /// stop at the first `#`.
+    private static func tomlScalarValue(_ raw: String) -> String {
+        let value = raw.trimmingCharacters(in: .whitespaces)
+        guard let first = value.first, first == "\"" || first == "'" else {
+            if let hash = value.firstIndex(of: "#") {
+                return String(value[..<hash]).trimmingCharacters(in: .whitespaces)
+            }
+            return value
+        }
+        let afterOpen = value.index(after: value.startIndex)
+        guard let close = value[afterOpen...].firstIndex(of: first) else {
+            return String(value[afterOpen...])
+        }
+        return String(value[afterOpen..<close])
     }
 
     /// The credential JSON from the keychain, or nil when there is none.
