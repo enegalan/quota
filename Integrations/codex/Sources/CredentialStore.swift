@@ -101,7 +101,7 @@ enum CredentialStore {
         guard let close = value[afterOpen...].firstIndex(of: first) else {
             return String(value[afterOpen...])
         }
-        return String(value[afterOpen..<close])
+        return String(value[afterOpen ..< close])
     }
 
     /// The credential JSON from the keychain, or nil when there is none.
