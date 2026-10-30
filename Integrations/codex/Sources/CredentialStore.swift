@@ -4,11 +4,21 @@ import ProviderSupport
 
 /// Where Codex keeps its ChatGPT sign-in.
 ///
-/// Two places when `auto` storage is configured: `auth.json` under
-/// `CODEX_HOME`, and the macOS keychain. The resolver prefers the file so a
-/// machine that has both is never asked for keychain consent on every refresh.
-/// Nothing here is written — the credential belongs to Codex.
+/// Codex's `cli_auth_credentials_store` chooses the place: the keychain, the
+/// file, both under `auto`, or neither under `ephemeral`. Nothing here is
+/// written — the credential belongs to Codex.
 enum CredentialStore {
+    /// Where Codex itself will look for the active sign-in.
+    ///
+    /// Mirrored from Codex so this plugin does not prefer a stale `auth.json`
+    /// after Codex has moved the session into the keychain.
+    enum CredentialsStoreMode: String {
+        case file
+        case keyring
+        case auto
+        case ephemeral
+    }
+
     /// Codex's home directory (`CODEX_HOME`, or `~/.codex`).
     static var homeDirectoryURL: URL {
         if let override = ProcessInfo.processInfo.environment[CodexConstants.homeEnvironment],
@@ -28,6 +38,51 @@ enum CredentialStore {
             return URL(fileURLWithPath: override)
         }
         return homeDirectoryURL.appendingPathComponent(CodexConstants.credentialsFileName)
+    }
+
+    /// Codex's configuration file (`config.toml` under the home directory).
+    static var configurationFileURL: URL {
+        homeDirectoryURL.appendingPathComponent(CodexConstants.configurationFileName)
+    }
+
+    /// The storage mode Codex is configured to use.
+    ///
+    /// Defaults to `auto` when the key is absent or unreadable, matching Codex.
+    static func credentialsStoreMode(
+        configuration: String? = nil
+    ) -> CredentialsStoreMode {
+        let text = configuration ?? (try? String(contentsOf: configurationFileURL, encoding: .utf8))
+        guard let text else { return .auto }
+        return parseCredentialsStoreMode(from: text) ?? .auto
+    }
+
+    /// Reads `cli_auth_credentials_store` from a Codex `config.toml` body.
+    ///
+    /// Only the top-level key is accepted: the same name nested under a table
+    /// is not Codex's setting. Unknown values are ignored so a typo falls back
+    /// to `auto` at the call site rather than inventing a mode.
+    static func parseCredentialsStoreMode(from configuration: String) -> CredentialsStoreMode? {
+        for line in configuration.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("#") {
+                continue
+            }
+            // A table header ends the top-level keys; later assignments belong
+            // to that table, not to Codex's storage setting.
+            if trimmed.hasPrefix("[") {
+                return nil
+            }
+            guard trimmed.hasPrefix(CodexConstants.credentialsStoreConfigKey) else { continue }
+            let parts = trimmed.split(separator: "=", maxSplits: 1).map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
+            guard parts.count == 2, parts[0] == CodexConstants.credentialsStoreConfigKey else {
+                continue
+            }
+            let raw = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            return CredentialsStoreMode(rawValue: raw)
+        }
+        return nil
     }
 
     /// The credential JSON from the keychain, or nil when there is none.

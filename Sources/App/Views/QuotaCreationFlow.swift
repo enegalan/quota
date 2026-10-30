@@ -160,8 +160,16 @@ struct QuotaCreationFlow: View {
             caption: statusCaption,
             isAvailable: isAvailable,
             onSelect: { listing in
+                // Ignore switches while a connect/load is in flight: the open
+                // task still owns `isWorking`, and applying its buckets to a
+                // different provider would be a lie about what was just read.
+                guard !isWorking else { return }
                 selected = listing
                 name = listing.displayName
+                // Drop the previous provider's limits so a stale full set
+                // cannot keep Next disabled for a freshly chosen provider.
+                buckets = []
+                bucketID = nil
             }
         )
     }
@@ -257,7 +265,9 @@ struct QuotaCreationFlow: View {
         case .install:
             beginConnect(listing.id)
         case .connect:
-            step = .policy
+            // A failed connect clears `isWorking` and would otherwise let Next
+            // skip into policy with no reading behind it. Retry instead.
+            beginConnect(listing.id)
         case .policy:
             break
         }
@@ -298,10 +308,14 @@ struct QuotaCreationFlow: View {
     private func beginPolicy(afterLoadingBucketsFor providerID: String) {
         isWorking = true
         Task {
-            if let updated = refreshedListing(id: providerID) {
+            if let updated = refreshedListing(id: providerID), selected?.id == providerID {
                 selected = updated
             }
-            await loadBuckets()
+            await loadBuckets(for: providerID)
+            guard selected?.id == providerID else {
+                isWorking = false
+                return
+            }
             isWorking = false
             step = .policy
         }
@@ -345,7 +359,11 @@ struct QuotaCreationFlow: View {
                 isWorking = false
                 return
             }
-            await loadBuckets()
+            await loadBuckets(for: providerID)
+            guard selected?.id == providerID else {
+                isWorking = false
+                return
+            }
             isWorking = false
             step = .policy
         }
@@ -361,13 +379,14 @@ struct QuotaCreationFlow: View {
     /// user means the common case — one provider, one quota — needs no decision at
     /// all, and a provider metering several arrives at a picker already on a limit
     /// that has no quota.
-    private func loadBuckets() async {
-        guard let selected else {
-            buckets = []
-            bucketID = nil
-            return
-        }
-        buckets = await model.buckets(forProviderID: selected.id)
+    ///
+    /// Results are applied only while `providerID` is still the selection: a load
+    /// started for one provider must not overwrite buckets after another was
+    /// chosen.
+    private func loadBuckets(for providerID: String) async {
+        let loaded = await model.buckets(forProviderID: providerID)
+        guard selected?.id == providerID else { return }
+        buckets = loaded
         bucketID = buckets.first { !takenBucketIDs.contains($0.id) }?.id ?? buckets.first?.id
     }
 

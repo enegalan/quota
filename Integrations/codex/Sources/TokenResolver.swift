@@ -28,16 +28,29 @@ enum TokenResolver {
         credential.accountLabel ?? credential.planType
     }
 
-    /// The sources Codex leaves under `auto` storage.
+    /// The sources Codex leaves for the configured storage mode.
     ///
-    /// The credentials file is tried first: it holds the same JSON the keychain
-    /// does, and reading it never asks the OS for consent. The keychain is the
-    /// fallback for installations that only wrote there.
+    /// The mode comes from Codex's own `cli_auth_credentials_store` so this
+    /// walk matches where Codex reads the active account. Under `auto`, the
+    /// keychain is first: Codex prefers it and may leave a stale `auth.json`
+    /// behind after a keyring save, which must not win here.
     private static func credentialSources() -> [(CredentialSource, () throws -> String?)] {
-        [
-            (.credentialsFile, { CredentialStore.fileCredentialJSON() }),
-            (.keychain, { CredentialStore.keychainCredentialJSON() }),
-        ]
+        let file: (CredentialSource, () throws -> String?) = (
+            .credentialsFile, { CredentialStore.fileCredentialJSON() }
+        )
+        let keychain: (CredentialSource, () throws -> String?) = (
+            .keychain, { CredentialStore.keychainCredentialJSON() }
+        )
+        switch CredentialStore.credentialsStoreMode() {
+        case .file:
+            return [file]
+        case .keyring:
+            return [keychain]
+        case .auto:
+            return [keychain, file]
+        case .ephemeral:
+            return []
+        }
     }
 
     /// Reads one source's JSON into a credential, or refuses it.

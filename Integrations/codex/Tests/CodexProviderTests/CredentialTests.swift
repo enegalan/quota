@@ -64,6 +64,33 @@ struct CredentialTests {
         #expect(account.count == 4 + 16)
     }
 
+    @Test("Storage mode follows Codex's top-level config key")
+    func credentialsStoreModeFromConfig() {
+        #expect(
+            CredentialStore.parseCredentialsStoreMode(
+                from: #"cli_auth_credentials_store = "keyring""#
+            ) == .keyring
+        )
+        #expect(
+            CredentialStore.parseCredentialsStoreMode(
+                from: "cli_auth_credentials_store = \"file\"\nmodel = \"gpt-5\""
+            ) == .file
+        )
+        #expect(
+            CredentialStore.credentialsStoreMode(configuration: "model = \"gpt-5\"") == .auto
+        )
+    }
+
+    @Test("A table-scoped storage key is not Codex's setting")
+    func credentialsStoreModeIgnoresTables() {
+        let nested = """
+        [features]
+        cli_auth_credentials_store = "file"
+        """
+        #expect(CredentialStore.parseCredentialsStoreMode(from: nested) == nil)
+        #expect(CredentialStore.credentialsStoreMode(configuration: nested) == .auto)
+    }
+
     /// A JWT the reader can parse without verifying a signature.
     private func makeUnsignedJWT(claims: [String: Any]) throws -> String {
         func encode(_ object: [String: Any]) throws -> String {

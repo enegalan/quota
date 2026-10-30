@@ -22,9 +22,10 @@ public enum KeychainReader {
         process.arguments = securityArguments(service: service, account: account)
 
         let stdout = Pipe()
-        let stderr = Pipe()
         process.standardOutput = stdout
-        process.standardError = stderr
+        // Leave stderr unread and it can fill the pipe and stall `security`
+        // the same way a full stdout pipe can; discard it instead.
+        process.standardError = FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice
 
         do {
@@ -32,11 +33,11 @@ public enum KeychainReader {
         } catch {
             return nil
         }
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-
+        // Drain stdout before waiting: a full pipe blocks the child, and
+        // waiting first then leaves this process wedged on both sides.
         let data = stdout.fileHandleForReading.readDataToEndOfFile()
-        guard let text = String(data: data, encoding: .utf8) else { return nil }
+        process.waitUntilExit()
+        guard process.terminationStatus == 0, let text = String(data: data, encoding: .utf8) else { return nil }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }

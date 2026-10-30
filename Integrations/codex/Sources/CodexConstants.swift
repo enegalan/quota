@@ -12,7 +12,14 @@ enum CodexConstants {
     /// Overridable with `CODEX_HOME`. The credential belongs to Codex, and this
     /// plugin never writes it — Codex refreshes the original.
     static let credentialsFileName = "auth.json"
+    static let configurationFileName = "config.toml"
     static let defaultHomeRelativePath = ".codex"
+
+    /// Codex's `cli_auth_credentials_store` key in `config.toml`.
+    ///
+    /// Decides whether the active sign-in lives in the keychain, in
+    /// `auth.json`, or prefers the keychain with a file fallback (`auto`).
+    static let credentialsStoreConfigKey = "cli_auth_credentials_store"
 
     /// The macOS keychain service Codex writes its sign-in under.
     ///
