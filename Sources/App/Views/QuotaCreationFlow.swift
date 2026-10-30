@@ -13,10 +13,10 @@ import SwiftUI
 struct QuotaCreationFlow: View {
     let model: AppModel
 
-    @State private var step: StepTrail.Step = .chooseProvider
-    @State private var selected: ProviderListing?
-    @State private var policy: AllocationPolicy = .even
-    @State private var name = ""
+    @State var step: StepTrail.Step = .chooseProvider
+    @State var selected: ProviderListing?
+    @State var policy: AllocationPolicy = .even
+    @State var name = ""
 
     /// The limits the chosen provider meters, once it has been connected and read.
     ///
@@ -24,11 +24,11 @@ struct QuotaCreationFlow: View {
     /// as "this provider does not name its limits" rather than as an error, because
     /// a provider that meters one limit has nothing to choose between and should
     /// not be asked.
-    @State private var buckets: [UsageBucket] = []
+    @State var buckets: [UsageBucket] = []
 
     /// Which limit this quota will watch, `nil` for the provider's primary one.
-    @State private var bucketID: String?
-    @State private var isWorking = false
+    @State var bucketID: String?
+    @State var isWorking = false
 
     /// Creation steps, in order.
     ///
@@ -49,7 +49,7 @@ struct QuotaCreationFlow: View {
     ///
     /// Derived from the provider's state so an installed Cursor is not asked to
     /// install again, and a connected one is not asked to connect again.
-    private var visibleSteps: [StepTrail.Step] {
+    var visibleSteps: [StepTrail.Step] {
         guard let selected else { return [.chooseProvider] }
         switch selected.state.prerequisite {
         case .installation:
@@ -128,7 +128,7 @@ struct QuotaCreationFlow: View {
     }
 
     /// The limits of this provider that already have a quota of their own.
-    private var takenBucketIDs: Set<String> {
+    var takenBucketIDs: Set<String> {
         guard let selected else { return [] }
         return Set(
             buckets
@@ -144,7 +144,7 @@ struct QuotaCreationFlow: View {
     /// contradict. `monthAround` is the fallback for a provider that could not be
     /// read: the plan has to span something, and the month is at least a span the
     /// app can defend.
-    private var chosenPeriod: QuotaPeriod? {
+    var chosenPeriod: QuotaPeriod? {
         if let bucket = buckets.first(where: { $0.id == bucketID }) {
             return bucket.period
         }
@@ -160,8 +160,16 @@ struct QuotaCreationFlow: View {
             caption: statusCaption,
             isAvailable: isAvailable,
             onSelect: { listing in
+                // Ignore switches while a connect/load is in flight: the open
+                // task still owns `isWorking`, and applying its buckets to a
+                // different provider would be a lie about what was just read.
+                guard !isWorking else { return }
                 selected = listing
                 name = listing.displayName
+                // Drop the previous provider's limits so a stale full set
+                // cannot keep Next disabled for a freshly chosen provider.
+                buckets = []
+                bucketID = nil
             }
         )
     }
@@ -203,7 +211,7 @@ struct QuotaCreationFlow: View {
     ///
     /// A provider the app cannot install and has not got is not offered, because
     /// Creation installs inline and there would be nothing to install.
-    private var availableListings: [ProviderListing] {
+    var availableListings: [ProviderListing] {
         model.sections.connected + model.sections.installed + model.sections.available
     }
 
@@ -224,7 +232,7 @@ struct QuotaCreationFlow: View {
 
     private var canAdvance: Bool {
         switch step {
-        case .chooseProvider: selected != nil && canCreate
+        case .chooseProvider: selected != nil && canCreate && !isWorking
         case .install, .connect: !isWorking
         case .policy: false
         }
@@ -242,156 +250,5 @@ struct QuotaCreationFlow: View {
         // Empty means the provider could not be read, which is not the same as
         // every limit being taken: there is then nothing to have ruled out.
         return buckets.isEmpty || buckets.count > takenBucketIDs.count
-    }
-
-    /// Moves forward according to what the selected provider still needs.
-    ///
-    /// Install and connect run here rather than as empty screens the user clicks
-    /// through: a Next that only changed a label while claiming to install is
-    /// what made an already-installed Cursor look missing.
-    private func advance() {
-        guard let listing = selected else { return }
-        switch step {
-        case .chooseProvider:
-            beginFromChoice(listing)
-        case .install:
-            beginConnect(listing.id)
-        case .connect:
-            step = .policy
-        case .policy:
-            break
-        }
-    }
-
-    /// Enters the flow at the step the chosen provider's state calls for.
-    ///
-    /// The listing is re-read rather than used as tapped, because Install and
-    /// Connect change a provider's state and the row the user tapped can still
-    /// hold the state from before that ran in the same session.
-    private func beginFromChoice(_ listing: ProviderListing) {
-        // Re-read from the live sections: `selected` can still hold the state
-        // from when the row was tapped, which is wrong after Install / Connect
-        // on the Providers screen in the same session.
-        let current = refreshedListing(id: listing.id) ?? listing
-        selected = current
-        switch current.state.prerequisite {
-        case .installation:
-            beginInstall(current)
-        case .authentication:
-            beginConnect(current.id)
-        case .none:
-            step = .policy
-        }
-    }
-
-    /// Installs the provider, then carries straight on to connecting it.
-    ///
-    /// Install and connect are one gesture to the user, so a successful install
-    /// advances rather than stopping to report success the user did not ask about.
-    /// A failed install falls out through `lastError`, which stops the step
-    /// advancing and leaves the choice on screen to be retried.
-    private func beginInstall(_ listing: ProviderListing) {
-        step = .install
-        isWorking = true
-        Task {
-            await model.install(listing)
-            isWorking = false
-            if let updated = refreshedListing(id: listing.id) {
-                selected = updated
-            }
-            guard model.lastError == nil else { return }
-            beginConnect(listing.id)
-        }
-    }
-
-    /// Authenticates the provider, then asks it which limits it meters.
-    ///
-    /// The listing is refreshed afterwards so the connection state shown from here
-    /// on is the state the provider actually reported, not the state that was
-    /// true when the row was tapped. Connecting before asking for buckets is the
-    /// order that matters: an unauthenticated provider cannot be read.
-    private func beginConnect(_ providerID: String) {
-        step = .connect
-        isWorking = true
-        Task {
-            await model.connect(providerID: providerID)
-            isWorking = false
-            if let updated = refreshedListing(id: providerID) {
-                selected = updated
-            }
-            guard model.lastError == nil else { return }
-            await loadBuckets()
-            step = .policy
-        }
-    }
-
-    /// Asks the provider which limits it meters, and picks the first unwatched one.
-    ///
-    /// Done after Connect rather than before, because a provider that is not
-    /// authenticated yet cannot be read, and its answer would be a failure the
-    /// flow would then have to explain as an empty list.
-    ///
-    /// Choosing the first available limit rather than leaving the choice to the
-    /// user means the common case — one provider, one quota — needs no decision at
-    /// all, and a provider metering several arrives at a picker already on a limit
-    /// that has no quota.
-    private func loadBuckets() async {
-        guard let selected else {
-            buckets = []
-            bucketID = nil
-            return
-        }
-        buckets = await model.buckets(forProviderID: selected.id)
-        bucketID = buckets.first { !takenBucketIDs.contains($0.id) }?.id ?? buckets.first?.id
-    }
-
-    /// The current state of one provider, read from the live listings.
-    ///
-    /// - Returns: nil once the provider has left the listings, which the caller
-    ///   treats as "leave the selection as it is" rather than clearing it: a
-    ///   provider that vanished mid-flow should not blank the screen.
-    private func refreshedListing(id: String) -> ProviderListing? {
-        availableListings.first { $0.id == id }
-    }
-
-    /// Registers the quota and, on success, resets the flow to choose a provider.
-    ///
-    /// The bucket is captured before the call rather than read from state
-    /// afterwards, so a quota cannot be filed against a limit the user has since
-    /// changed their mind about. A refused registration keeps the form as it was,
-    /// because the name and policy the user entered are still what they want.
-    private func create(using listing: ProviderListing) {
-        isWorking = true
-        let chosen = bucketID
-        Task {
-            let created = await model.createQuota(
-                named: name,
-                providerID: listing.id,
-                bucketID: chosen,
-                period: chosenPeriod,
-                policy: policy
-            )
-            isWorking = false
-            if created {
-                name = ""
-                selected = nil
-                buckets = []
-                bucketID = nil
-                step = .chooseProvider
-            }
-        }
-    }
-
-    /// The step a Back press should land on.
-    ///
-    /// - Returns: the previous visible step, or `chooseProvider` when there is
-    ///   none. Backing out of the first step returns to the start rather than
-    ///   doing nothing, so Back is never a key that appears not to work.
-    private func previousVisible(of step: StepTrail.Step) -> StepTrail.Step {
-        let steps = visibleSteps
-        guard let index = steps.firstIndex(of: step), index > 0 else {
-            return .chooseProvider
-        }
-        return steps[index - 1]
     }
 }

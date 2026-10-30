@@ -3,11 +3,12 @@ import ProviderSupport
 
 /// Where Claude Code keeps its sign-in.
 ///
-/// Two places, in the order Claude Code itself prefers them: the macOS
-/// keychain, and the credentials file it falls back to. Nothing here is
-/// written — the credential belongs to Claude Code, and Claude Code refreshes
-/// it. This plugin reads it afresh on every call so a token Claude Code has
-/// just rotated is picked up on the next refresh rather than a session later.
+/// Two places: the credentials file and the macOS keychain. The resolver
+/// prefers the file so a machine that has both is never asked for keychain
+/// consent on every refresh. Nothing here is written — the credential belongs
+/// to Claude Code, and Claude Code refreshes it. This plugin reads it afresh
+/// on every call so a token Claude Code has just rotated is picked up on the
+/// next refresh rather than a session later.
 enum CredentialStore {
     /// The credentials file's path.
     static var credentialsFileURL: URL {
