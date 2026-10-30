@@ -47,20 +47,21 @@ enum CredentialStore {
 
     /// The storage mode Codex is configured to use.
     ///
-    /// Defaults to `auto` when the key is absent or unreadable, matching Codex.
+    /// Defaults to `file` when the key is absent or unreadable, matching Codex's
+    /// `AuthCredentialsStoreMode` default.
     static func credentialsStoreMode(
         configuration: String? = nil
     ) -> CredentialsStoreMode {
         let text = configuration ?? (try? String(contentsOf: configurationFileURL, encoding: .utf8))
-        guard let text else { return .auto }
-        return parseCredentialsStoreMode(from: text) ?? .auto
+        guard let text else { return .file }
+        return parseCredentialsStoreMode(from: text) ?? .file
     }
 
     /// Reads `cli_auth_credentials_store` from a Codex `config.toml` body.
     ///
     /// Only the top-level key is accepted: the same name nested under a table
     /// is not Codex's setting. Unknown values are ignored so a typo falls back
-    /// to `auto` at the call site rather than inventing a mode.
+    /// to `file` at the call site rather than inventing a mode.
     static func parseCredentialsStoreMode(from configuration: String) -> CredentialsStoreMode? {
         for line in configuration.split(whereSeparator: \.isNewline) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)

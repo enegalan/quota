@@ -77,7 +77,7 @@ struct CredentialTests {
             ) == .file
         )
         #expect(
-            CredentialStore.credentialsStoreMode(configuration: "model = \"gpt-5\"") == .auto
+            CredentialStore.credentialsStoreMode(configuration: "model = \"gpt-5\"") == .file
         )
     }
 
@@ -88,7 +88,7 @@ struct CredentialTests {
         cli_auth_credentials_store = "file"
         """
         #expect(CredentialStore.parseCredentialsStoreMode(from: nested) == nil)
-        #expect(CredentialStore.credentialsStoreMode(configuration: nested) == .auto)
+        #expect(CredentialStore.credentialsStoreMode(configuration: nested) == .file)
     }
 
     /// A JWT the reader can parse without verifying a signature.
