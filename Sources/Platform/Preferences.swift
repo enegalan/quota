@@ -13,7 +13,14 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
     public var hiddenDailyIntegrations: Set<String> = []
     public var hiddenBuckets: [String: Set<String>] = [:]
     public var shownUnavailableBuckets: [String: Set<String>] = [:]
-    public var selectedQuotas: [String: UUID] = [:]
+
+    /// Quotas whose today's allowance is shown, per integration.
+    ///
+    /// An integration with no entry keeps the older choice: the planned quota,
+    /// unless that integration is in `hiddenDailyIntegrations`. An entry, even
+    /// an empty one, is the list the user picked, so turning the planned quota
+    /// off does not put it back.
+    public var dailyQuotas: [String: Set<UUID>] = [:]
 
     public init() {}
 
@@ -32,7 +39,56 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
             [String: Set<String>].self,
             forKey: .shownUnavailableBuckets
         ) ?? [:]
-        selectedQuotas = try values.decodeIfPresent([String: UUID].self, forKey: .selectedQuotas) ?? [:]
+        dailyQuotas = try values.decodeIfPresent([String: Set<UUID>].self, forKey: .dailyQuotas) ?? [:]
+    }
+
+    /// Whether this quota's today's allowance belongs in the menu bar.
+    ///
+    /// The global switch wins: with daily quota hidden, no quota shows one.
+    /// Otherwise the integration's own list wins over the planned quota, and
+    /// an integration that has never been given a list still shows the planned
+    /// quota — the choice the menu bar made before a list existed.
+    public func showsDailyAllowance(
+        quotaID: UUID,
+        integrationID: String,
+        plannedQuotaID: UUID
+    ) -> Bool {
+        guard showDailyQuota else { return false }
+        return dailyQuotaIDs(integrationID: integrationID, plannedQuotaID: plannedQuotaID)
+            .contains(quotaID)
+    }
+
+    /// Records whether one quota shows today's allowance.
+    ///
+    /// The first change stores the whole list, including the planned quota
+    /// when that was what the menu bar had been showing. A later change to the
+    /// planned quota then leaves the list alone: the two choices are no longer
+    /// the same choice.
+    public mutating func setShowsDailyAllowance(
+        _ enabled: Bool,
+        for quotaID: UUID,
+        integrationID: String,
+        plannedQuotaID: UUID
+    ) {
+        var chosen = dailyQuotaIDs(integrationID: integrationID, plannedQuotaID: plannedQuotaID)
+        if enabled {
+            chosen.insert(quotaID)
+        } else {
+            chosen.remove(quotaID)
+        }
+        dailyQuotas[integrationID] = chosen
+        hiddenDailyIntegrations.remove(integrationID)
+    }
+
+    /// The quotas of one integration that show today's allowance.
+    private func dailyQuotaIDs(integrationID: String, plannedQuotaID: UUID) -> Set<UUID> {
+        if let chosen = dailyQuotas[integrationID] {
+            return chosen
+        }
+        if hiddenDailyIntegrations.contains(integrationID) {
+            return []
+        }
+        return [plannedQuotaID]
     }
 }
 

@@ -2,7 +2,8 @@ import Core
 import Platform
 import SwiftUI
 
-/// The menu bar item shows today's allowance and each integration's selected limits.
+/// The menu bar item shows each chosen quota's today's allowance and each
+/// integration's selected limits.
 struct MenuBarLabel: View {
     /// The presentation the label speaks for, either handed in (for tests) or
     /// read live from the model (for the status item). Holding the model here
@@ -44,16 +45,7 @@ struct MenuBarLabel: View {
             guard !options.hiddenIntegrations.contains(integrationID),
                   seenIntegrations.insert(integrationID).inserted
             else { return nil }
-            // A pin is the latest choice for this integration. A stored
-            // per-integration selection must not replace it; other
-            // integrations still follow that selection.
-            if candidate.id == model?.menuBarQuotaID {
-                return candidate
-            }
-            guard let selected = options.selectedQuotas[integrationID] else { return candidate }
-            return candidates.first {
-                $0.id == selected && $0.summary.quota.providerID.rawValue == integrationID
-            } ?? candidate
+            return candidate
         }
     }
 
@@ -138,14 +130,52 @@ struct MenuBarLabel: View {
         for limit in limits where isMissing(limit, from: buckets) && shows(limit, integrationID: integrationID) {
             labels.append("\(limit.menuBarLabel) \(values(used: nil, remaining: nil))")
         }
-        var result: [String] = []
-        if options.showDailyQuota, !options.hiddenDailyIntegrations.contains(integrationID) {
-            let allowance = presentation.summary.todayAllowance
-            let remaining = allowance.flatMap { value in value.usedToday.map { max(0, value.suggested - $0) } }
-            let daily = values(used: allowance?.usedToday, remaining: remaining)
-            result.append("Today \(daily)")
+        return (dailyLines(for: presentation) + labels).joined(separator: "  ")
+    }
+
+    /// Today's allowance for every quota of this integration the user chose.
+    ///
+    /// One quota keeps the bare "Today". A second quota has to be named, and
+    /// so does a single quota that is not the one this integration is drawn
+    /// from: the limits beside it still come from that quota, and an unnamed
+    /// "Today" would be read as its plan.
+    private func dailyLines(for presentation: QuotaPresentation) -> [String] {
+        let integrationID = presentation.summary.quota.providerID.rawValue
+        let siblings = dailySiblings(integrationID: integrationID, fallback: presentation)
+        let shown = siblings.filter {
+            options.showsDailyAllowance(
+                quotaID: $0.id,
+                integrationID: integrationID,
+                plannedQuotaID: presentation.id
+            )
         }
-        return (result + labels).joined(separator: "  ")
+        var ordered: [QuotaPresentation] = []
+        if let planned = shown.first(where: { $0.id == presentation.id }) {
+            ordered.append(planned)
+        }
+        for quota in shown where quota.id != presentation.id {
+            ordered.append(quota)
+        }
+        let named = ordered.count > 1 || ordered.first?.id != presentation.id
+        return ordered.map { quota in
+            let allowance = quota.summary.todayAllowance
+            let remaining = allowance.flatMap { value in
+                value.usedToday.map { max(0, value.suggested - $0) }
+            }
+            let figures = values(used: allowance?.usedToday, remaining: remaining)
+            guard named else { return "Today \(figures)" }
+            return "Today \(quota.dailyMenuTitle(among: ordered)) \(figures)"
+        }
+    }
+
+    private func dailySiblings(
+        integrationID: String,
+        fallback: QuotaPresentation
+    ) -> [QuotaPresentation] {
+        let siblings = model?.presentations.filter {
+            $0.summary.quota.providerID.rawValue == integrationID
+        } ?? []
+        return siblings.isEmpty ? [fallback] : siblings
     }
 
     private func isMissing(_ limit: KnownLimit, from buckets: [UsageBucket]) -> Bool {

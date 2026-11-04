@@ -86,13 +86,6 @@ extension AppModel {
     /// store on every click would make choosing look like waiting.
     func showInMenuBar(_ presentation: QuotaPresentation) async {
         guard presentation.id != menuBarQuotaID else { return }
-        let integrationID = presentation.summary.quota.providerID.rawValue
-        // The label prefers this pin over a stored per-integration choice, and
-        // the settings picker reads that choice. Writing both keeps the pin
-        // from being masked and the picker from showing a different quota.
-        var preferences = menuBarPreferences
-        preferences.selectedQuotas[integrationID] = presentation.id
-        storeMenuBarPreferences(preferences)
         let options = menuBarPreferences
         do {
             try await savePreferences(restoringMenuBarOnFailure: true) {

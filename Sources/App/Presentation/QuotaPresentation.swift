@@ -253,6 +253,20 @@ struct QuotaPresentation: Identifiable, Hashable {
         return "\(limit) · \(account)"
     }
 
+    /// The name to put beside today's allowance when it has to name its quota.
+    ///
+    /// The quota's own name, and the limit after it when a sibling is called
+    /// the same thing. Two quotas on one provider are often both named for the
+    /// provider, and the limit is what tells them apart.
+    func dailyMenuTitle(among siblings: [QuotaPresentation]) -> String {
+        let name = summary.quota.name
+        let sharesName = siblings.contains { sibling in
+            sibling.id != id && sibling.summary.quota.name == name
+        }
+        guard sharesName, let limitName else { return name }
+        return "\(name) · \(limitName)"
+    }
+
     /// Whether the sync caption should read as a warning at this instant.
     ///
     /// The tone and the words come from the same place, so a screen cannot show

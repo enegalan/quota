@@ -40,9 +40,9 @@ enum CursorFixtureLoader {
             quotas: [
                 ProviderUsage(
                     externalID: "cursor-plan",
-                    displayName: "Included plan",
+                    displayName: "Cursor Models",
                     bucketID: "plan",
-                    bucketDisplayName: "Included plan",
+                    bucketDisplayName: "Cursor Models",
                     usagePercentage: planPercent,
                     periodStart: start,
                     periodEnd: end,
@@ -50,9 +50,9 @@ enum CursorFixtureLoader {
                 ),
                 ProviderUsage(
                     externalID: "cursor-api",
-                    displayName: "API / named models",
+                    displayName: "Other Models",
                     bucketID: "api",
-                    bucketDisplayName: "API / named models",
+                    bucketDisplayName: "Other Models",
                     usagePercentage: apiPercent,
                     periodStart: start,
                     periodEnd: end,
@@ -73,9 +73,9 @@ enum CursorFixtureLoader {
             quotas: [
                 ProviderUsage(
                     externalID: "cursor-plan",
-                    displayName: "Included plan",
+                    displayName: "Cursor Models",
                     bucketID: "plan",
-                    bucketDisplayName: "Included plan",
+                    bucketDisplayName: "Cursor Models",
                     usagePercentage: planPercent,
                     periodStart: start,
                     periodEnd: end,
@@ -83,9 +83,9 @@ enum CursorFixtureLoader {
                 ),
                 ProviderUsage(
                     externalID: "cursor-api",
-                    displayName: "API / named models",
+                    displayName: "Other Models",
                     bucketID: "api",
-                    bucketDisplayName: "API / named models",
+                    bucketDisplayName: "Other Models",
                     usagePercentage: apiPercent,
                     periodStart: start,
                     periodEnd: end,

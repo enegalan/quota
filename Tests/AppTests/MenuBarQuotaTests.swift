@@ -176,11 +176,9 @@ struct MenuBarPreferenceSaveTests {
         await pin.value
 
         let stored = try await preferencesRepository(store).load()
-        let integrationID = second.summary.quota.providerID.rawValue
         #expect(model.menuBarQuotaID == second.id)
         #expect(!stored.menuBar.showLogos)
         #expect(stored.menuBarQuotaID == second.id)
-        #expect(stored.menuBar.selectedQuotas[integrationID] == second.id)
     }
 
     private func waitUntil(_ ready: @MainActor () async throws -> Bool) async throws {

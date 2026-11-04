@@ -125,20 +125,44 @@ struct SettingsView: View {
 
     private var menuBarSettings: some View {
         Section {
-            Toggle("Show integration logos", isOn: menuBarBinding(\.showLogos))
-            Toggle("Show daily quota", isOn: menuBarBinding(\.showDailyQuota))
-            Picker("Show values", selection: menuBarBinding(\.valueMode)) {
-                Text("Used and remaining").tag(MenuBarPreferences.ValueMode.both)
-                Text("Used only").tag(MenuBarPreferences.ValueMode.used)
-                Text("Remaining only").tag(MenuBarPreferences.ValueMode.remaining)
+            HStack(alignment: .firstTextBaseline) {
+                Toggle("Show integration logos", isOn: menuBarBinding(\.showLogos))
+                SettingInfoButton(explanation: Self.logosExplanation)
             }
-            Text("Daily quota remaining is the amount planned for today minus the amount used.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline) {
+                Toggle("Show daily quota", isOn: menuBarBinding(\.showDailyQuota))
+                SettingInfoButton(explanation: Self.dailyQuotaExplanation)
+            }
+            HStack(alignment: .firstTextBaseline) {
+                Picker("Show values", selection: menuBarBinding(\.valueMode)) {
+                    Text("Used and remaining").tag(MenuBarPreferences.ValueMode.both)
+                    Text("Used only").tag(MenuBarPreferences.ValueMode.used)
+                    Text("Remaining only").tag(MenuBarPreferences.ValueMode.remaining)
+                }
+                SettingInfoButton(explanation: Self.valuesExplanation)
+            }
         } header: {
             Text("Menu Bar")
         }
     }
+
+    private static let logosExplanation = """
+    When on, each integration in the menu bar starts with its provider \
+    mark. When off, the integration name is shown instead.
+    """
+
+    private static let dailyQuotaExplanation = """
+    When on, the menu bar includes today's allowance for the quotas \
+    switched on under Integration Limits. Remaining is the amount planned \
+    for today minus the amount used. When off, those Today figures are \
+    hidden.
+    """
+
+    private static let valuesExplanation = """
+    The figures drawn beside each limit. Used and remaining shows both; \
+    used only and remaining only show one of them. A figure that has not \
+    been read yet is a dash.
+    """
 
     private func menuBarBinding<Value>(_ keyPath: WritableKeyPath<MenuBarPreferences, Value>) -> Binding<Value> {
         Binding(
@@ -191,7 +215,7 @@ struct SettingsView: View {
 }
 
 /// A compact “i” that shows what changing a setting does.
-private struct SettingInfoButton: View {
+struct SettingInfoButton: View {
     let explanation: String
 
     @State private var isPresented = false
@@ -201,6 +225,7 @@ private struct SettingInfoButton: View {
             isPresented.toggle()
         } label: {
             Image(systemName: "info.circle")
+                .font(.body)
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
