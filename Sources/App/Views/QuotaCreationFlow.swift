@@ -290,7 +290,9 @@ struct QuotaCreationFlow: View {
         guard let selected, !model.hasUnboundQuota(forProviderID: selected.id) else { return false }
         // Empty means the provider could not be read, which is not the same as
         // every limit being taken: there is then nothing to have ruled out.
-        if buckets.isEmpty { return true }
+        if buckets.isEmpty {
+            return true
+        }
         guard let bucketID else { return false }
         return !takenBucketIDs.contains(bucketID)
     }

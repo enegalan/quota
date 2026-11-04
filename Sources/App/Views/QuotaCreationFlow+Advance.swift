@@ -171,7 +171,9 @@ extension QuotaCreationFlow {
         // Defend the one-quota-per-limit rule here as well as on the button:
         // menu pickers historically ignored `.disabled` on rows, so a taken
         // limit could still be the selection when Create was pressed.
-        if let chosen, takenBucketIDs.contains(chosen) { return }
+        if let chosen, takenBucketIDs.contains(chosen) {
+            return
+        }
         isWorking = true
         Task {
             let created = await model.createQuota(

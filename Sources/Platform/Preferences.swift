@@ -25,7 +25,10 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
         hiddenProviders = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenProviders) ?? []
         hiddenDailyProviders = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenDailyProviders) ?? []
         hiddenBuckets = try values.decodeIfPresent([String: Set<String>].self, forKey: .hiddenBuckets) ?? [:]
-        shownUnavailableBuckets = try values.decodeIfPresent([String: Set<String>].self, forKey: .shownUnavailableBuckets)
+        shownUnavailableBuckets = try values.decodeIfPresent(
+            [String: Set<String>].self,
+            forKey: .shownUnavailableBuckets
+        )
             ?? ["claude": ["five_hour"]]
         selectedQuotas = try values.decodeIfPresent([String: UUID].self, forKey: .selectedQuotas) ?? [:]
     }
