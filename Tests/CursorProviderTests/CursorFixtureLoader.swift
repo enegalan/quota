@@ -14,6 +14,19 @@ enum CursorFixtureLoader {
     }
 
     static func numeric(_ object: [String: Any], _ key: String) throws -> Double {
+        if let value = optionalNumeric(object, key) {
+            return value
+        }
+        Issue.record("missing \(key)")
+        return 0
+    }
+
+    /// A number when the key holds one, and nil when the plugin would skip it.
+    ///
+    /// `numeric` records a missing key and returns zero, which is a meter.
+    /// `UsageNormaliser` omits Other Models when `apiPercentUsed` is absent,
+    /// and a fixture that invented a zero there would not be testing that.
+    private static func optionalNumeric(_ object: [String: Any], _ key: String) -> Double? {
         if let value = object[key] as? Double {
             return value
         }
@@ -23,8 +36,7 @@ enum CursorFixtureLoader {
         if let value = object[key] as? NSNumber {
             return value.doubleValue
         }
-        Issue.record("missing \(key)")
-        return 0
+        return nil
     }
 
     /// Mirrors the plugin's percentage rule and period handling for fixtures.
@@ -35,30 +47,14 @@ enum CursorFixtureLoader {
         let start = instantString(Date(timeIntervalSince1970: startMs / 1000))
         let end = instantString(Date(timeIntervalSince1970: endMs / 1000))
         let planPercent = try planUsagePercentage(plan)
-        let apiPercent = try numeric(plan, "apiPercentUsed")
         return UsageResult(
-            quotas: [
-                ProviderUsage(
-                    externalID: "cursor-plan",
-                    displayName: "Cursor Models",
-                    bucketID: "plan",
-                    bucketDisplayName: "Cursor Models",
-                    usagePercentage: planPercent,
-                    periodStart: start,
-                    periodEnd: end,
-                    updatedAt: day
-                ),
-                ProviderUsage(
-                    externalID: "cursor-api",
-                    displayName: "Other Models",
-                    bucketID: "api",
-                    bucketDisplayName: "Other Models",
-                    usagePercentage: apiPercent,
-                    periodStart: start,
-                    periodEnd: end,
-                    updatedAt: day
-                ),
-            ]
+            quotas: usages(
+                planPercent: planPercent,
+                apiPercent: optionalNumeric(plan, "apiPercentUsed"),
+                start: start,
+                end: end,
+                day: day
+            )
         )
     }
 
@@ -68,31 +64,50 @@ enum CursorFixtureLoader {
         let start = instantString(try parseISO(try #require(json["billingCycleStart"] as? String)))
         let end = instantString(try parseISO(try #require(json["billingCycleEnd"] as? String)))
         let planPercent = try planUsagePercentage(plan)
-        let apiPercent = try numeric(plan, "apiPercentUsed")
         return UsageResult(
-            quotas: [
-                ProviderUsage(
-                    externalID: "cursor-plan",
-                    displayName: "Cursor Models",
-                    bucketID: "plan",
-                    bucketDisplayName: "Cursor Models",
-                    usagePercentage: planPercent,
-                    periodStart: start,
-                    periodEnd: end,
-                    updatedAt: day
-                ),
-                ProviderUsage(
-                    externalID: "cursor-api",
-                    displayName: "Other Models",
-                    bucketID: "api",
-                    bucketDisplayName: "Other Models",
-                    usagePercentage: apiPercent,
-                    periodStart: start,
-                    periodEnd: end,
-                    updatedAt: day
-                ),
-            ]
+            quotas: usages(
+                planPercent: planPercent,
+                apiPercent: optionalNumeric(plan, "apiPercentUsed"),
+                start: start,
+                end: end,
+                day: day
+            )
         )
+    }
+
+    /// Cursor Models, plus Other Models only when `apiPercentUsed` is present.
+    private static func usages(
+        planPercent: Double,
+        apiPercent: Double?,
+        start: String,
+        end: String,
+        day: String
+    ) -> [ProviderUsage] {
+        var quotas = [
+            ProviderUsage(
+                externalID: "cursor-plan",
+                displayName: "Cursor Models",
+                bucketID: "plan",
+                bucketDisplayName: "Cursor Models",
+                usagePercentage: planPercent,
+                periodStart: start,
+                periodEnd: end,
+                updatedAt: day
+            ),
+        ]
+        if let apiPercent {
+            quotas.append(ProviderUsage(
+                externalID: "cursor-api",
+                displayName: "Other Models",
+                bucketID: "api",
+                bucketDisplayName: "Other Models",
+                usagePercentage: apiPercent,
+                periodStart: start,
+                periodEnd: end,
+                updatedAt: day
+            ))
+        }
+        return quotas
     }
 
     /// Same rule as the plugin: percent fields first, cents as fallback.

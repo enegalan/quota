@@ -200,6 +200,7 @@ public struct Preferences: Codable, Sendable, Equatable {
         copy(menuBarQuotaID: id)
     }
 
+    /// The same preferences with a different menu-bar block.
     public func withMenuBar(_ menuBar: MenuBarPreferences) -> Preferences {
         copy(menuBar: menuBar)
     }

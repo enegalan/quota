@@ -135,6 +135,7 @@ private struct IntegrationLimitRowView: View {
         }
     }
 
+    /// A heading for the rows under it, without a separator that would split them off.
     private func groupLabel(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
@@ -195,6 +196,7 @@ private struct IntegrationSlice {
         )
     }
 
+    /// Whether this quota's today's allowance is drawn in the menu bar.
     func dailyQuotaBinding(_ quotaID: UUID) -> Binding<Bool> {
         Binding(
             get: {
@@ -217,6 +219,8 @@ private struct IntegrationSlice {
         )
     }
 
+    /// Whether this limit is drawn. Hiding and showing write opposite sets, so
+    /// a limit that is off stays off when a later reading marks it unavailable.
     func limitBinding(
         _ bucketID: String,
         available: Bool,
@@ -238,6 +242,8 @@ private struct IntegrationSlice {
         )
     }
 
+    /// An available limit is shown unless hidden. An unavailable one is shown
+    /// when the user chose it, or when the integration asks for it by default.
     private func isShown(_ bucketID: String, available: Bool, shownByDefault: Bool) -> Bool {
         let preferences = model.menuBarPreferences
         let hidden = (preferences.hiddenBuckets[integrationID] ?? []).contains(bucketID)
@@ -270,6 +276,7 @@ private struct IntegrationLimitItem: Identifiable {
     /// Extra space above a later integration, so two providers do not read as one list.
     let separates: Bool
 
+    /// The form rows for one integration, in the order they are shown.
     static func rows(
         model: AppModel,
         presentation: QuotaPresentation,
@@ -308,6 +315,8 @@ private struct IntegrationLimitItem: Identifiable {
         return built
     }
 
+    /// One row that does not open a gap above it. The identity row is the one
+    /// that separates a later integration.
     private static func item(
         _ prefix: String,
         _ suffix: String,

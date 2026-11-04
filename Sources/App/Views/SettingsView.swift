@@ -164,6 +164,7 @@ struct SettingsView: View {
     been read yet is a dash.
     """
 
+    /// A binding that writes one menu-bar preference through the model.
     private func menuBarBinding<Value>(_ keyPath: WritableKeyPath<MenuBarPreferences, Value>) -> Binding<Value> {
         Binding(
             get: { model.menuBarPreferences[keyPath: keyPath] },

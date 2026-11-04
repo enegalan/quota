@@ -46,6 +46,8 @@ struct ProviderMark: View {
         }
     }
 
+    /// A copy at the mark's size. The menu bar draws the image's own size,
+    /// and the file's size would overflow the status item.
     private func displayImage(_ image: NSImage) -> NSImage {
         guard sizesNativeImage, let copy = image.copy() as? NSImage else { return image }
         copy.size = NSSize(width: size, height: size)

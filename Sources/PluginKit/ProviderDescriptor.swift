@@ -82,6 +82,7 @@ public extension ProviderDescriptor {
         )
     }
 
+    /// Inverse of `init(from:)`, including limits added after the first descriptor.
     func encode(to encoder: any Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(id, forKey: .id)

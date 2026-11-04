@@ -87,6 +87,7 @@ struct MenuBarLabel: View {
         .monospacedDigit()
     }
 
+    /// One integration's mark and figures, so a separator can sit between integrations.
     private func quotaLabel(_ presentation: QuotaPresentation) -> some View {
         let figures = figures(for: presentation)
         return HStack(spacing: LayoutMetrics.lineSpacing) {
@@ -107,12 +108,14 @@ struct MenuBarLabel: View {
         .accessibilityLabel("\(presentation.summary.quota.name): \(figures)")
     }
 
+    /// The provider's display name, or the quota name when the listing is gone.
     private func integrationName(for presentation: QuotaPresentation) -> String {
         let integrationID = presentation.summary.quota.providerID.rawValue
         return model?.sections.listing(id: integrationID)?.displayName
             ?? presentation.summary.quota.name
     }
 
+    /// Today's allowances and the visible limits, in the order the status item draws them.
     private func figures(for presentation: QuotaPresentation) -> String {
         let integrationID = presentation.summary.quota.providerID.rawValue
         let buckets = presentation.summary.snapshot?.buckets ?? []
@@ -164,10 +167,12 @@ struct MenuBarLabel: View {
             }
             let figures = values(used: allowance?.usedToday, remaining: remaining)
             guard named else { return "Today \(figures)" }
-            return "Today \(quota.dailyMenuTitle(among: ordered)) \(figures)"
+            return "Today \(quota.dailyMenuTitle(among: siblings)) \(figures)"
         }
     }
 
+    /// Every quota of this integration. With no model, the presentation the
+    /// label was given is the only sibling a test can name.
     private func dailySiblings(
         integrationID: String,
         fallback: QuotaPresentation
@@ -178,10 +183,13 @@ struct MenuBarLabel: View {
         return siblings.isEmpty ? [fallback] : siblings
     }
 
+    /// A limit the integration declared that this reading did not carry.
     private func isMissing(_ limit: KnownLimit, from buckets: [UsageBucket]) -> Bool {
         !buckets.contains { $0.id == limit.id }
     }
 
+    /// Hidden wins. Otherwise an unavailable limit is drawn when the user
+    /// chose it, or when the integration asks for it by default.
     private func shows(_ limit: KnownLimit, integrationID: String) -> Bool {
         let hidden = options.hiddenBuckets[integrationID] ?? []
         guard !hidden.contains(limit.id) else { return false }
@@ -189,10 +197,15 @@ struct MenuBarLabel: View {
         return chosen.contains(limit.id) || limit.shownWhenUnavailable
     }
 
+    /// The short label the integration asked for, or the bucket's own name.
     private func menuBarLabel(for bucket: UsageBucket, limits: [KnownLimit]) -> String {
         limits.first { $0.id == bucket.id }?.menuBarLabel ?? bucket.displayName
     }
 
+    /// Whether another limit would be drawn with the same short label.
+    ///
+    /// Two limits that share it are indistinguishable at menu-bar size, so
+    /// the longer name is used instead.
     private func sharesLabel(
         _ label: String,
         besides bucketID: String,
@@ -204,6 +217,7 @@ struct MenuBarLabel: View {
         }
     }
 
+    /// Used, remaining, or both. A figure that was not read is a dash, not zero.
     private func values(used: Double?, remaining: Double?) -> String {
         let usedText = used.map { formatter.preciseString($0) } ?? PercentageFormatter.unknown
         let remainingText = remaining.map { formatter.preciseString($0) } ?? PercentageFormatter.unknown
@@ -231,6 +245,7 @@ struct MenuBarLabel: View {
         return "Quota · \(figures(for: allowance, formatter: formatter))"
     }
 
+    /// Used over the day's plan. A missing spend stays a dash rather than zero.
     private static func figures(for allowance: TodayAllowance?, formatter: PercentageFormatter) -> String {
         guard let allowance else { return PercentageFormatter.unknown }
         let used = allowance.usedToday.map { formatter.preciseString($0) } ?? PercentageFormatter.unknown

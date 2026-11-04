@@ -76,6 +76,7 @@ public enum ElectronSafeStorage {
         return text
     }
 
+    /// Chromium's OSCrypt key: PBKDF2-SHA1, 1003 rounds, the fixed salt.
     private static func deriveKey(password: String) throws -> Data {
         var key = Data(count: keyLength)
         let status = key.withUnsafeMutableBytes { keyBytes in
@@ -101,6 +102,7 @@ public enum ElectronSafeStorage {
         return key
     }
 
+    /// AES-128-CBC with PKCS7 padding and Chromium's space-filled IV.
     private static func aes128CBCDecrypt(ciphertext: Data, key: Data) throws -> Data {
         var output = Data(count: ciphertext.count + kCCBlockSizeAES128)
         let outputCapacity = output.count

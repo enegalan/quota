@@ -3,6 +3,10 @@ import Foundation
 import Platform
 
 extension AppModel {
+    /// Applies a menu-bar preference change and saves it.
+    ///
+    /// The screen updates before the write. A failed write puts the stored
+    /// value back, so a toggle that did not stick does not stay on screen.
     func updateMenuBarPreferences(_ update: (inout MenuBarPreferences) -> Void) {
         var preferences = menuBarPreferences
         update(&preferences)

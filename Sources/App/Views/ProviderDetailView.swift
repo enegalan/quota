@@ -238,6 +238,7 @@ struct ProviderDetailSheet: View {
 private enum ProviderDetailBodyHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
+    /// Keeps the tallest measurement. A later zero must not shrink the sheet.
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
     }

@@ -302,18 +302,21 @@ struct NameEditor: View {
         return !trimmed.isEmpty && trimmed != presentation.summary.quota.name
     }
 
+    /// Starts a rename from the name on screen, and moves focus to the field.
     private func beginEditing() {
         name = presentation.summary.quota.name
         isEditing = true
         isFocused = true
     }
 
+    /// Drops the draft and leaves the stored name in place.
     private func cancel() {
         name = presentation.summary.quota.name
         isEditing = false
         isFocused = false
     }
 
+    /// Writes the draft when it is a real rename, then leaves the field.
     private func save() async {
         guard canSave else { return }
         isSaving = true

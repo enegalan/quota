@@ -180,6 +180,7 @@ struct QuotaCreationFlow: View {
         Self.takenBucketsCaption(bucketIDs: buckets.map(\.id), takenIDs: takenBucketIDs)
     }
 
+    /// The disabled-Create caption when the only loaded limit already has a quota.
     static func takenBucketsCaption(bucketIDs: [String], takenIDs: Set<String>) -> String? {
         guard bucketIDs.count == 1, takenIDs.isSuperset(of: bucketIDs) else { return nil }
         return "Every limit this provider meters already has a quota."
@@ -322,6 +323,7 @@ struct QuotaCreationFlow: View {
 private enum CreationBodyHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
+    /// Keeps the tallest measurement. A later zero must not shrink the sheet.
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
     }
