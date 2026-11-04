@@ -1,4 +1,6 @@
+import Core
 import Foundation
+import Platform
 
 extension AppModel {
     func updateMenuBarPreferences(_ update: (inout MenuBarPreferences) -> Void) {

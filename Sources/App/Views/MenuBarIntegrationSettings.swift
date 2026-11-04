@@ -102,18 +102,8 @@ private struct MenuBarLimitControls: View {
             }
             if quotas.count > 1 {
                 Picker("Planned quota", selection: Binding(
-                    get: { selected.id },
-                    set: { id in
-                        let pinnedHere = model.presentations.contains { presentation in
-                            presentation.id == model.menuBarQuotaID
-                                && presentation.summary.quota.providerID.rawValue == integrationID
-                        }
-                        guard pinnedHere, let quota = quotas.first(where: { $0.id == id }) else {
-                            model.updateMenuBarPreferences { $0.selectedQuotas[integrationID] = id }
-                            return
-                        }
-                        Task { await model.showInMenuBar(quota) }
-                    }
+                    get: { selected.summary.id },
+                    set: { selectPlannedQuota($0) }
                 )) {
                     ForEach(quotas) { quota in
                         Text(quota.summary.quota.name).tag(quota.id)
@@ -139,6 +129,15 @@ private struct MenuBarLimitControls: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func selectPlannedQuota(_ quotaID: UUID) {
+        let pinnedHere = quotas.contains { $0.summary.id == model.menuBarQuotaID }
+        guard pinnedHere, let quota = quotas.first(where: { $0.summary.id == quotaID }) else {
+            model.updateMenuBarPreferences { $0.selectedQuotas[integrationID] = quotaID }
+            return
+        }
+        Task { await model.showInMenuBar(quota) }
     }
 
     private var showsDailyQuota: Binding<Bool> {

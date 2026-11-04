@@ -24,6 +24,11 @@ enum CursorConstants {
         "cursorAuth/accessToken",
     ]
 
+    /// Electron `safeStorage` Keychain item that unlocks encrypted
+    /// `cursorAuth/accessToken` values (`cursor-safe-storage:v1:…`).
+    static let safeStorageKeychainService = "Cursor Safe Storage"
+    static let safeStorageKeychainAccount = "Cursor Key"
+
     /// Credential file paths tried last, relative to the home directory.
     static let credentialsFileRelativePaths = [
         ".cursor/auth.json",
