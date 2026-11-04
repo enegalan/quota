@@ -20,6 +20,8 @@ import Platform
 final class AppModel {
     /// Every quota the app knows about, ready to render.
     private(set) var presentations: [QuotaPresentation] = []
+    private(set) var menuBarPreferences = MenuBarPreferences()
+    @ObservationIgnored private var menuBarSaveTask: Task<Void, Never>?
 
     /// The packaged providers split into available, installed, and connected.
     private(set) var sections = ProviderSections(available: [], installed: [], connected: [])
@@ -131,6 +133,9 @@ final class AppModel {
         do {
             reference = environment.now()
             let preferences = try await environment.preferences.load()
+            if menuBarSaveTask == nil {
+                menuBarPreferences = preferences.menuBar
+            }
             menuBarQuotaID = preferences.menuBarQuotaID
             // The provider list is read before the quota panels, and on its own:
             // it depends on nothing but the store, and a panel that cannot be
@@ -147,6 +152,21 @@ final class AppModel {
         // Counted here, at the end, so that a view waiting for fresh data waits
         // for the load to have finished reading it.
         loadGeneration += 1
+    }
+
+    func updateMenuBarPreferences(_ update: (inout MenuBarPreferences) -> Void) {
+        update(&menuBarPreferences)
+        let options = menuBarPreferences
+        let previous = menuBarSaveTask
+        menuBarSaveTask = Task {
+            await previous?.value
+            do {
+                let current = try await environment.preferences.load()
+                try await environment.preferences.save(current.withMenuBar(options))
+            } catch {
+                report(error)
+            }
+        }
     }
 
     /// Makes one quota the one the menu bar item speaks for.

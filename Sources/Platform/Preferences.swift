@@ -1,6 +1,36 @@
 import Core
 import Foundation
 
+public struct MenuBarPreferences: Codable, Sendable, Equatable {
+    public enum ValueMode: String, Codable, Sendable, CaseIterable {
+        case both, used, remaining
+    }
+
+    public var showLogos = true
+    public var showDailyQuota = true
+    public var valueMode: ValueMode = .both
+    public var hiddenProviders: Set<String> = []
+    public var hiddenDailyProviders: Set<String> = []
+    public var hiddenBuckets: [String: Set<String>] = [:]
+    public var shownUnavailableBuckets: [String: Set<String>] = ["claude": ["five_hour"]]
+    public var selectedQuotas: [String: UUID] = [:]
+
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        showLogos = try values.decodeIfPresent(Bool.self, forKey: .showLogos) ?? true
+        showDailyQuota = try values.decodeIfPresent(Bool.self, forKey: .showDailyQuota) ?? true
+        valueMode = try values.decodeIfPresent(ValueMode.self, forKey: .valueMode) ?? .both
+        hiddenProviders = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenProviders) ?? []
+        hiddenDailyProviders = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenDailyProviders) ?? []
+        hiddenBuckets = try values.decodeIfPresent([String: Set<String>].self, forKey: .hiddenBuckets) ?? [:]
+        shownUnavailableBuckets = try values.decodeIfPresent([String: Set<String>].self, forKey: .shownUnavailableBuckets)
+            ?? ["claude": ["five_hour"]]
+        selectedQuotas = try values.decodeIfPresent([String: UUID].self, forKey: .selectedQuotas) ?? [:]
+    }
+}
+
 /// User-level settings that are not tied to a single quota.
 public struct Preferences: Codable, Sendable, Equatable {
     /// Whether a period is offered as daily, weekly, or monthly when a quota is
@@ -55,6 +85,7 @@ public struct Preferences: Codable, Sendable, Equatable {
     /// An automatic check that finds the same version again must not reopen the
     /// browser; a manual check still may.
     public let announcedUpdateVersion: String?
+    public let menuBar: MenuBarPreferences
 
     public init(
         defaultPolicyKind: String = PreferenceConstants.defaultPolicyKind,
@@ -65,7 +96,8 @@ public struct Preferences: Codable, Sendable, Equatable {
         notificationsEnabled: Bool = PreferenceConstants.defaultNotificationsEnabled,
         automaticUpdateChecksEnabled: Bool = PreferenceConstants.defaultAutomaticUpdateChecksEnabled,
         lastUpdateCheckAt: Date? = nil,
-        announcedUpdateVersion: String? = nil
+        announcedUpdateVersion: String? = nil,
+        menuBar: MenuBarPreferences = MenuBarPreferences()
     ) {
         self.defaultPolicyKind = defaultPolicyKind
         self.hasCompletedOnboarding = hasCompletedOnboarding
@@ -76,6 +108,7 @@ public struct Preferences: Codable, Sendable, Equatable {
         self.automaticUpdateChecksEnabled = automaticUpdateChecksEnabled
         self.lastUpdateCheckAt = lastUpdateCheckAt
         self.announcedUpdateVersion = announcedUpdateVersion
+        self.menuBar = menuBar
     }
 
     /// Older stored preferences omit newer keys; treat those as the platform
@@ -98,11 +131,16 @@ public struct Preferences: Codable, Sendable, Equatable {
             String.self,
             forKey: .announcedUpdateVersion
         )
+        menuBar = try container.decodeIfPresent(MenuBarPreferences.self, forKey: .menuBar) ?? MenuBarPreferences()
     }
 
     /// The same preferences pointing at a different quota.
     public func withMenuBarQuotaID(_ id: UUID?) -> Preferences {
         copy(menuBarQuotaID: id)
+    }
+
+    public func withMenuBar(_ menuBar: MenuBarPreferences) -> Preferences {
+        copy(menuBar: menuBar)
     }
 
     /// The same preferences with notifications toggled.
@@ -139,7 +177,8 @@ public struct Preferences: Codable, Sendable, Equatable {
         notificationsEnabled: Bool? = nil,
         automaticUpdateChecksEnabled: Bool? = nil,
         lastUpdateCheckAt: Date?? = nil,
-        announcedUpdateVersion: String?? = nil
+        announcedUpdateVersion: String?? = nil,
+        menuBar: MenuBarPreferences? = nil
     ) -> Preferences {
         Preferences(
             defaultPolicyKind: defaultPolicyKind ?? self.defaultPolicyKind,
@@ -151,7 +190,8 @@ public struct Preferences: Codable, Sendable, Equatable {
             automaticUpdateChecksEnabled: automaticUpdateChecksEnabled
                 ?? self.automaticUpdateChecksEnabled,
             lastUpdateCheckAt: lastUpdateCheckAt ?? self.lastUpdateCheckAt,
-            announcedUpdateVersion: announcedUpdateVersion ?? self.announcedUpdateVersion
+            announcedUpdateVersion: announcedUpdateVersion ?? self.announcedUpdateVersion,
+            menuBar: menuBar ?? self.menuBar
         )
     }
 
