@@ -16,7 +16,11 @@ public enum SnapshotNormaliser: Sendable {
     ///
     /// - Throws: `NormalisationError` with a reason, which the caller turns into
     ///   a `SyncFailure` — never into a partially built snapshot.
-    public static func snapshot(from result: UsageResult, recordedAt: Date) throws -> UsageSnapshot {
+    public static func snapshot(
+        from result: UsageResult,
+        recordedAt: Date,
+        limits: [ProviderLimit] = []
+    ) throws -> UsageSnapshot {
         // Checked before the buckets are built, because an answer with no quotas
         // has no dates to read and reporting "unreadable period" for it would send
         // a provider author looking at their date format.
@@ -38,7 +42,18 @@ public enum SnapshotNormaliser: Sendable {
                 )
             )
         }
-        return try UsageSnapshot(updatedAt: recordedAt, buckets: buckets)
+        return try UsageSnapshot(
+            updatedAt: recordedAt,
+            buckets: buckets,
+            knownLimits: limits.map { limit in
+                KnownLimit(
+                    id: limit.id,
+                    name: limit.name,
+                    menuBarLabel: limit.menuBarLabel,
+                    shownWhenUnavailable: limit.shownWhenUnavailable
+                )
+            }
+        )
     }
 
     /// The window one of the provider's limits is measured over.

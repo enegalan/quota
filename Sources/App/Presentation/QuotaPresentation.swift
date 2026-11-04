@@ -230,6 +230,43 @@ struct QuotaPresentation: Identifiable, Hashable {
         CaptionText(accountLabel ?? Self.disconnectedAccountCaption, isWarning: accountLabel == nil)
     }
 
+    /// The limit this quota watches, as the provider names it.
+    ///
+    /// A provider may meter several — Cursor's included plan and its API models —
+    /// and the quota's own name is often just the provider's. Without this, two
+    /// quotas named "Cursor" cannot be told apart. Taken from the live reading
+    /// when there is one, and from the last remembered name when the provider
+    /// has stopped reporting the limit: the same source the unavailable caption
+    /// already uses, so the two cannot disagree about what to call it.
+    var limitName: String? {
+        summary.usage?.displayName ?? unavailableBucketName
+    }
+
+    /// The limit and the account, on one line for a list row.
+    ///
+    /// The limit leads when there is one, because two quotas on the same provider
+    /// share an account and differ only by which limit they watch — and a list
+    /// that only names the account cannot tell them apart.
+    var identityCaption: String {
+        let account = accountCaption.text
+        guard let limit = limitName else { return account }
+        return "\(limit) · \(account)"
+    }
+
+    /// The name to put beside today's allowance when it has to name its quota.
+    ///
+    /// The quota's own name, and the limit after it when a sibling is called
+    /// the same thing. Two quotas on one provider are often both named for the
+    /// provider, and the limit is what tells them apart.
+    func dailyMenuTitle(among siblings: [QuotaPresentation]) -> String {
+        let name = summary.quota.name
+        let sharesName = siblings.contains { sibling in
+            sibling.id != id && sibling.summary.quota.name == name
+        }
+        guard sharesName, let limitName else { return name }
+        return "\(name) · \(limitName)"
+    }
+
     /// Whether the sync caption should read as a warning at this instant.
     ///
     /// The tone and the words come from the same place, so a screen cannot show

@@ -16,7 +16,8 @@ struct CodexProvider: ProviderPluginHandler {
         displayName: CodexConstants.displayName,
         description: CodexConstants.description,
         capabilities: [.automaticUsageRetrieval, .multipleQuotas, .automaticPeriodDetection],
-        suggestedRefreshIntervalSeconds: CodexConstants.suggestedRefreshIntervalSeconds
+        suggestedRefreshIntervalSeconds: CodexConstants.suggestedRefreshIntervalSeconds,
+        limits: CodexConstants.limits
     )
 
     func connect(_ request: ConnectRequest) throws -> ConnectResult {

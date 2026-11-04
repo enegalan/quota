@@ -16,7 +16,8 @@ struct CursorProvider: ProviderPluginHandler {
         displayName: CursorConstants.displayName,
         description: CursorConstants.description,
         capabilities: [.automaticUsageRetrieval, .multipleQuotas],
-        suggestedRefreshIntervalSeconds: CursorConstants.suggestedRefreshIntervalSeconds
+        suggestedRefreshIntervalSeconds: CursorConstants.suggestedRefreshIntervalSeconds,
+        limits: CursorConstants.limits
     )
 
     func connect(_ request: ConnectRequest) throws -> ConnectResult {

@@ -73,6 +73,28 @@ struct SnapshotNormalisationTests {
         #expect(snapshot.buckets[0].period == snapshot.buckets[1].period)
     }
 
+    @Test("Other Models is omitted when apiPercentUsed is missing")
+    func omitsOtherModelsWithoutApiPercent() throws {
+        var current = try CursorFixtureLoader.json("get-current-period-usage")
+        var currentPlan = try #require(current["planUsage"] as? [String: Any])
+        currentPlan.removeValue(forKey: "apiPercentUsed")
+        current["planUsage"] = currentPlan
+        let currentResult = try CursorFixtureLoader.usageResult(
+            fromCurrentPeriod: current,
+            day: "2026-09-26"
+        )
+        #expect(currentResult.quotas.map(\.bucketID) == ["plan"])
+
+        var summary = try CursorFixtureLoader.json("usage-summary")
+        var individual = try #require(summary["individualUsage"] as? [String: Any])
+        var summaryPlan = try #require(individual["plan"] as? [String: Any])
+        summaryPlan.removeValue(forKey: "apiPercentUsed")
+        individual["plan"] = summaryPlan
+        summary["individualUsage"] = individual
+        let summaryResult = try CursorFixtureLoader.usageResult(fromSummary: summary, day: "2026-09-26")
+        #expect(summaryResult.quotas.map(\.bucketID) == ["plan"])
+    }
+
     @Test("An unknown on-demand cap is absent from the fixture, not zero")
     func unknownCapAbsent() throws {
         let summary = try CursorFixtureLoader.json("usage-summary")

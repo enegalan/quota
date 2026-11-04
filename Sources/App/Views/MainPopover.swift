@@ -93,6 +93,9 @@ struct MainPopover: View {
                             .padding(2)
                         MenuBarMarker()
                     }
+                    if let limitName = presentation.limitName {
+                        Caption(text: limitName)
+                    }
                     Caption(presentation.accountCaption)
                 }
                 Spacer(minLength: 0)
@@ -101,9 +104,7 @@ struct MainPopover: View {
                     label: formatter.string(presentation.usagePercentage)
                 )
             }
-            TodayAllowanceView(
-                presentation: presentation
-            )
+            TodayAllowanceView(presentation: presentation)
             OutlookRow(
                 presentation: presentation,
                 reference: model.reference,
@@ -148,7 +149,7 @@ struct MainPopover: View {
                         Text(presentation.summary.quota.name)
                             .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
                             .lineLimit(1)
-                        Caption(presentation.accountCaption)
+                        Caption(text: presentation.identityCaption)
                     }
                     Spacer(minLength: 0)
                     VStack(alignment: .trailing, spacing: LayoutMetrics.lineSpacing) {

@@ -42,9 +42,7 @@ enum UsageNormaliser {
         updatedAtDay: String
     ) throws -> UsageResult {
         let planPercentage = try planUsagePercentage(plan)
-        let apiPercentage = JSONAccess.double(plan, key: "apiPercentUsed") ?? 0
-
-        let quotas = [
+        var quotas = [
             ProviderUsage(
                 externalID: CursorConstants.planExternalID,
                 displayName: CursorConstants.planBucketDisplayName,
@@ -55,7 +53,9 @@ enum UsageNormaliser {
                 periodEnd: period.end,
                 updatedAt: updatedAtDay
             ),
-            ProviderUsage(
+        ]
+        if let apiPercentage = JSONAccess.double(plan, key: "apiPercentUsed") {
+            quotas.append(ProviderUsage(
                 externalID: CursorConstants.apiExternalID,
                 displayName: CursorConstants.apiBucketDisplayName,
                 bucketID: CursorConstants.apiBucketID,
@@ -64,8 +64,8 @@ enum UsageNormaliser {
                 periodStart: period.start,
                 periodEnd: period.end,
                 updatedAt: updatedAtDay
-            ),
-        ]
+            ))
+        }
         return UsageResult(quotas: quotas, supportsHistorical: false)
     }
 

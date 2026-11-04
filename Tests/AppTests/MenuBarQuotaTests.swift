@@ -96,6 +96,181 @@ struct MenuBarQuotaTests {
     }
 }
 
+/// Preferences saves share one document, so they have to share one queue.
+@Suite("Menu bar preference saves")
+@MainActor
+struct MenuBarPreferenceSaveTests {
+    @Test("A finished save lets the next load read what was stored")
+    func finishedSaveLetsLoadReadTheStore() async throws {
+        let store = CodableStore.inMemory()
+        let model = MenuBarQuotaFixture.model(store: store)
+        model.updateMenuBarPreferences { $0.showLogos = false }
+        // Joins the menu-bar save, and must not write the logos change away.
+        await model.setNotificationsEnabled(false)
+
+        var stored = try await preferencesRepository(store).load()
+        #expect(!stored.menuBar.showLogos)
+        #expect(!stored.notificationsEnabled)
+        var menuBar = stored.menuBar
+        menuBar.showLogos = true
+        stored = stored.withMenuBar(menuBar)
+        try await preferencesRepository(store).save(stored)
+        await model.load()
+
+        #expect(model.menuBarPreferences.showLogos)
+    }
+
+    @Test("A failed save puts the stored menu bar back")
+    func failedSaveRestoresTheStoredMenuBar() async throws {
+        let store = CodableStore(backend: FailingPreferencesBackend(failuresRemaining: 1))
+        let model = MenuBarQuotaFixture.model(store: store)
+        await model.load()
+
+        model.updateMenuBarPreferences { $0.showLogos = false }
+        #expect(!model.menuBarPreferences.showLogos)
+
+        try await waitUntil { model.menuBarPreferences.showLogos }
+        #expect(model.lastError != nil)
+        #expect(model.menuBarPreferences.showLogos)
+    }
+
+    @Test("An older save does not let a load drop a newer one")
+    func olderSaveDoesNotClearANewerOne() async throws {
+        let backend = BlockingPreferencesBackend()
+        let store = CodableStore(backend: backend)
+        let model = MenuBarQuotaFixture.model(store: store)
+        await backend.blockNextPreferencesWrite(skipping: 1)
+
+        model.updateMenuBarPreferences { $0.showLogos = false }
+        model.updateMenuBarPreferences { $0.showDailyQuota = false }
+        await backend.waitUntilWriteBlocked()
+        await model.load()
+
+        #expect(!model.menuBarPreferences.showLogos)
+        #expect(!model.menuBarPreferences.showDailyQuota)
+        await backend.releaseBlockedWrite()
+        try await waitUntil {
+            let stored = try await preferencesRepository(store).load()
+            return !stored.menuBar.showLogos && !stored.menuBar.showDailyQuota
+        }
+    }
+
+    @Test("A pin waits for the menu-bar save already in flight")
+    func pinWaitsForTheMenuBarSave() async throws {
+        let backend = BlockingPreferencesBackend()
+        let store = CodableStore(backend: backend)
+        let model = MenuBarQuotaFixture.model(store: store)
+        await MenuBarQuotaFixture.seed(model, names: ["First", "Second"])
+        let second = try #require(model.presentations.first { $0.summary.quota.name == "Second" })
+        await backend.blockNextPreferencesWrite()
+
+        model.updateMenuBarPreferences { $0.showLogos = false }
+        let pin = Task { await model.showInMenuBar(second) }
+        await backend.waitUntilWriteBlocked()
+        for _ in 0 ..< 30 {
+            await Task.yield()
+        }
+
+        #expect(model.menuBarQuotaID == nil)
+        await backend.releaseBlockedWrite()
+        await pin.value
+
+        let stored = try await preferencesRepository(store).load()
+        #expect(model.menuBarQuotaID == second.id)
+        #expect(!stored.menuBar.showLogos)
+        #expect(stored.menuBarQuotaID == second.id)
+    }
+
+    private func waitUntil(_ ready: @MainActor () async throws -> Bool) async throws {
+        for _ in 0 ..< 500 {
+            if try await ready() {
+                return
+            }
+            await Task.yield()
+        }
+        Issue.record("timed out waiting for a preference save")
+    }
+}
+
+/// Preferences writes fail a fixed number of times, then behave as memory.
+private actor FailingPreferencesBackend: StoreBackend {
+    private let inner = InMemoryStoreBackend()
+    private var failuresRemaining: Int
+
+    init(failuresRemaining: Int) {
+        self.failuresRemaining = failuresRemaining
+    }
+
+    func read(_ fileName: String) async throws -> Data? {
+        await inner.read(fileName)
+    }
+
+    func write(_ data: Data, to fileName: String) async throws {
+        if fileName == PersistenceConstants.FileName.preferences, failuresRemaining > 0 {
+            failuresRemaining -= 1
+            throw CocoaError(.fileWriteUnknown)
+        }
+        await inner.write(data, to: fileName)
+    }
+
+    func quarantine(_ data: Data, from fileName: String) async throws {
+        await inner.quarantine(data, from: fileName)
+    }
+}
+
+/// Holds the next preferences write, so a test can see what a later save does.
+private actor BlockingPreferencesBackend: StoreBackend {
+    private let inner = InMemoryStoreBackend()
+    private var writesToSkip = 0
+    private var blockNext = false
+    private var isBlocked = false
+    private var entered: CheckedContinuation<Void, Never>?
+    private var blocked: CheckedContinuation<Void, Never>?
+
+    func blockNextPreferencesWrite(skipping: Int = 0) {
+        writesToSkip = skipping
+        blockNext = true
+    }
+
+    func waitUntilWriteBlocked() async {
+        if isBlocked {
+            return
+        }
+        await withCheckedContinuation { entered = $0 }
+    }
+
+    func releaseBlockedWrite() {
+        blocked?.resume()
+        blocked = nil
+    }
+
+    func read(_ fileName: String) async throws -> Data? {
+        await inner.read(fileName)
+    }
+
+    func write(_ data: Data, to fileName: String) async throws {
+        if fileName == PersistenceConstants.FileName.preferences, blockNext {
+            if writesToSkip > 0 {
+                writesToSkip -= 1
+            } else {
+                blockNext = false
+                isBlocked = true
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    blocked = continuation
+                    entered?.resume()
+                    entered = nil
+                }
+                isBlocked = false
+            }
+        }
+        await inner.write(data, to: fileName)
+    }
+
+    func quarantine(_ data: Data, from fileName: String) async throws {
+        await inner.quarantine(data, from: fileName)
+    }
+}
+
 /// The world a menu-bar-quota test runs against.
 ///
 /// Several quotas on several providers, because the claim under test only exists

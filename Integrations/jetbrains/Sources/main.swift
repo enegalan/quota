@@ -16,7 +16,8 @@ struct JetBrainsProvider: ProviderPluginHandler {
         displayName: JetBrainsConstants.displayName,
         description: JetBrainsConstants.description,
         capabilities: [.automaticUsageRetrieval, .multipleQuotas, .automaticPeriodDetection],
-        suggestedRefreshIntervalSeconds: JetBrainsConstants.suggestedRefreshIntervalSeconds
+        suggestedRefreshIntervalSeconds: JetBrainsConstants.suggestedRefreshIntervalSeconds,
+        limits: JetBrainsConstants.limits
     )
 
     func connect(_ request: ConnectRequest) throws -> ConnectResult {

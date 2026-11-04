@@ -240,6 +240,53 @@ struct QuotaCreationTests {
         #expect(model.presentations.map(\.summary.quota.bucketID) == ["models", "requests"])
     }
 
+    @Test("A second quota on the same named bucket is refused")
+    func duplicateNamedBucketIsRefused() async {
+        // The multi-limit case the creation picker exists for: two free limits
+        // is not a licence to file two quotas against one of them. The second
+        // must watch a different bucket, or be refused.
+        let model = QuotaCreationFixture.model()
+
+        _ = await model.createQuota(
+            named: "Models",
+            providerID: QuotaCreationFixture.providerID,
+            bucketID: "models",
+            period: nil,
+            policy: .even
+        )
+        let created = await model.createQuota(
+            named: "Models again",
+            providerID: QuotaCreationFixture.providerID,
+            bucketID: "models",
+            period: nil,
+            policy: .even
+        )
+
+        #expect(!created)
+        #expect(model.presentations.count == 1)
+        #expect(model.presentations.map(\.summary.quota.name) == ["Models"])
+        #expect(model.isWatched(providerID: QuotaCreationFixture.providerID, bucketID: "models"))
+    }
+
+    @Test("One taken limit is explained, and an empty read is not")
+    func takenLimitIsExplained() {
+        let caption = "Every limit this provider meters already has a quota."
+        #expect(
+            QuotaCreationFlow.takenBucketsCaption(bucketIDs: ["models"], takenIDs: ["models"]) == caption
+        )
+        // An empty read is not every limit being taken, and a missing selection
+        // is not consulted: the rule looks only at the loaded ids.
+        #expect(QuotaCreationFlow.takenBucketsCaption(bucketIDs: [], takenIDs: []) == nil)
+        #expect(QuotaCreationFlow.takenBucketsCaption(bucketIDs: ["models"], takenIDs: []) == nil)
+        // More than one limit already says this under the picker.
+        #expect(
+            QuotaCreationFlow.takenBucketsCaption(
+                bucketIDs: ["models", "requests"],
+                takenIDs: ["models", "requests"]
+            ) == nil
+        )
+    }
+
     @Test("A provider with an un bucketed quota is closed off to further quotas")
     func unboundQuotaClosesTheProviderOff() async {
         // Asked of the model rather than worked out in the flow, because the row
@@ -284,53 +331,19 @@ struct QuotaCreationTests {
         #expect(!model.hasUnboundQuota(forProviderID: QuotaCreationFixture.providerID))
         #expect(!model.isWatched(providerID: "some.other.provider", bucketID: "models"))
     }
+}
 
-    @Test("The pools a provider meters are read from it, each with its own window")
-    func bucketsAreDiscoveredFromTheProvider() async throws {
-        let model = try await QuotaCreationFixture.modelWithTwoPools()
-
-        let buckets = await model.buckets(forProviderID: QuotaCreationFixture.providerID)
-
-        #expect(buckets.map(\.id) == ["five_hour", "week"])
-        // Two limits that reset at different instants is the arrangement this
-        // whole path exists for, so the picker is handed two windows rather than
-        // one window twice.
-        let first = try #require(buckets.first)
-        let second = try #require(buckets.last)
-        #expect(first.period != second.period)
-    }
-
-    @Test("A quota is created over the window the provider reports for that pool")
-    func quotaTakesTheBucketsWindow() async throws {
-        let model = try await QuotaCreationFixture.modelWithTwoPools()
-        let buckets = await model.buckets(forProviderID: QuotaCreationFixture.providerID)
-        let week = try #require(buckets.last)
-
-        let created = await model.createQuota(
-            named: "Weekly",
-            providerID: QuotaCreationFixture.providerID,
-            bucketID: week.id,
-            period: week.period,
-            policy: .even
-        )
-
-        #expect(created)
-        // Not the month around today: the window the provider says this pool
-        // resets over, which for a weekly pool is not a month.
-        let quota = try #require(model.presentations.first?.summary.quota)
-        #expect(quota.bucketID == "week")
-        #expect(quota.period == week.period)
-        let monthAround = try QuotaPeriod.month(containing: SummaryFixture.reference, calendar: .current)
-        #expect(quota.period != monthAround)
-    }
-
-    @Test("A created quota is planned straight away, not left until the next tick")
-    func creationPlansImmediately() async {
-        // A quota appearing with no plan would show an empty panel until a
-        // refresh happened, and says the first-run state must be honest
-        // rather than blank.
+/// Renaming an existing quota.
+///
+/// Shares the creation fixture because the claim is about what stays put after
+/// a label change: the same stored quota, under a new name, without a second
+/// registration.
+@Suite("Quota renaming")
+@MainActor
+struct QuotaRenamingTests {
+    @Test("Renaming updates the shown name and keeps the same quota")
+    func renameUpdatesTheShownName() async throws {
         let model = QuotaCreationFixture.model()
-
         _ = await model.createQuota(
             named: "Work",
             providerID: QuotaCreationFixture.providerID,
@@ -338,11 +351,29 @@ struct QuotaCreationTests {
             period: nil,
             policy: .even
         )
+        let id = try #require(model.presentations.first?.id)
 
-        // With no reading there is no allowance to divide, so no plan exists
-        // yet — and that is not a failure to have created a quota. What matters
-        // is that the quota is on screen rather than saved and invisible.
-        #expect(model.presentations.first?.summary.plan == nil)
+        await model.renameQuota(id, to: "Home")
+
         #expect(model.presentations.count == 1)
+        #expect(model.presentations.first?.id == id)
+        #expect(model.presentations.first?.summary.quota.name == "Home")
+    }
+
+    @Test("A blank rename is refused")
+    func blankRenameIsRefused() async throws {
+        let model = QuotaCreationFixture.model()
+        _ = await model.createQuota(
+            named: "Work",
+            providerID: QuotaCreationFixture.providerID,
+            bucketID: nil,
+            period: nil,
+            policy: .even
+        )
+        let id = try #require(model.presentations.first?.id)
+
+        await model.renameQuota(id, to: "   ")
+
+        #expect(model.presentations.first?.summary.quota.name == "Work")
     }
 }

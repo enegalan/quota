@@ -1,6 +1,97 @@
 import Core
 import Foundation
 
+public struct MenuBarPreferences: Codable, Sendable, Equatable {
+    public enum ValueMode: String, Codable, Sendable, CaseIterable {
+        case both, used, remaining
+    }
+
+    public var showLogos = true
+    public var showDailyQuota = true
+    public var valueMode: ValueMode = .both
+    public var hiddenIntegrations: Set<String> = []
+    public var hiddenDailyIntegrations: Set<String> = []
+    public var hiddenBuckets: [String: Set<String>] = [:]
+    public var shownUnavailableBuckets: [String: Set<String>] = [:]
+
+    /// Quotas whose today's allowance is shown, per integration.
+    ///
+    /// An integration with no entry keeps the older choice: the planned quota,
+    /// unless that integration is in `hiddenDailyIntegrations`. An entry, even
+    /// an empty one, is the list the user picked, so turning the planned quota
+    /// off does not put it back.
+    public var dailyQuotas: [String: Set<UUID>] = [:]
+
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        showLogos = try values.decodeIfPresent(Bool.self, forKey: .showLogos) ?? true
+        showDailyQuota = try values.decodeIfPresent(Bool.self, forKey: .showDailyQuota) ?? true
+        valueMode = try values.decodeIfPresent(ValueMode.self, forKey: .valueMode) ?? .both
+        hiddenIntegrations = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenIntegrations) ?? []
+        hiddenDailyIntegrations = try values.decodeIfPresent(
+            Set<String>.self,
+            forKey: .hiddenDailyIntegrations
+        ) ?? []
+        hiddenBuckets = try values.decodeIfPresent([String: Set<String>].self, forKey: .hiddenBuckets) ?? [:]
+        shownUnavailableBuckets = try values.decodeIfPresent(
+            [String: Set<String>].self,
+            forKey: .shownUnavailableBuckets
+        ) ?? [:]
+        dailyQuotas = try values.decodeIfPresent([String: Set<UUID>].self, forKey: .dailyQuotas) ?? [:]
+    }
+
+    /// Whether this quota's today's allowance belongs in the menu bar.
+    ///
+    /// The global switch wins: with daily quota hidden, no quota shows one.
+    /// Otherwise the integration's own list wins over the planned quota, and
+    /// an integration that has never been given a list still shows the planned
+    /// quota — the choice the menu bar made before a list existed.
+    public func showsDailyAllowance(
+        quotaID: UUID,
+        integrationID: String,
+        plannedQuotaID: UUID
+    ) -> Bool {
+        guard showDailyQuota else { return false }
+        return dailyQuotaIDs(integrationID: integrationID, plannedQuotaID: plannedQuotaID)
+            .contains(quotaID)
+    }
+
+    /// Records whether one quota shows today's allowance.
+    ///
+    /// The first change stores the whole list, including the planned quota
+    /// when that was what the menu bar had been showing. A later change to the
+    /// planned quota then leaves the list alone: the two choices are no longer
+    /// the same choice.
+    public mutating func setShowsDailyAllowance(
+        _ enabled: Bool,
+        for quotaID: UUID,
+        integrationID: String,
+        plannedQuotaID: UUID
+    ) {
+        var chosen = dailyQuotaIDs(integrationID: integrationID, plannedQuotaID: plannedQuotaID)
+        if enabled {
+            chosen.insert(quotaID)
+        } else {
+            chosen.remove(quotaID)
+        }
+        dailyQuotas[integrationID] = chosen
+        hiddenDailyIntegrations.remove(integrationID)
+    }
+
+    /// The quotas of one integration that show today's allowance.
+    private func dailyQuotaIDs(integrationID: String, plannedQuotaID: UUID) -> Set<UUID> {
+        if let chosen = dailyQuotas[integrationID] {
+            return chosen
+        }
+        if hiddenDailyIntegrations.contains(integrationID) {
+            return []
+        }
+        return [plannedQuotaID]
+    }
+}
+
 /// User-level settings that are not tied to a single quota.
 public struct Preferences: Codable, Sendable, Equatable {
     /// Whether a period is offered as daily, weekly, or monthly when a quota is
@@ -55,6 +146,7 @@ public struct Preferences: Codable, Sendable, Equatable {
     /// An automatic check that finds the same version again must not reopen the
     /// browser; a manual check still may.
     public let announcedUpdateVersion: String?
+    public let menuBar: MenuBarPreferences
 
     public init(
         defaultPolicyKind: String = PreferenceConstants.defaultPolicyKind,
@@ -65,7 +157,8 @@ public struct Preferences: Codable, Sendable, Equatable {
         notificationsEnabled: Bool = PreferenceConstants.defaultNotificationsEnabled,
         automaticUpdateChecksEnabled: Bool = PreferenceConstants.defaultAutomaticUpdateChecksEnabled,
         lastUpdateCheckAt: Date? = nil,
-        announcedUpdateVersion: String? = nil
+        announcedUpdateVersion: String? = nil,
+        menuBar: MenuBarPreferences = MenuBarPreferences()
     ) {
         self.defaultPolicyKind = defaultPolicyKind
         self.hasCompletedOnboarding = hasCompletedOnboarding
@@ -76,6 +169,7 @@ public struct Preferences: Codable, Sendable, Equatable {
         self.automaticUpdateChecksEnabled = automaticUpdateChecksEnabled
         self.lastUpdateCheckAt = lastUpdateCheckAt
         self.announcedUpdateVersion = announcedUpdateVersion
+        self.menuBar = menuBar
     }
 
     /// Older stored preferences omit newer keys; treat those as the platform
@@ -98,11 +192,17 @@ public struct Preferences: Codable, Sendable, Equatable {
             String.self,
             forKey: .announcedUpdateVersion
         )
+        menuBar = try container.decodeIfPresent(MenuBarPreferences.self, forKey: .menuBar) ?? MenuBarPreferences()
     }
 
     /// The same preferences pointing at a different quota.
     public func withMenuBarQuotaID(_ id: UUID?) -> Preferences {
         copy(menuBarQuotaID: id)
+    }
+
+    /// The same preferences with a different menu-bar block.
+    public func withMenuBar(_ menuBar: MenuBarPreferences) -> Preferences {
+        copy(menuBar: menuBar)
     }
 
     /// The same preferences with notifications toggled.
@@ -139,7 +239,8 @@ public struct Preferences: Codable, Sendable, Equatable {
         notificationsEnabled: Bool? = nil,
         automaticUpdateChecksEnabled: Bool? = nil,
         lastUpdateCheckAt: Date?? = nil,
-        announcedUpdateVersion: String?? = nil
+        announcedUpdateVersion: String?? = nil,
+        menuBar: MenuBarPreferences? = nil
     ) -> Preferences {
         Preferences(
             defaultPolicyKind: defaultPolicyKind ?? self.defaultPolicyKind,
@@ -151,7 +252,8 @@ public struct Preferences: Codable, Sendable, Equatable {
             automaticUpdateChecksEnabled: automaticUpdateChecksEnabled
                 ?? self.automaticUpdateChecksEnabled,
             lastUpdateCheckAt: lastUpdateCheckAt ?? self.lastUpdateCheckAt,
-            announcedUpdateVersion: announcedUpdateVersion ?? self.announcedUpdateVersion
+            announcedUpdateVersion: announcedUpdateVersion ?? self.announcedUpdateVersion,
+            menuBar: menuBar ?? self.menuBar
         )
     }
 

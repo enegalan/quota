@@ -48,6 +48,22 @@ struct QuotaTests {
         let data = try JSONEncoder().encode(quota)
         #expect(try JSONDecoder().decode(Quota.self, from: data) == quota)
     }
+
+    @Test("Renaming keeps the identity and what the quota watches")
+    func withNamePreservesIdentity() throws {
+        let quota = try makeQuota(bucketID: "models")
+        let updatedAt = try quotaInstant(2026, 9, 2)
+        let renamed = quota.withName("Work", updatedAt: updatedAt)
+
+        #expect(renamed.name == "Work")
+        #expect(renamed.id == quota.id)
+        #expect(renamed.providerID == quota.providerID)
+        #expect(renamed.bucketID == quota.bucketID)
+        #expect(renamed.period == quota.period)
+        #expect(renamed.policy == quota.policy)
+        #expect(renamed.createdAt == quota.createdAt)
+        #expect(renamed.updatedAt == updatedAt)
+    }
 }
 
 @Suite("QuotaSummary")

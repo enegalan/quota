@@ -1,3 +1,4 @@
+import Core
 import Platform
 import SwiftUI
 
@@ -16,6 +17,8 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            menuBarSettings
+            MenuBarIntegrationSettings(model: model)
             Section {
                 HStack(alignment: .firstTextBaseline) {
                     Toggle(isOn: $notificationsEnabled) {
@@ -120,6 +123,55 @@ struct SettingsView: View {
         }
     }
 
+    private var menuBarSettings: some View {
+        Section {
+            HStack(alignment: .firstTextBaseline) {
+                Toggle("Show integration logos", isOn: menuBarBinding(\.showLogos))
+                SettingInfoButton(explanation: Self.logosExplanation)
+            }
+            HStack(alignment: .firstTextBaseline) {
+                Toggle("Show daily quota", isOn: menuBarBinding(\.showDailyQuota))
+                SettingInfoButton(explanation: Self.dailyQuotaExplanation)
+            }
+            HStack(alignment: .firstTextBaseline) {
+                Picker("Show values", selection: menuBarBinding(\.valueMode)) {
+                    Text("Used and remaining").tag(MenuBarPreferences.ValueMode.both)
+                    Text("Used only").tag(MenuBarPreferences.ValueMode.used)
+                    Text("Remaining only").tag(MenuBarPreferences.ValueMode.remaining)
+                }
+                SettingInfoButton(explanation: Self.valuesExplanation)
+            }
+        } header: {
+            Text("Menu Bar")
+        }
+    }
+
+    private static let logosExplanation = """
+    When on, each integration in the menu bar starts with its provider \
+    mark. When off, the integration name is shown instead.
+    """
+
+    private static let dailyQuotaExplanation = """
+    When on, the menu bar includes today's allowance for the quotas \
+    switched on under Integration Limits. Remaining is the amount planned \
+    for today minus the amount used. When off, those Today figures are \
+    hidden.
+    """
+
+    private static let valuesExplanation = """
+    The figures drawn beside each limit. Used and remaining shows both; \
+    used only and remaining only show one of them. A figure that has not \
+    been read yet is a dash.
+    """
+
+    /// A binding that writes one menu-bar preference through the model.
+    private func menuBarBinding<Value>(_ keyPath: WritableKeyPath<MenuBarPreferences, Value>) -> Binding<Value> {
+        Binding(
+            get: { model.menuBarPreferences[keyPath: keyPath] },
+            set: { value in model.updateMenuBarPreferences { $0[keyPath: keyPath] = value } }
+        )
+    }
+
     private var statusText: String {
         switch model.updateStatus {
         case .idle:
@@ -164,7 +216,7 @@ struct SettingsView: View {
 }
 
 /// A compact “i” that shows what changing a setting does.
-private struct SettingInfoButton: View {
+struct SettingInfoButton: View {
     let explanation: String
 
     @State private var isPresented = false
@@ -174,6 +226,7 @@ private struct SettingInfoButton: View {
             isPresented.toggle()
         } label: {
             Image(systemName: "info.circle")
+                .font(.body)
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)

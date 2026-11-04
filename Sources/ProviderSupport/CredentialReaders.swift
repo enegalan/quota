@@ -1,37 +1,58 @@
 import Foundation
-import LocalAuthentication
-import Security
 
 /// Reading a credential out of the user's keychain.
 ///
-/// Never interactive, on purpose: an item owned by another application's code
-/// signature can ask for consent on every read, so a read allowed to prompt
-/// may put up a dialog nobody is watching on a background refresh. A read that
-/// would need the user simply fails, and the plugin's next source is tried.
+/// Foreign items (Claude Code, Codex, Cursor, …) carry a classic macOS ACL.
+/// Reading them with `SecItemCopyMatching` from an unsigned or ad-hoc plugin
+/// binary puts up a consent dialog on every refresh, and "Always Allow" does
+/// not stick: the plugin's code signature is not a stable trusted-application
+/// identity. `/usr/bin/security` is Apple-signed; once the user allows it,
+/// that grant survives plugin updates and background refreshes.
+///
+/// A missing item, a denied prompt, or a tool failure all return nil so the
+/// plugin's next credential source can be tried.
 public enum KeychainReader {
+    /// Absolute path of Apple's keychain tool. Stable across macOS releases.
+    public static let securityToolPath = "/usr/bin/security"
+
     /// The password stored for a service, or nil when there is none to be had.
     public static func password(service: String, account: String? = nil) -> String? {
-        let context = LAContext()
-        context.interactionNotAllowed = true
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: securityToolPath)
+        process.arguments = securityArguments(service: service, account: account)
 
-        var query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecUseAuthenticationContext as String: context,
-        ]
-        if let account {
-            query[kSecAttrAccount as String] = account
-        }
+        let stdout = Pipe()
+        process.standardOutput = stdout
+        // Leave stderr unread and it can fill the pipe and stall `security`
+        // the same way a full stdout pipe can; discard it instead.
+        process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
 
-        var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data
-        else {
+        do {
+            try process.run()
+        } catch {
             return nil
         }
-        return String(data: data, encoding: .utf8)
+        // Drain stdout before waiting: a full pipe blocks the child, and
+        // waiting first then leaves this process wedged on both sides.
+        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0, let text = String(data: data, encoding: .utf8) else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Arguments for `security find-generic-password … -w`.
+    ///
+    /// `-w` prints only the password, so the plugin never has to parse the
+    /// attribute dump `security` emits without it.
+    public static func securityArguments(service: String, account: String? = nil) -> [String] {
+        var arguments = ["find-generic-password", "-s", service]
+        if let account {
+            arguments.append(contentsOf: ["-a", account])
+        }
+        arguments.append("-w")
+        return arguments
     }
 }
 

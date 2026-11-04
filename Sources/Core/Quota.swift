@@ -70,6 +70,7 @@ public struct Quota: Sendable, Hashable, Codable, Identifiable {
     public func withPeriod(_ period: QuotaPeriod, updatedAt: Date) -> Quota {
         Quota(
             copying: self,
+            name: name,
             period: period,
             policy: policy,
             updatedAt: updatedAt
@@ -78,12 +79,21 @@ public struct Quota: Sendable, Hashable, Codable, Identifiable {
 
     /// The same quota, marked as having been read at `date`.
     public func withUpdatedAt(_ date: Date) -> Quota {
-        Quota(copying: self, period: period, policy: policy, updatedAt: date)
+        Quota(copying: self, name: name, period: period, policy: policy, updatedAt: date)
     }
 
     /// The same quota with a different allocation policy.
     public func withPolicy(_ policy: AllocationPolicy, updatedAt: Date) -> Quota {
-        Quota(copying: self, period: period, policy: policy, updatedAt: updatedAt)
+        Quota(copying: self, name: name, period: period, policy: policy, updatedAt: updatedAt)
+    }
+
+    /// The same quota under a different name.
+    ///
+    /// Separate from creating a new quota so readings, plan, and identity stay
+    /// put: renaming is a label change, not a replacement of the thing that was
+    /// being watched.
+    public func withName(_ name: String, updatedAt: Date) -> Quota {
+        Quota(copying: self, name: name, period: period, policy: policy, updatedAt: updatedAt)
     }
 
     /// A copy of a quota that is already valid, with fields replaced.
@@ -95,12 +105,13 @@ public struct Quota: Sendable, Hashable, Codable, Identifiable {
     /// happen, which reads as a place where something can.
     private init(
         copying source: Quota,
+        name: String,
         period: QuotaPeriod,
         policy: AllocationPolicy,
         updatedAt: Date
     ) {
         id = source.id
-        name = source.name
+        self.name = name
         providerID = source.providerID
         bucketID = source.bucketID
         self.period = period

@@ -1,4 +1,5 @@
 import Foundation
+import PluginKit
 
 /// Named values for the Cursor provider plugin.
 enum CursorConstants {
@@ -22,6 +23,11 @@ enum CursorConstants {
         "Cursor Auth",
         "cursorAuth/accessToken",
     ]
+
+    /// Electron `safeStorage` Keychain item that unlocks encrypted
+    /// `cursorAuth/accessToken` values (`cursor-safe-storage:v1:…`).
+    static let safeStorageKeychainService = "Cursor Safe Storage"
+    static let safeStorageKeychainAccount = "Cursor Key"
 
     /// Credential file paths tried last, relative to the home directory.
     static let credentialsFileRelativePaths = [
@@ -48,10 +54,15 @@ enum CursorConstants {
 
     static let planBucketID = "plan"
     static let apiBucketID = "api"
-    static let planBucketDisplayName = "Included plan"
-    static let apiBucketDisplayName = "API / named models"
+    static let planBucketDisplayName = "Cursor Models"
+    static let apiBucketDisplayName = "Other Models"
     static let planExternalID = "cursor-plan"
     static let apiExternalID = "cursor-api"
+
+    static let limits: [ProviderLimit] = [
+        ProviderLimit(id: planBucketID, name: planBucketDisplayName),
+        ProviderLimit(id: apiBucketID, name: apiBucketDisplayName),
+    ]
 
     /// Validated by the spike poll; clamped by the host to its own bounds.
     static let suggestedRefreshIntervalSeconds = 300.0

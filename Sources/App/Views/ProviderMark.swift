@@ -14,28 +14,44 @@ struct ProviderMark: View {
     /// The side the mark is drawn at.
     var size: CGFloat = LayoutMetrics.bodySize
 
+    /// Menu bar images need their native size set as well as their view frame.
+    var sizesNativeImage = false
+
     /// The colour the fallback symbol takes, so a row can still say with it what
     /// the image cannot.
     var fallbackColor: Color = .accentColor
 
     var body: some View {
         mark
-            .frame(width: size + LayoutMetrics.unit)
+            .frame(width: size + LayoutMetrics.unit, height: size)
+            .clipped()
             .accessibilityHidden(true)
     }
 
     @ViewBuilder
     private var mark: some View {
         if let image = ProviderLogo.image(for: providerID) {
-            Image(nsImage: image)
+            Image(nsImage: displayImage(image))
+                .renderingMode(.original)
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
                 .frame(width: size, height: size)
+                .clipped()
+                .foregroundStyle(.primary)
         } else {
             Image(systemName: "puzzlepiece.extension")
                 .font(.system(size: size))
                 .foregroundStyle(fallbackColor)
         }
+    }
+
+    /// A copy at the mark's size. The menu bar draws the image's own size,
+    /// and the file's size would overflow the status item.
+    private func displayImage(_ image: NSImage) -> NSImage {
+        guard sizesNativeImage, let copy = image.copy() as? NSImage else { return image }
+        copy.size = NSSize(width: size, height: size)
+        copy.isTemplate = false
+        return copy
     }
 }

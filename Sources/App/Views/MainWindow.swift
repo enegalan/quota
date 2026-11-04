@@ -77,6 +77,8 @@ struct MainWindow: View {
                 maxHeight: LayoutMetrics.sheetMaxHeight,
                 alignment: .top
             )
+            // Hug short steps; the flow itself caps and scrolls the policy body
+            // so this no longer clips weekly weights or the custom calendar.
             .fixedSize(horizontal: false, vertical: true)
         }
         .task {

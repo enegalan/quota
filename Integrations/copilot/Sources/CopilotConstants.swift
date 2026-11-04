@@ -1,4 +1,5 @@
 import Foundation
+import PluginKit
 
 /// Named values for the GitHub Copilot provider plugin.
 enum CopilotConstants {
@@ -61,6 +62,12 @@ enum CopilotConstants {
     static let premiumInteractionsDisplayName = "Premium requests"
     static let chatDisplayName = "Chat"
     static let completionsDisplayName = "Completions"
+
+    static let limits: [ProviderLimit] = [
+        ProviderLimit(id: premiumInteractionsKey, name: premiumInteractionsDisplayName),
+        ProviderLimit(id: chatKey, name: chatDisplayName),
+        ProviderLimit(id: completionsKey, name: completionsDisplayName),
+    ]
 
     /// Free/limited payloads that omit `quota_snapshots` and use these instead.
     static let limitedUserQuotasKey = "limited_user_quotas"

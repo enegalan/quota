@@ -1,4 +1,5 @@
 import Foundation
+import PluginKit
 
 /// Named values for the Codex provider plugin.
 enum CodexConstants {
@@ -12,7 +13,14 @@ enum CodexConstants {
     /// Overridable with `CODEX_HOME`. The credential belongs to Codex, and this
     /// plugin never writes it — Codex refreshes the original.
     static let credentialsFileName = "auth.json"
+    static let configurationFileName = "config.toml"
     static let defaultHomeRelativePath = ".codex"
+
+    /// Codex's `cli_auth_credentials_store` key in `config.toml`.
+    ///
+    /// Decides whether the active sign-in lives in the keychain, in
+    /// `auth.json`, or prefers the keychain with a file fallback (`auto`).
+    static let credentialsStoreConfigKey = "cli_auth_credentials_store"
 
     /// The macOS keychain service Codex writes its sign-in under.
     ///
@@ -42,6 +50,21 @@ enum CodexConstants {
     static let secondaryBucketID = "secondary_window"
     static let primaryDisplayName = "5-hour session"
     static let secondaryDisplayName = "Weekly"
+    static let primaryMenuBarLabel = "5h"
+    static let secondaryMenuBarLabel = "1w"
+
+    static let limits: [ProviderLimit] = [
+        ProviderLimit(
+            id: primaryBucketID,
+            name: primaryDisplayName,
+            menuBarLabel: primaryMenuBarLabel
+        ),
+        ProviderLimit(
+            id: secondaryBucketID,
+            name: secondaryDisplayName,
+            menuBarLabel: secondaryMenuBarLabel
+        ),
+    ]
 
     /// How often the provider would rather not be asked again, in seconds.
     static let suggestedRefreshIntervalSeconds = 300.0

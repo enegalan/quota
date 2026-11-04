@@ -14,6 +14,12 @@ public struct UsageSnapshot: Sendable, Hashable, Codable, Identifiable {
     public let updatedAt: Date
     public let buckets: [UsageBucket]
 
+    /// Limits the integration declared with this reading.
+    ///
+    /// Empty for a reading stored before the integration said, and for one
+    /// whose integration declared none. A missing key is the first of those.
+    public let knownLimits: [KnownLimit]
+
     /// Distinguishes two readings of the same provider taken at different
     /// moments. Derived, not stored, because two snapshots of one provider in
     /// one list are otherwise indistinguishable to SwiftUI.
@@ -24,7 +30,11 @@ public struct UsageSnapshot: Sendable, Hashable, Codable, Identifiable {
     /// - Throws: `QuotaDomainError.emptyBuckets` when there is nothing to report,
     ///   and `QuotaDomainError.duplicateBucketID` when two buckets share an
     ///   identifier, which would make a quota's bucket reference ambiguous.
-    public init(updatedAt: Date, buckets: [UsageBucket]) throws {
+    public init(
+        updatedAt: Date,
+        buckets: [UsageBucket],
+        knownLimits: [KnownLimit] = []
+    ) throws {
         guard !buckets.isEmpty else {
             throw QuotaDomainError.emptyBuckets
         }
@@ -38,6 +48,7 @@ public struct UsageSnapshot: Sendable, Hashable, Codable, Identifiable {
 
         self.updatedAt = updatedAt
         self.buckets = buckets
+        self.knownLimits = knownLimits
     }
 
     /// The bucket a quota with no explicit bucket reference uses.
@@ -84,7 +95,8 @@ public struct UsageSnapshot: Sendable, Hashable, Codable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         try self.init(
             updatedAt: container.decode(Date.self, forKey: .updatedAt),
-            buckets: container.decode([UsageBucket].self, forKey: .buckets)
+            buckets: container.decode([UsageBucket].self, forKey: .buckets),
+            knownLimits: container.decodeIfPresent([KnownLimit].self, forKey: .knownLimits) ?? []
         )
     }
 }

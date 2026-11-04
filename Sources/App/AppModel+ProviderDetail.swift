@@ -12,6 +12,15 @@ extension AppModel {
     func providerDetail(for listing: ProviderListing) async -> ProviderDetail {
         let record = try? await environment.providers.provider(ProviderID(listing.id))
         let pools = await pools(reading: listing.id)
+        // A quota that names no limit closes the provider. It matches none of
+        // the pools, so counting watched pools would still recommend another
+        // quota the repository will refuse.
+        let limitAdvice = hasUnboundQuota(forProviderID: listing.id)
+            ? nil
+            : LimitAdvice.caption(
+                total: pools.count,
+                taken: pools.filter { isWatched(providerID: listing.id, bucketID: $0.id) }.count
+            )
         return ProviderDetail(
             listing: listing,
             accountLabel: record?.authenticatedAccountLabel,
@@ -20,7 +29,8 @@ extension AppModel {
             versionCaption: versionCaption(for: listing),
             protocolCaption: protocolCaption(for: listing),
             refreshCaption: refreshCaption(for: listing, record: record),
-            pools: pools
+            pools: pools,
+            limitAdvice: limitAdvice
         )
     }
 

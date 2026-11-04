@@ -20,6 +20,13 @@ import Platform
 final class AppModel {
     /// Every quota the app knows about, ready to render.
     private(set) var presentations: [QuotaPresentation] = []
+    private(set) var menuBarPreferences = MenuBarPreferences()
+    /// The preferences save in flight, and which save is the latest.
+    ///
+    /// Held here so `load()` can see them. Not private: the save queue lives in
+    /// `AppModel+Preferences`, and a private property is invisible to that file.
+    @ObservationIgnored var menuBarSaveTask: Task<Void, Never>?
+    @ObservationIgnored var menuBarSaveToken: UUID?
 
     /// The packaged providers split into available, installed, and connected.
     private(set) var sections = ProviderSections(available: [], installed: [], connected: [])
@@ -131,6 +138,9 @@ final class AppModel {
         do {
             reference = environment.now()
             let preferences = try await environment.preferences.load()
+            if menuBarSaveTask == nil {
+                menuBarPreferences = preferences.menuBar
+            }
             menuBarQuotaID = preferences.menuBarQuotaID
             // The provider list is read before the quota panels, and on its own:
             // it depends on nothing but the store, and a panel that cannot be
@@ -149,31 +159,16 @@ final class AppModel {
         loadGeneration += 1
     }
 
-    /// Makes one quota the one the menu bar item speaks for.
-    ///
-    /// Saved rather than held, because the choice has to survive the relaunch
-    /// that follows quitting: a menu bar item that showed a different quota each
-    /// morning would make the number beside it untrustworthy, and a number the
-    /// user cannot rely on is the one thing a menu bar item is for.
-    ///
-    /// Pinning one quota unpins the previous one — there is no separate unpin
-    /// action, because picking another quota is itself the way to change it.
-    ///
-    /// Not routed through `perform`, which reloads everything: the choice touches
-    /// no reading, no plan, and no quota, and a popover that re-read the whole
-    /// store on every click would make choosing look like waiting.
-    func showInMenuBar(_ presentation: QuotaPresentation) async {
-        guard presentation.id != menuBarQuotaID else { return }
-        do {
-            let preferences = try await environment.preferences.load()
-            try await environment.preferences.save(
-                preferences.withMenuBarQuotaID(presentation.id)
-            )
-            menuBarQuotaID = presentation.id
-            lastError = nil
-        } catch {
-            report(error)
-        }
+    /// Writes menu-bar preferences. The setter is private, and the save queue
+    /// lives in another file.
+    func storeMenuBarPreferences(_ preferences: MenuBarPreferences) {
+        menuBarPreferences = preferences
+    }
+
+    /// Writes the menu-bar quota. The setter is private, and pinning lives in
+    /// another file.
+    func storeMenuBarQuotaID(_ id: UUID?) {
+        menuBarQuotaID = id
     }
 
     /// Adds sync status from the provider record and continuity map.
@@ -361,19 +356,18 @@ final class AppModel {
         }
     }
 
-    // MARK: - providers
-
-    /// What removing a provider would cost, so can say it before doing it.
+    /// Renames a quota without touching its readings, plan, or what it watches.
     ///
-    /// Asked for rather than counted in the view: a provider can back several
-    /// quotas, and a row that removed it without saying so would leave those
-    /// quotas listed with numbers that can never update again.
-    func impact(ofUninstalling listing: ProviderListing) async -> UninstallImpact? {
-        do {
-            return try await environment.installer.impact(ofUninstalling: listing.id)
-        } catch {
-            report(error)
-            return nil
+    /// Trimmed and refused when blank, for the same reason Create is: a quota
+    /// with no name is a row the list cannot tell apart from any other.
+    func renameQuota(_ id: UUID, to name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await perform {
+            guard let existing = try await self.environment.quotas.quota(id: id),
+                  existing.name != trimmed else { return }
+            let now = self.environment.now()
+            try await self.environment.quotas.save(existing.withName(trimmed, updatedAt: now))
         }
     }
 }
