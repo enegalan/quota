@@ -201,6 +201,46 @@ struct ProviderDetailTests {
         #expect(detail.pools.count == 2)
     }
 
+    @Test("The page recommends a quota for each limit still without one")
+    func severalLimitsRecommendAQuotaEach() async throws {
+        let (model, _) = try await ProviderDetailFixture.model()
+        let detail = await model.providerDetail(for: ProviderDetailFixture.listing())
+
+        // The page is where a user goes to find out what a provider meters, so
+        // it has to say that the second limit is not covered by the first quota.
+        #expect(
+            detail.limitAdvice
+                == "1 of 2 limits still need a quota. Create one per limit you want to track."
+        )
+    }
+
+    @Test("The page stops recommending once every limit has a quota")
+    func everyLimitCoveredDropsTheRecommendation() async throws {
+        let (model, _) = try await ProviderDetailFixture.model()
+        _ = await model.createQuota(
+            named: "Five hours",
+            providerID: ProviderDetailFixture.providerID,
+            bucketID: "five_hour",
+            period: nil,
+            policy: .even
+        )
+        let detail = await model.providerDetail(for: ProviderDetailFixture.listing())
+
+        #expect(detail.limitAdvice == "Every limit this provider meters already has a quota.")
+    }
+
+    @Test("A provider metering one limit is given no recommendation")
+    func singleLimitGetsNoAdvice() {
+        // A recommendation about choosing between limits is noise for a provider
+        // that has only one, and for one that has not been read yet.
+        #expect(LimitAdvice.caption(total: 1, taken: 0) == nil)
+        #expect(LimitAdvice.caption(total: 0, taken: 0) == nil)
+        #expect(
+            LimitAdvice.caption(total: 2, taken: 0)
+                == "This provider meters 2 limits. Create one quota per limit you want to track."
+        )
+    }
+
     @Test("Opening a page reads the store rather than the provider")
     func pageDoesNotAskTheProvider() async throws {
         let (model, fetcher) = try await ProviderDetailFixture.model()

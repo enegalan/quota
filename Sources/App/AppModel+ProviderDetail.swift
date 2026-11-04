@@ -12,6 +12,7 @@ extension AppModel {
     func providerDetail(for listing: ProviderListing) async -> ProviderDetail {
         let record = try? await environment.providers.provider(ProviderID(listing.id))
         let pools = await pools(reading: listing.id)
+        let watched = pools.filter { isWatched(providerID: listing.id, bucketID: $0.id) }.count
         return ProviderDetail(
             listing: listing,
             accountLabel: record?.authenticatedAccountLabel,
@@ -20,7 +21,8 @@ extension AppModel {
             versionCaption: versionCaption(for: listing),
             protocolCaption: protocolCaption(for: listing),
             refreshCaption: refreshCaption(for: listing, record: record),
-            pools: pools
+            pools: pools,
+            limitAdvice: LimitAdvice.caption(total: pools.count, taken: watched)
         )
     }
 

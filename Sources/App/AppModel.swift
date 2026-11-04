@@ -361,6 +361,23 @@ final class AppModel {
         }
     }
 
+    /// Renames a quota without touching its readings, plan, or what it watches.
+    ///
+    /// Trimmed and refused when blank, for the same reason Create is: a quota
+    /// with no name is a row the list cannot tell apart from any other.
+    func renameQuota(_ id: UUID, to name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await perform {
+            guard let existing = try await self.environment.quotas.quota(id: id) else {
+                return
+            }
+            guard existing.name != trimmed else { return }
+            let now = self.environment.now()
+            try await self.environment.quotas.save(existing.withName(trimmed, updatedAt: now))
+        }
+    }
+
     // MARK: - providers
 
     /// What removing a provider would cost, so can say it before doing it.

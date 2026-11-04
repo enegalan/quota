@@ -139,6 +139,16 @@ extension QuotaCreationFlow {
         guard selected?.id == providerID else { return }
         buckets = loaded
         bucketID = buckets.first { !takenBucketIDs.contains($0.id) }?.id ?? buckets.first?.id
+        // A multi-limit provider needs the quota named after the limit it watches,
+        // not after the provider: two quotas both called "Cursor" cannot be told
+        // apart once the flow closes. A single-limit provider keeps the provider
+        // name — there is nothing else to distinguish.
+        if buckets.count > 1,
+           let bucketID,
+           let bucket = buckets.first(where: { $0.id == bucketID })
+        {
+            name = bucket.displayName
+        }
     }
 
     /// The current state of one provider, read from the live listings.
@@ -157,8 +167,12 @@ extension QuotaCreationFlow {
     /// changed their mind about. A refused registration keeps the form as it was,
     /// because the name and policy the user entered are still what they want.
     func create(using listing: ProviderListing) {
-        isWorking = true
         let chosen = bucketID
+        // Defend the one-quota-per-limit rule here as well as on the button:
+        // menu pickers historically ignored `.disabled` on rows, so a taken
+        // limit could still be the selection when Create was pressed.
+        if let chosen, takenBucketIDs.contains(chosen) { return }
+        isWorking = true
         Task {
             let created = await model.createQuota(
                 named: name,

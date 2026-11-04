@@ -60,7 +60,7 @@ struct QuotaListRow: View {
                     providerID: presentation.summary.quota.providerID.rawValue,
                     size: LayoutMetrics.footnoteSize
                 )
-                Caption(presentation.accountCaption)
+                Caption(text: presentation.identityCaption)
                     .lineLimit(1)
             }
             UsageBar(

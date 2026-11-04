@@ -14,18 +14,12 @@ struct ProviderDetailView: View {
 
     private let formatter = PercentageFormatter()
 
-    var body: some View {
-        ScrollView {
-            content
-        }
-    }
-
-    /// The page itself, without the scroll view around it.
+    /// The page itself.
     ///
-    /// Separate because a sheet wants the content and the scroll view is the
-    /// window's business: a renderer asked for the whole view would draw
-    /// nothing at all, and a picture of the page is worth having.
-    var content: some View {
+    /// No scroll view here: the sheet owns scrolling and its viewport height.
+    /// A ScrollView as the page root collapses to a slit when the sheet only
+    /// offers a max height — which is how the page looked on some displays.
+    var body: some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
             header
             status
@@ -110,6 +104,9 @@ struct ProviderDetailView: View {
                             }
                         }
                     }
+                    if let advice = detail.limitAdvice {
+                        Caption(text: advice)
+                    }
                 }
             }
         }
@@ -154,18 +151,35 @@ struct ProviderDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var detail: ProviderDetail?
 
+    /// Height of the page body, so the sheet can hug short pages and scroll
+    /// once the content passes the sheet's ceiling.
+    @State private var bodyHeight: CGFloat = 0
+
     var body: some View {
         NavigationStack {
             Group {
                 if let detail {
-                    ProviderDetailView(
-                        detail: detail,
-                        model: model,
-                        onUninstall: onUninstall
-                    )
+                    ScrollView {
+                        ProviderDetailView(
+                            detail: detail,
+                            model: model,
+                            onUninstall: onUninstall
+                        )
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear.preference(
+                                    key: ProviderDetailBodyHeightKey.self,
+                                    value: proxy.size.height
+                                )
+                            }
+                        )
+                    }
+                    .onPreferenceChange(ProviderDetailBodyHeightKey.self) { bodyHeight = $0 }
+                    .frame(height: scrollViewportHeight)
                 } else {
                     ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity)
+                        .padding(LayoutMetrics.windowPadding)
                 }
             }
             .navigationTitle(detail?.displayName ?? listing?.displayName ?? "")
@@ -182,6 +196,10 @@ struct ProviderDetailSheet: View {
             maxHeight: LayoutMetrics.sheetMaxHeight,
             alignment: .top
         )
+        // Same contract as the create-quota sheet: hug the page, and stop at
+        // the ceiling. Without it the ScrollView takes a near-zero height on
+        // some displays and the page collapses to a slit under the title.
+        .fixedSize(horizontal: false, vertical: true)
         // Keyed by the load that has just finished, not by the instant the load
         // started: a reload that runs while the load is still reading reads what
         // was there before it, and the page would show the state its own action
@@ -190,6 +208,12 @@ struct ProviderDetailSheet: View {
         .task(id: model.loadGeneration) {
             await reload()
         }
+    }
+
+    /// Height of the scrolling page: content when it fits, the ceiling when it
+    /// does not.
+    private var scrollViewportHeight: CGFloat {
+        min(max(bodyHeight, 1), LayoutMetrics.sheetBodyMaxHeight)
     }
 
     /// The provider as the app knows it now.
@@ -204,5 +228,17 @@ struct ProviderDetailSheet: View {
     private func reload() async {
         guard let listing else { return }
         detail = await model.providerDetail(for: listing)
+    }
+}
+
+/// Height of the provider page's body.
+///
+/// Reported so the sheet's scroll viewport can match short content and stop at
+/// the sheet ceiling once the page grows past it.
+private enum ProviderDetailBodyHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

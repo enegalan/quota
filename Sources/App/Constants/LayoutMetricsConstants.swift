@@ -95,9 +95,17 @@ enum LayoutMetrics {
     /// Ceiling for the create-quota sheet when the policy calendar is showing.
     ///
     /// Without a ceiling a custom-policy month can push the sheet past what fits
-    /// on a small display; with only a floor (as before) every short step was
-    /// padded with empty space.
+    /// on a small display. Past the ceiling the creation flow scrolls its middle
+    /// rather than clipping the calendar, the weekday rows, or Create itself.
     static let sheetMaxHeight: CGFloat = 640
+
+    /// Tallest the creation flow's scrolling middle may grow before it scrolls.
+    ///
+    /// Leaves room above for the step trail and below for Back / Create, so those
+    /// stay on screen while weekly weights or the custom calendar move under the
+    /// fold. Derived from `sheetMaxHeight` rather than chosen on its own, so the
+    /// two cannot drift apart.
+    static let sheetBodyMaxHeight: CGFloat = sheetMaxHeight - 140
 
     /// Narrowest a day cell may shrink before the grid stops compressing.
     ///

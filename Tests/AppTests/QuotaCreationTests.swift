@@ -240,6 +240,34 @@ struct QuotaCreationTests {
         #expect(model.presentations.map(\.summary.quota.bucketID) == ["models", "requests"])
     }
 
+    @Test("A second quota on the same named bucket is refused")
+    func duplicateNamedBucketIsRefused() async {
+        // The multi-limit case the creation picker exists for: two free limits
+        // is not a licence to file two quotas against one of them. The second
+        // must watch a different bucket, or be refused.
+        let model = QuotaCreationFixture.model()
+
+        _ = await model.createQuota(
+            named: "Models",
+            providerID: QuotaCreationFixture.providerID,
+            bucketID: "models",
+            period: nil,
+            policy: .even
+        )
+        let created = await model.createQuota(
+            named: "Models again",
+            providerID: QuotaCreationFixture.providerID,
+            bucketID: "models",
+            period: nil,
+            policy: .even
+        )
+
+        #expect(!created)
+        #expect(model.presentations.count == 1)
+        #expect(model.presentations.map(\.summary.quota.name) == ["Models"])
+        #expect(model.isWatched(providerID: QuotaCreationFixture.providerID, bucketID: "models"))
+    }
+
     @Test("A provider with an un bucketed quota is closed off to further quotas")
     func unboundQuotaClosesTheProviderOff() async {
         // Asked of the model rather than worked out in the flow, because the row
@@ -344,5 +372,50 @@ struct QuotaCreationTests {
         // is that the quota is on screen rather than saved and invisible.
         #expect(model.presentations.first?.summary.plan == nil)
         #expect(model.presentations.count == 1)
+    }
+}
+
+/// Renaming an existing quota.
+///
+/// Shares the creation fixture because the claim is about what stays put after
+/// a label change: the same stored quota, under a new name, without a second
+/// registration.
+@Suite("Quota renaming")
+@MainActor
+struct QuotaRenamingTests {
+    @Test("Renaming updates the shown name and keeps the same quota")
+    func renameUpdatesTheShownName() async throws {
+        let model = QuotaCreationFixture.model()
+        _ = await model.createQuota(
+            named: "Work",
+            providerID: QuotaCreationFixture.providerID,
+            bucketID: nil,
+            period: nil,
+            policy: .even
+        )
+        let id = try #require(model.presentations.first?.id)
+
+        await model.renameQuota(id, to: "Home")
+
+        #expect(model.presentations.count == 1)
+        #expect(model.presentations.first?.id == id)
+        #expect(model.presentations.first?.summary.quota.name == "Home")
+    }
+
+    @Test("A blank rename is refused")
+    func blankRenameIsRefused() async throws {
+        let model = QuotaCreationFixture.model()
+        _ = await model.createQuota(
+            named: "Work",
+            providerID: QuotaCreationFixture.providerID,
+            bucketID: nil,
+            period: nil,
+            policy: .even
+        )
+        let id = try #require(model.presentations.first?.id)
+
+        await model.renameQuota(id, to: "   ")
+
+        #expect(model.presentations.first?.summary.quota.name == "Work")
     }
 }

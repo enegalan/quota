@@ -30,19 +30,46 @@ struct QuotaCreationFlow: View {
     @State var bucketID: String?
     @State var isWorking = false
 
+    /// Height of the step body, so the middle can hug short steps and scroll
+    /// once weekly weights or the custom calendar pass the sheet's ceiling.
+    @State private var bodyHeight: CGFloat = 0
+
     /// Creation steps, in order.
     ///
+    /// The middle scrolls when weekly weights or the custom calendar push past
+    /// the sheet's ceiling; the step trail and the Create row stay put. Without
+    /// that, the sheet clips those editors and the foot under the Close control.
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
             steps
             Divider()
-            stepBody
-            if let lastError = model.lastError {
-                ErrorBanner(message: lastError)
+            ScrollView {
+                VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
+                    stepBody
+                    if let lastError = model.lastError {
+                        ErrorBanner(message: lastError)
+                    }
+                }
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: CreationBodyHeightKey.self,
+                            value: proxy.size.height
+                        )
+                    }
+                )
             }
+            .onPreferenceChange(CreationBodyHeightKey.self) { bodyHeight = $0 }
+            .frame(height: scrollViewportHeight)
             actions
         }
         .padding(LayoutMetrics.inset)
+    }
+
+    /// Height of the scrolling middle: content when it fits, the ceiling when it
+    /// does not — so choose/install/connect stay short and policy can scroll.
+    private var scrollViewportHeight: CGFloat {
+        min(max(bodyHeight, 1), LayoutMetrics.sheetBodyMaxHeight)
     }
 
     /// The steps the user still has to walk for the current selection.
@@ -125,6 +152,20 @@ struct QuotaCreationFlow: View {
             calendar: model.userCalendar,
             selection: $bucketID
         )
+        .onChange(of: bucketID) { _, newID in
+            // Keep the name on the chosen limit while it still looks seeded —
+            // either the provider's name or another of this provider's limits —
+            // so switching the picker does not leave a stale limit name on a
+            // different quota. A name the user typed is left alone.
+            guard let newID,
+                  let bucket = buckets.first(where: { $0.id == newID })
+            else { return }
+            let seeded = Set(buckets.map(\.displayName))
+                .union([selected?.displayName].compactMap(\.self))
+            if name.isEmpty || seeded.contains(name) {
+                name = bucket.displayName
+            }
+        }
     }
 
     /// The limits of this provider that already have a quota of their own.
@@ -238,17 +279,31 @@ struct QuotaCreationFlow: View {
         }
     }
 
-    /// Whether the chosen provider can still take a quota.
+    /// Whether the chosen provider can still take a quota on the selected limit.
     ///
     /// Re-read at the last step rather than assumed from the row that was tapped:
     /// a quota can be created from the window behind the sheet while this flow is
     /// open, and Create has to refuse a provider that acquired one in between.
-    /// The limits only settle once the provider has answered, so this is also the
-    /// place that decides whether every one of them is spoken for.
+    /// Having a free limit somewhere is not enough — Create must also refuse when
+    /// the picker is still pointing at a limit that already has a quota.
     private var canCreate: Bool {
         guard let selected, !model.hasUnboundQuota(forProviderID: selected.id) else { return false }
         // Empty means the provider could not be read, which is not the same as
         // every limit being taken: there is then nothing to have ruled out.
-        return buckets.isEmpty || buckets.count > takenBucketIDs.count
+        if buckets.isEmpty { return true }
+        guard let bucketID else { return false }
+        return !takenBucketIDs.contains(bucketID)
+    }
+}
+
+/// Height of the creation flow's middle column.
+///
+/// Reported so the scroll viewport can match short content and stop at the
+/// sheet ceiling once the policy editors grow past it.
+private enum CreationBodyHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

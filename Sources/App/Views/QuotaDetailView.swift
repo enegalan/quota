@@ -58,8 +58,13 @@ struct QuotaDetailView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
-            Text(presentation.summary.quota.name)
-                .font(.title2.weight(.semibold))
+            NameEditor(presentation: presentation, model: model)
+                // One editor per quota: otherwise switching the selection keeps
+                // the previous draft and leaves the field open on the wrong name.
+                .id(presentation.id)
+            if let limitName = presentation.limitName {
+                Caption(text: limitName)
+            }
             HStack(spacing: LayoutMetrics.unit) {
                 ProviderMark(
                     providerID: presentation.summary.quota.providerID.rawValue,
@@ -220,6 +225,102 @@ struct PeriodCalendarSection: View {
                 }
             }
         }
+    }
+}
+
+/// Rename an existing quota.
+///
+/// Reads as the title until the pencil is pressed; only then does the name
+/// become a field, with a tick to keep the draft and a cross to discard it.
+/// Keeping the draft off-screen until asked means a stray keystroke cannot
+/// rewrite the label the list and the menu bar are already showing.
+struct NameEditor: View {
+    let presentation: QuotaPresentation
+    let model: AppModel
+
+    @State private var name: String
+    @State private var isEditing = false
+    @State private var isSaving = false
+    @FocusState private var isFocused: Bool
+
+    init(presentation: QuotaPresentation, model: AppModel) {
+        self.presentation = presentation
+        self.model = model
+        _name = State(initialValue: presentation.summary.quota.name)
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.actionSpacing) {
+            if isEditing {
+                TextField("Quota name", text: $name)
+                    .font(.title2.weight(.semibold))
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isFocused)
+                    .disabled(isSaving)
+                    .onSubmit { Task { await save() } }
+            } else {
+                Text(presentation.summary.quota.name)
+                    .font(.title2.weight(.semibold))
+            }
+            if isEditing {
+                Button {
+                    Task { await save() }
+                } label: {
+                    Image(systemName: "checkmark")
+                }
+                .buttonStyle(.borderless)
+                .disabled(isSaving || !canSave)
+                .help("Save name")
+                Button {
+                    cancel()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .disabled(isSaving)
+                .help("Cancel")
+            } else {
+                Button {
+                    beginEditing()
+                } label: {
+                    Image(systemName: "pencil")
+                }
+                .buttonStyle(.borderless)
+                .help("Rename")
+            }
+        }
+        .onChange(of: presentation.summary.quota.name) { _, newValue in
+            if !isEditing {
+                name = newValue
+            }
+        }
+    }
+
+    /// Whether the draft is a real rename rather than the same label again.
+    private var canSave: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed != presentation.summary.quota.name
+    }
+
+    private func beginEditing() {
+        name = presentation.summary.quota.name
+        isEditing = true
+        isFocused = true
+    }
+
+    private func cancel() {
+        name = presentation.summary.quota.name
+        isEditing = false
+        isFocused = false
+    }
+
+    private func save() async {
+        guard canSave else { return }
+        isSaving = true
+        await model.renameQuota(presentation.id, to: name)
+        isSaving = false
+        isEditing = false
+        isFocused = false
     }
 }
 

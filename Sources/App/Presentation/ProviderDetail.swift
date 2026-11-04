@@ -29,6 +29,13 @@ struct ProviderDetail: Identifiable {
     /// The limits it meters, as the last reading described them.
     let pools: [ProviderPool]
 
+    /// What the page says about the quotas those limits need.
+    ///
+    /// Nil for a provider metering a single limit, and for one that has not been
+    /// read yet: there is no count to make a recommendation about, and guessing
+    /// one would tell the user something the provider never said.
+    let limitAdvice: String?
+
     var id: String {
         listing.id
     }
