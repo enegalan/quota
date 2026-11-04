@@ -1,5 +1,5 @@
-import Platform
 import Core
+import Platform
 import SwiftUI
 
 /// User-level settings: notifications, refresh interval, and update checks.
@@ -180,8 +180,11 @@ struct SettingsView: View {
                     get: { !model.menuBarPreferences.hiddenProviders.contains(providerID) },
                     set: { enabled in
                         model.updateMenuBarPreferences {
-                            if enabled { $0.hiddenProviders.remove(providerID) }
-                            else { $0.hiddenProviders.insert(providerID) }
+                            if enabled {
+                                $0.hiddenProviders.remove(providerID)
+                            } else {
+                                $0.hiddenProviders.insert(providerID)
+                            }
                         }
                     }
                 ))
@@ -192,8 +195,11 @@ struct SettingsView: View {
                             get: { !model.menuBarPreferences.hiddenDailyProviders.contains(providerID) },
                             set: { enabled in
                                 model.updateMenuBarPreferences {
-                                    if enabled { $0.hiddenDailyProviders.remove(providerID) }
-                                    else { $0.hiddenDailyProviders.insert(providerID) }
+                                    if enabled {
+                                        $0.hiddenDailyProviders.remove(providerID)
+                                    } else {
+                                        $0.hiddenDailyProviders.insert(providerID)
+                                    }
                                 }
                             }
                         ))
@@ -220,9 +226,11 @@ struct SettingsView: View {
                     if !unavailable.isEmpty {
                         DisclosureGroup("Unavailable limits (\(unavailable.count))") {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("These limits may be unavailable for your plan or missing from the latest update. Selected limits show a dash until data is available.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                Text(
+                                    "These limits may be unavailable for your plan or missing from the latest update. Selected limits show a dash until data is available."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                                 ForEach(unavailable) { limit in
                                     Toggle(limit.name, isOn: limitBinding(providerID, limit.id, available: false))
                                         .accessibilityLabel("\(providerID) \(limit.name), unavailable")

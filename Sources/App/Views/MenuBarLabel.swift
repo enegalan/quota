@@ -13,7 +13,9 @@ struct MenuBarLabel: View {
 
     private let formatter = PercentageFormatter()
     @Environment(\.colorScheme) private var colorScheme
-    private var options: MenuBarPreferences { model?.menuBarPreferences ?? MenuBarPreferences() }
+    private var options: MenuBarPreferences {
+        model?.menuBarPreferences ?? MenuBarPreferences()
+    }
 
     init(presentation: QuotaPresentation?) {
         self.presentation = presentation
@@ -26,15 +28,14 @@ struct MenuBarLabel: View {
     }
 
     private var resolvedPresentations: [QuotaPresentation] {
-        let candidates: [QuotaPresentation]
-        if let model {
+        let candidates: [QuotaPresentation] = if let model {
             if let primary = model.primaryPresentation {
-                candidates = [primary] + model.presentations.filter { $0.id != primary.id }
+                [primary] + model.presentations.filter { $0.id != primary.id }
             } else {
-                candidates = model.presentations
+                model.presentations
             }
         } else {
-            candidates = presentation.map { [$0] } ?? []
+            presentation.map { [$0] } ?? []
         }
 
         var seenProviders = Set<String>()
@@ -100,7 +101,9 @@ struct MenuBarLabel: View {
                 Text(model?.sections.listing(id: presentation.summary.quota.providerID.rawValue)?.displayName
                     ?? presentation.summary.quota.name)
             }
-            if !figures.isEmpty { Text(figures) }
+            if !figures.isEmpty {
+                Text(figures)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(presentation.summary.quota.name): \(figures)")
@@ -118,12 +121,13 @@ struct MenuBarLabel: View {
         }
         for limit in MenuBarLimits.known(for: providerID) where
             !buckets.contains(where: { $0.id == limit.id })
-                && (options.shownUnavailableBuckets[providerID] ?? []).contains(limit.id)
-                && !(options.hiddenBuckets[providerID] ?? []).contains(limit.id) {
+            && (options.shownUnavailableBuckets[providerID] ?? []).contains(limit.id)
+            && !(options.hiddenBuckets[providerID] ?? []).contains(limit.id)
+        {
             labels.append("\(limit.shortName) \(values(used: nil, remaining: nil))")
         }
         var result: [String] = []
-        if options.showDailyQuota && !options.hiddenDailyProviders.contains(providerID) {
+        if options.showDailyQuota, !options.hiddenDailyProviders.contains(providerID) {
             let allowance = presentation.summary.todayAllowance
             let remaining = allowance.flatMap { value in value.usedToday.map { max(0, value.suggested - $0) } }
             let daily = values(used: allowance?.usedToday, remaining: remaining)
@@ -144,8 +148,12 @@ struct MenuBarLabel: View {
 
     static func windowLabel(for bucket: UsageBucket) -> String {
         let hours = bucket.period.end.timeIntervalSince(bucket.period.start) / 3600
-        if bucket.displayName == "5-hour session", abs(hours - 5) < 0.02 { return "5h" }
-        if bucket.displayName == "Weekly", abs(hours - 168) < 0.02 { return "1w" }
+        if bucket.displayName == "5-hour session", abs(hours - 5) < 0.02 {
+            return "5h"
+        }
+        if bucket.displayName == "Weekly", abs(hours - 168) < 0.02 {
+            return "1w"
+        }
         return bucket.displayName
     }
 

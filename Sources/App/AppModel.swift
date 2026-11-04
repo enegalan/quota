@@ -389,10 +389,8 @@ final class AppModel {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         await perform {
-            guard let existing = try await self.environment.quotas.quota(id: id) else {
-                return
-            }
-            guard existing.name != trimmed else { return }
+            guard let existing = try await self.environment.quotas.quota(id: id),
+                  existing.name != trimmed else { return }
             let now = self.environment.now()
             try await self.environment.quotas.save(existing.withName(trimmed, updatedAt: now))
         }
