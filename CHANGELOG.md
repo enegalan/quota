@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Pin SwiftFormat to 0.64.5. Bootstrap failed after Homebrew moved past 0.64.4.
 - The quota detail, list, and popover now name the limit a quota watches. A
   provider that meters several — Cursor's included plan and its API models —
   no longer leaves two quotas that share the provider's name indistinguishable.
