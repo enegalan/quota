@@ -74,4 +74,18 @@ extension AppModel {
         }
         lastError = failures.first
     }
+
+    /// What removing a provider would cost, so can say it before doing it.
+    ///
+    /// Asked for rather than counted in the view: a provider can back several
+    /// quotas, and a row that removed it without saying so would leave those
+    /// quotas listed with numbers that can never update again.
+    func impact(ofUninstalling listing: ProviderListing) async -> UninstallImpact? {
+        do {
+            return try await environment.installer.impact(ofUninstalling: listing.id)
+        } catch {
+            report(error)
+            return nil
+        }
+    }
 }

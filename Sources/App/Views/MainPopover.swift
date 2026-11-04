@@ -104,9 +104,7 @@ struct MainPopover: View {
                     label: formatter.string(presentation.usagePercentage)
                 )
             }
-            TodayAllowanceView(
-                presentation: presentation
-            )
+            TodayAllowanceView(presentation: presentation)
             OutlookRow(
                 presentation: presentation,
                 reference: model.reference,
