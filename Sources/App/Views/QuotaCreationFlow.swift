@@ -127,6 +127,9 @@ struct QuotaCreationFlow: View {
                 if buckets.count > 1 {
                     bucketChoice
                 }
+                if let takenBucketsCaption {
+                    Caption(text: takenBucketsCaption)
+                }
                 if let period = chosenPeriod {
                     PolicyEditor(
                         policy: $policy,
@@ -166,6 +169,20 @@ struct QuotaCreationFlow: View {
                 name = bucket.displayName
             }
         }
+    }
+
+    /// Why Create is disabled when the only loaded limit already has a quota.
+    ///
+    /// Several limits already say this under the picker. An empty read is not
+    /// the same as every limit being taken, and neither is a selection that
+    /// has not been made yet.
+    var takenBucketsCaption: String? {
+        Self.takenBucketsCaption(bucketIDs: buckets.map(\.id), takenIDs: takenBucketIDs)
+    }
+
+    static func takenBucketsCaption(bucketIDs: [String], takenIDs: Set<String>) -> String? {
+        guard bucketIDs.count == 1, takenIDs.isSuperset(of: bucketIDs) else { return nil }
+        return "Every limit this provider meters already has a quota."
     }
 
     /// The limits of this provider that already have a quota of their own.

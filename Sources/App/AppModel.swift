@@ -21,7 +21,12 @@ final class AppModel {
     /// Every quota the app knows about, ready to render.
     private(set) var presentations: [QuotaPresentation] = []
     private(set) var menuBarPreferences = MenuBarPreferences()
-    @ObservationIgnored private var menuBarSaveTask: Task<Void, Never>?
+    /// The preferences save in flight, and which save is the latest.
+    ///
+    /// Held here so `load()` can see them. Not private: the save queue lives in
+    /// `AppModel+Preferences`, and a private property is invisible to that file.
+    @ObservationIgnored var menuBarSaveTask: Task<Void, Never>?
+    @ObservationIgnored var menuBarSaveToken: UUID?
 
     /// The packaged providers split into available, installed, and connected.
     private(set) var sections = ProviderSections(available: [], installed: [], connected: [])
@@ -154,46 +159,16 @@ final class AppModel {
         loadGeneration += 1
     }
 
-    func updateMenuBarPreferences(_ update: (inout MenuBarPreferences) -> Void) {
-        update(&menuBarPreferences)
-        let options = menuBarPreferences
-        let previous = menuBarSaveTask
-        menuBarSaveTask = Task {
-            await previous?.value
-            do {
-                let current = try await environment.preferences.load()
-                try await environment.preferences.save(current.withMenuBar(options))
-            } catch {
-                report(error)
-            }
-        }
+    /// Writes menu-bar preferences. The setter is private, and the save queue
+    /// lives in another file.
+    func storeMenuBarPreferences(_ preferences: MenuBarPreferences) {
+        menuBarPreferences = preferences
     }
 
-    /// Makes one quota the one the menu bar item speaks for.
-    ///
-    /// Saved rather than held, because the choice has to survive the relaunch
-    /// that follows quitting: a menu bar item that showed a different quota each
-    /// morning would make the number beside it untrustworthy, and a number the
-    /// user cannot rely on is the one thing a menu bar item is for.
-    ///
-    /// Pinning one quota unpins the previous one — there is no separate unpin
-    /// action, because picking another quota is itself the way to change it.
-    ///
-    /// Not routed through `perform`, which reloads everything: the choice touches
-    /// no reading, no plan, and no quota, and a popover that re-read the whole
-    /// store on every click would make choosing look like waiting.
-    func showInMenuBar(_ presentation: QuotaPresentation) async {
-        guard presentation.id != menuBarQuotaID else { return }
-        do {
-            let preferences = try await environment.preferences.load()
-            try await environment.preferences.save(
-                preferences.withMenuBarQuotaID(presentation.id)
-            )
-            menuBarQuotaID = presentation.id
-            lastError = nil
-        } catch {
-            report(error)
-        }
+    /// Writes the menu-bar quota. The setter is private, and pinning lives in
+    /// another file.
+    func storeMenuBarQuotaID(_ id: UUID?) {
+        menuBarQuotaID = id
     }
 
     /// Adds sync status from the provider record and continuity map.

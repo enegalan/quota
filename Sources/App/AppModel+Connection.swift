@@ -87,10 +87,12 @@ extension AppModel {
     func setRefreshInterval(_ seconds: TimeInterval) async {
         await perform {
             let clamped = RefreshConstants.clamped(seconds)
-            let current = try await self.environment.preferences.load()
-            try await self.environment.preferences.save(
-                current.withRefreshIntervalSeconds(clamped)
-            )
+            try await self.savePreferences {
+                let current = try await self.environment.preferences.load()
+                try await self.environment.preferences.save(
+                    current.withRefreshIntervalSeconds(clamped)
+                )
+            }
         }
     }
 
@@ -109,8 +111,10 @@ extension AppModel {
     /// Enables or disables quota notifications.
     func setNotificationsEnabled(_ enabled: Bool) async {
         await perform {
-            let current = try await self.environment.preferences.load()
-            try await self.environment.preferences.save(current.withNotificationsEnabled(enabled))
+            try await self.savePreferences {
+                let current = try await self.environment.preferences.load()
+                try await self.environment.preferences.save(current.withNotificationsEnabled(enabled))
+            }
         }
     }
 

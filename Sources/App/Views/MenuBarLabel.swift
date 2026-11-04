@@ -44,6 +44,12 @@ struct MenuBarLabel: View {
             guard !options.hiddenIntegrations.contains(integrationID),
                   seenIntegrations.insert(integrationID).inserted
             else { return nil }
+            // A pin is the latest choice for this integration. A stored
+            // per-integration selection must not replace it; other
+            // integrations still follow that selection.
+            if candidate.id == model?.menuBarQuotaID {
+                return candidate
+            }
             guard let selected = options.selectedQuotas[integrationID] else { return candidate }
             return candidates.first {
                 $0.id == selected && $0.summary.quota.providerID.rawValue == integrationID
@@ -98,9 +104,8 @@ struct MenuBarLabel: View {
                     size: LayoutMetrics.indicatorSize + 7,
                     sizesNativeImage: true
                 )
-            } else if figures.isEmpty {
-                Text(model?.sections.listing(id: presentation.summary.quota.providerID.rawValue)?.displayName
-                    ?? presentation.summary.quota.name)
+            } else {
+                Text(integrationName(for: presentation))
             }
             if !figures.isEmpty {
                 Text(figures)
@@ -108,6 +113,12 @@ struct MenuBarLabel: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(presentation.summary.quota.name): \(figures)")
+    }
+
+    private func integrationName(for presentation: QuotaPresentation) -> String {
+        let integrationID = presentation.summary.quota.providerID.rawValue
+        return model?.sections.listing(id: integrationID)?.displayName
+            ?? presentation.summary.quota.name
     }
 
     private func figures(for presentation: QuotaPresentation) -> String {

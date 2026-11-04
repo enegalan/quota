@@ -14,7 +14,10 @@ extension QuotaCreationFlow {
         case .chooseProvider:
             beginFromChoice(listing)
         case .install:
-            beginConnect(listing.id)
+            // A failed install stays on this step. Next reads the provider
+            // again: it retries installation while that is still required, and
+            // moves on to connect or the policy step once it is not.
+            beginFromChoice(listing)
         case .connect:
             // A failed connect clears `isWorking` and would otherwise let Next
             // skip into policy with no reading behind it. Retry instead.

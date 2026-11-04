@@ -12,10 +12,12 @@ extension AppModel {
     /// Enables or disables automatic update checks.
     func setAutomaticUpdateChecksEnabled(_ enabled: Bool) async {
         await perform {
-            let current = try await self.environment.preferences.load()
-            try await self.environment.preferences.save(
-                current.withAutomaticUpdateChecksEnabled(enabled)
-            )
+            try await self.savePreferences {
+                let current = try await self.environment.preferences.load()
+                try await self.environment.preferences.save(
+                    current.withAutomaticUpdateChecksEnabled(enabled)
+                )
+            }
         }
     }
 
@@ -78,8 +80,10 @@ extension AppModel {
 
     private func saveLastUpdateCheck(at now: Date) async {
         do {
-            let current = try await environment.preferences.load()
-            try await environment.preferences.save(current.withLastUpdateCheckAt(now))
+            try await savePreferences {
+                let current = try await self.environment.preferences.load()
+                try await self.environment.preferences.save(current.withLastUpdateCheckAt(now))
+            }
         } catch {
             report(error)
         }
@@ -111,10 +115,12 @@ extension AppModel {
 
     private func saveAnnouncedUpdate(_ version: String) async {
         do {
-            let current = try await environment.preferences.load()
-            try await environment.preferences.save(
-                current.withAnnouncedUpdateVersion(version)
-            )
+            try await savePreferences {
+                let current = try await self.environment.preferences.load()
+                try await self.environment.preferences.save(
+                    current.withAnnouncedUpdateVersion(version)
+                )
+            }
         } catch {
             report(error)
         }

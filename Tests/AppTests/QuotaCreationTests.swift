@@ -268,6 +268,25 @@ struct QuotaCreationTests {
         #expect(model.isWatched(providerID: QuotaCreationFixture.providerID, bucketID: "models"))
     }
 
+    @Test("One taken limit is explained, and an empty read is not")
+    func takenLimitIsExplained() {
+        let caption = "Every limit this provider meters already has a quota."
+        #expect(
+            QuotaCreationFlow.takenBucketsCaption(bucketIDs: ["models"], takenIDs: ["models"]) == caption
+        )
+        // An empty read is not every limit being taken, and a missing selection
+        // is not consulted: the rule looks only at the loaded ids.
+        #expect(QuotaCreationFlow.takenBucketsCaption(bucketIDs: [], takenIDs: []) == nil)
+        #expect(QuotaCreationFlow.takenBucketsCaption(bucketIDs: ["models"], takenIDs: []) == nil)
+        // More than one limit already says this under the picker.
+        #expect(
+            QuotaCreationFlow.takenBucketsCaption(
+                bucketIDs: ["models", "requests"],
+                takenIDs: ["models", "requests"]
+            ) == nil
+        )
+    }
+
     @Test("A provider with an un bucketed quota is closed off to further quotas")
     func unboundQuotaClosesTheProviderOff() async {
         // Asked of the model rather than worked out in the flow, because the row
