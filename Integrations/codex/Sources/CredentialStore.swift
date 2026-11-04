@@ -87,8 +87,8 @@ enum CredentialStore {
 
     /// TOML scalar text before any trailing inline comment.
     ///
-    /// Quoted values keep the text through the matching closer; unquoted values
-    /// stop at the first `#`.
+    /// Quoted values keep the text through the matching closer (`"`/`'` or
+    /// `"""`/`'''`); unquoted values stop at the first `#`.
     private static func tomlScalarValue(_ raw: String) -> String {
         let value = raw.trimmingCharacters(in: .whitespaces)
         guard let first = value.first, first == "\"" || first == "'" else {
@@ -97,11 +97,22 @@ enum CredentialStore {
             }
             return value
         }
-        let afterOpen = value.index(after: value.startIndex)
-        guard let close = value[afterOpen...].firstIndex(of: first) else {
-            return String(value[afterOpen...])
+        let quote = String(first)
+        let triple = String(repeating: quote, count: 3)
+        let delimiter: String
+        let afterOpen: String.Index
+        if value.hasPrefix(triple) {
+            delimiter = triple
+            afterOpen = value.index(value.startIndex, offsetBy: 3)
+        } else {
+            delimiter = quote
+            afterOpen = value.index(after: value.startIndex)
         }
-        return String(value[afterOpen ..< close])
+        let remainder = value[afterOpen...]
+        if let close = remainder.range(of: delimiter) {
+            return String(remainder[..<close.lowerBound])
+        }
+        return String(remainder)
     }
 
     /// The credential JSON from the keychain, or nil when there is none.
