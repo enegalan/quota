@@ -129,7 +129,7 @@ public enum ElectronSafeStorage {
         guard status == kCCSuccess else {
             throw ElectronSafeStorageError.decryptFailed
         }
-        output.removeSubrange(outputLength..<output.count)
+        output.removeSubrange(outputLength ..< output.count)
         return output
     }
 }
