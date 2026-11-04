@@ -218,6 +218,39 @@ struct ProtocolShapeTests {
         let data = try PluginJSON.encoder.encode(descriptor)
         #expect(try PluginJSON.decoder.decode(ProviderDescriptor.self, from: data) == descriptor)
     }
+
+    @Test("A descriptor keeps the limits its integration declared")
+    func descriptorKeepsLimits() throws {
+        let limits = [
+            ProviderLimit(
+                id: "five_hour",
+                name: "5-hour session",
+                menuBarLabel: "5h",
+                shownWhenUnavailable: true
+            ),
+        ]
+        let descriptor = ProviderDescriptor(
+            id: "claude",
+            displayName: "Claude Code",
+            description: "Usage.",
+            capabilities: [],
+            protocolRange: PluginProtocolConstants.hostRange,
+            limits: limits
+        )
+        let data = try PluginJSON.encoder.encode(descriptor)
+        #expect(try PluginJSON.decoder.decode(ProviderDescriptor.self, from: data) == descriptor)
+    }
+
+    @Test("A descriptor written before limits existed still decodes")
+    func descriptorWithoutLimitsDecodes() throws {
+        let json = """
+        {"id":"mock","displayName":"Mock","description":"Invented numbers.",\
+        "capabilities":32,"protocolRange":{"minimum":"1.0.0","maximum":"1.9.0"}}
+        """
+        let decoded = try PluginJSON.decoder.decode(ProviderDescriptor.self, from: Data(json.utf8))
+        #expect(decoded.id == "mock")
+        #expect(decoded.limits.isEmpty)
+    }
 }
 
 @Suite("Protocol discrimination")

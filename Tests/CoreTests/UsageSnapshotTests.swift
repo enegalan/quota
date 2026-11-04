@@ -96,4 +96,17 @@ struct UsageSnapshotTests {
         let data = try JSONEncoder().encode(value)
         #expect(try JSONDecoder().decode(UsageSnapshot.self, from: data) == value)
     }
+
+    @Test("A reading stored before limits were declared decodes with none")
+    func decodingOmitsKnownLimits() throws {
+        let json = """
+        {"updatedAt":1757956800,
+         "buckets":[
+           {"id":"a","displayName":"A","usagePercentage":1.0,
+            "period":{"start":1756684800,"end":1759190399}}]}
+        """
+        let decoded = try JSONDecoder().decode(UsageSnapshot.self, from: Data(json.utf8))
+        #expect(decoded.knownLimits.isEmpty)
+        #expect(decoded.buckets.map(\.id) == ["a"])
+    }
 }

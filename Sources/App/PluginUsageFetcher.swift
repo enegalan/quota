@@ -105,7 +105,8 @@ struct PluginUsageFetcher: UsageFetching {
             return normalise(
                 result,
                 at: now,
-                suggestion: descriptor.suggestedRefreshIntervalSeconds
+                suggestion: descriptor.suggestedRefreshIntervalSeconds,
+                limits: descriptor.limits
             )
         } catch let error as ProviderError {
             return .failure(Self.failure(error.code, at: now))
@@ -140,10 +141,15 @@ struct PluginUsageFetcher: UsageFetching {
     private func normalise(
         _ result: UsageResult,
         at now: Date,
-        suggestion: Double?
+        suggestion: Double?,
+        limits: [ProviderLimit]
     ) -> UsageFetchOutcome {
         do {
-            let snapshot = try SnapshotNormaliser.snapshot(from: result, recordedAt: now)
+            let snapshot = try SnapshotNormaliser.snapshot(
+                from: result,
+                recordedAt: now,
+                limits: limits
+            )
             return .success(snapshot, suggestedRefreshInterval: suggestion)
         } catch let error as NormalisationError {
             return .failure(Self.failure(error.code, at: now))

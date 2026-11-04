@@ -1,4 +1,5 @@
 import Foundation
+import PluginKit
 
 /// Named values for the JetBrains AI Assistant provider plugin.
 enum JetBrainsConstants {
@@ -45,6 +46,11 @@ enum JetBrainsConstants {
     static let planBucketDisplayName = "Monthly credits"
     static let topUpBucketID = "topup"
     static let topUpBucketDisplayName = "Top-up credits"
+
+    static let limits: [ProviderLimit] = [
+        ProviderLimit(id: planBucketID, name: planBucketDisplayName),
+        ProviderLimit(id: topUpBucketID, name: topUpBucketDisplayName),
+    ]
 
     /// JetBrains stores 1 displayed credit as this many internal units.
     static let unitsPerCredit: Double = 100_000

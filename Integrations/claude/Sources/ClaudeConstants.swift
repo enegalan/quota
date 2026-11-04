@@ -1,4 +1,5 @@
 import Foundation
+import PluginKit
 
 /// Named values for the Claude provider plugin.
 enum ClaudeConstants {
@@ -62,6 +63,8 @@ enum ClaudeConstants {
     static let sevenDayDisplayName = "Weekly"
     static let sevenDayOpusDisplayName = "Weekly Opus"
     static let sevenDaySonnetDisplayName = "Weekly Sonnet"
+    static let fiveHourMenuBarLabel = "5h"
+    static let sevenDayMenuBarLabel = "1w"
 
     /// The per-model weekly limits, which arrive in a list rather than under a
     /// key of their own.
@@ -72,6 +75,23 @@ enum ClaudeConstants {
     static let extraUsageKey = "extra_usage"
     static let extraUsageBucketID = "extra_usage"
     static let extraUsageDisplayName = "Extra usage"
+
+    static let limits: [ProviderLimit] = [
+        ProviderLimit(
+            id: fiveHourBucketID,
+            name: fiveHourDisplayName,
+            menuBarLabel: fiveHourMenuBarLabel,
+            shownWhenUnavailable: true
+        ),
+        ProviderLimit(
+            id: sevenDayBucketID,
+            name: sevenDayDisplayName,
+            menuBarLabel: sevenDayMenuBarLabel
+        ),
+        ProviderLimit(id: sevenDayOpusBucketID, name: sevenDayOpusDisplayName),
+        ProviderLimit(id: sevenDaySonnetBucketID, name: sevenDaySonnetDisplayName),
+        ProviderLimit(id: extraUsageBucketID, name: extraUsageDisplayName),
+    ]
 
     /// How often the provider would rather not be asked again, in seconds.
     ///

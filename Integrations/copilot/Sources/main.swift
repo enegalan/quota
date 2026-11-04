@@ -16,7 +16,8 @@ struct CopilotProvider: ProviderPluginHandler {
         displayName: CopilotConstants.displayName,
         description: CopilotConstants.description,
         capabilities: [.automaticUsageRetrieval, .multipleQuotas, .automaticPeriodDetection],
-        suggestedRefreshIntervalSeconds: CopilotConstants.suggestedRefreshIntervalSeconds
+        suggestedRefreshIntervalSeconds: CopilotConstants.suggestedRefreshIntervalSeconds,
+        limits: CopilotConstants.limits
     )
 
     func connect(_ request: ConnectRequest) throws -> ConnectResult {

@@ -35,6 +35,31 @@ struct SnapshotNormaliserTests {
         #expect(snapshot.bucket(id: "primary")?.usagePercentage == 42)
         #expect(snapshot.updatedAt == recordedAt)
         #expect(snapshot.remainingPercentage == 58)
+        #expect(snapshot.knownLimits.isEmpty)
+    }
+
+    @Test("Limits declared by the integration are kept with the reading")
+    func keepsDeclaredLimits() throws {
+        let snapshot = try SnapshotNormaliser.snapshot(
+            from: UsageResult(quotas: [usage(percentage: 42)]),
+            recordedAt: recordedAt,
+            limits: [
+                ProviderLimit(
+                    id: "five_hour",
+                    name: "5-hour session",
+                    menuBarLabel: "5h",
+                    shownWhenUnavailable: true
+                ),
+            ]
+        )
+        #expect(snapshot.knownLimits == [
+            KnownLimit(
+                id: "five_hour",
+                name: "5-hour session",
+                menuBarLabel: "5h",
+                shownWhenUnavailable: true
+            ),
+        ])
     }
 
     @Test("Every bucket of a multi-pool provider is kept")

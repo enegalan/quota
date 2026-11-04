@@ -2,7 +2,7 @@ import Core
 import Platform
 import SwiftUI
 
-/// The menu bar item shows today's allowance and the provider's selected limits.
+/// The menu bar item shows today's allowance and each integration's selected limits.
 struct MenuBarLabel: View {
     /// The presentation the label speaks for, either handed in (for tests) or
     /// read live from the model (for the status item). Holding the model here
@@ -38,15 +38,16 @@ struct MenuBarLabel: View {
             presentation.map { [$0] } ?? []
         }
 
-        var seenProviders = Set<String>()
+        var seenIntegrations = Set<String>()
         return candidates.compactMap { candidate in
-            let providerID = candidate.summary.quota.providerID.rawValue
-            guard !options.hiddenProviders.contains(providerID), seenProviders.insert(providerID).inserted else {
-                return nil
-            }
-            guard let selected = options.selectedQuotas[providerID] else { return candidate }
-            return candidates.first { $0.id == selected && $0.summary.quota.providerID.rawValue == providerID }
-                ?? candidate
+            let integrationID = candidate.summary.quota.providerID.rawValue
+            guard !options.hiddenIntegrations.contains(integrationID),
+                  seenIntegrations.insert(integrationID).inserted
+            else { return nil }
+            guard let selected = options.selectedQuotas[integrationID] else { return candidate }
+            return candidates.first {
+                $0.id == selected && $0.summary.quota.providerID.rawValue == integrationID
+            } ?? candidate
         }
     }
 
@@ -110,30 +111,56 @@ struct MenuBarLabel: View {
     }
 
     private func figures(for presentation: QuotaPresentation) -> String {
-        let providerID = presentation.summary.quota.providerID.rawValue
+        let integrationID = presentation.summary.quota.providerID.rawValue
         let buckets = presentation.summary.snapshot?.buckets ?? []
-        let visible = buckets.filter { !(options.hiddenBuckets[providerID] ?? []).contains($0.id) }
+        let limits = presentation.summary.snapshot?.knownLimits ?? []
+        let hidden = options.hiddenBuckets[integrationID] ?? []
+        let visible = buckets.filter { !hidden.contains($0.id) }
         var labels = visible.map { bucket in
-            let label = Self.windowLabel(for: bucket)
-            let ambiguous = buckets.filter { Self.windowLabel(for: $0) == label }.count > 1
+            let label = menuBarLabel(for: bucket, limits: limits)
+            let name = sharesLabel(label, besides: bucket.id, among: buckets, limits: limits)
+                ? bucket.displayName
+                : label
             let figures = values(used: bucket.usagePercentage, remaining: 100 - bucket.usagePercentage)
-            return "\(ambiguous ? bucket.displayName : label) \(figures)"
+            return "\(name) \(figures)"
         }
-        for limit in MenuBarLimits.known(for: providerID) where
-            !buckets.contains(where: { $0.id == limit.id })
-            && (options.shownUnavailableBuckets[providerID] ?? []).contains(limit.id)
-            && !(options.hiddenBuckets[providerID] ?? []).contains(limit.id)
-        {
-            labels.append("\(limit.shortName) \(values(used: nil, remaining: nil))")
+        for limit in limits where isMissing(limit, from: buckets) && shows(limit, integrationID: integrationID) {
+            labels.append("\(limit.menuBarLabel) \(values(used: nil, remaining: nil))")
         }
         var result: [String] = []
-        if options.showDailyQuota, !options.hiddenDailyProviders.contains(providerID) {
+        if options.showDailyQuota, !options.hiddenDailyIntegrations.contains(integrationID) {
             let allowance = presentation.summary.todayAllowance
             let remaining = allowance.flatMap { value in value.usedToday.map { max(0, value.suggested - $0) } }
             let daily = values(used: allowance?.usedToday, remaining: remaining)
             result.append("Today \(daily)")
         }
         return (result + labels).joined(separator: "  ")
+    }
+
+    private func isMissing(_ limit: KnownLimit, from buckets: [UsageBucket]) -> Bool {
+        !buckets.contains { $0.id == limit.id }
+    }
+
+    private func shows(_ limit: KnownLimit, integrationID: String) -> Bool {
+        let hidden = options.hiddenBuckets[integrationID] ?? []
+        guard !hidden.contains(limit.id) else { return false }
+        let chosen = options.shownUnavailableBuckets[integrationID] ?? []
+        return chosen.contains(limit.id) || limit.shownWhenUnavailable
+    }
+
+    private func menuBarLabel(for bucket: UsageBucket, limits: [KnownLimit]) -> String {
+        limits.first { $0.id == bucket.id }?.menuBarLabel ?? bucket.displayName
+    }
+
+    private func sharesLabel(
+        _ label: String,
+        besides bucketID: String,
+        among buckets: [UsageBucket],
+        limits: [KnownLimit]
+    ) -> Bool {
+        buckets.contains { bucket in
+            bucket.id != bucketID && menuBarLabel(for: bucket, limits: limits) == label
+        }
     }
 
     private func values(used: Double?, remaining: Double?) -> String {
@@ -144,17 +171,6 @@ struct MenuBarLabel: View {
         case .remaining: return remainingText
         case .both: return "\(usedText) / \(remainingText)"
         }
-    }
-
-    static func windowLabel(for bucket: UsageBucket) -> String {
-        let hours = bucket.period.end.timeIntervalSince(bucket.period.start) / 3600
-        if bucket.displayName == "5-hour session", abs(hours - 5) < 0.02 {
-            return "5h"
-        }
-        if bucket.displayName == "Weekly", abs(hours - 168) < 0.02 {
-            return "1w"
-        }
-        return bucket.displayName
     }
 
     /// The label as text, for an allowance and a formatter.

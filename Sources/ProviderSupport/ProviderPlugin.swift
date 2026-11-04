@@ -52,7 +52,8 @@ public extension ProviderDescriptor {
         displayName: String,
         description: String,
         capabilities: ProviderCapabilities = [],
-        suggestedRefreshIntervalSeconds: Double? = nil
+        suggestedRefreshIntervalSeconds: Double? = nil,
+        limits: [ProviderLimit] = []
     ) {
         self.init(
             id: id,
@@ -60,7 +61,8 @@ public extension ProviderDescriptor {
             description: description,
             capabilities: capabilities,
             protocolRange: PluginProtocolConstants.hostRange,
-            suggestedRefreshIntervalSeconds: suggestedRefreshIntervalSeconds
+            suggestedRefreshIntervalSeconds: suggestedRefreshIntervalSeconds,
+            limits: limits
         )
     }
 }

@@ -9,10 +9,10 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
     public var showLogos = true
     public var showDailyQuota = true
     public var valueMode: ValueMode = .both
-    public var hiddenProviders: Set<String> = []
-    public var hiddenDailyProviders: Set<String> = []
+    public var hiddenIntegrations: Set<String> = []
+    public var hiddenDailyIntegrations: Set<String> = []
     public var hiddenBuckets: [String: Set<String>] = [:]
-    public var shownUnavailableBuckets: [String: Set<String>] = ["claude": ["five_hour"]]
+    public var shownUnavailableBuckets: [String: Set<String>] = [:]
     public var selectedQuotas: [String: UUID] = [:]
 
     public init() {}
@@ -22,14 +22,16 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
         showLogos = try values.decodeIfPresent(Bool.self, forKey: .showLogos) ?? true
         showDailyQuota = try values.decodeIfPresent(Bool.self, forKey: .showDailyQuota) ?? true
         valueMode = try values.decodeIfPresent(ValueMode.self, forKey: .valueMode) ?? .both
-        hiddenProviders = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenProviders) ?? []
-        hiddenDailyProviders = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenDailyProviders) ?? []
+        hiddenIntegrations = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenIntegrations) ?? []
+        hiddenDailyIntegrations = try values.decodeIfPresent(
+            Set<String>.self,
+            forKey: .hiddenDailyIntegrations
+        ) ?? []
         hiddenBuckets = try values.decodeIfPresent([String: Set<String>].self, forKey: .hiddenBuckets) ?? [:]
         shownUnavailableBuckets = try values.decodeIfPresent(
             [String: Set<String>].self,
             forKey: .shownUnavailableBuckets
-        )
-            ?? ["claude": ["five_hour"]]
+        ) ?? [:]
         selectedQuotas = try values.decodeIfPresent([String: UUID].self, forKey: .selectedQuotas) ?? [:]
     }
 }

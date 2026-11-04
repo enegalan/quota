@@ -18,7 +18,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             menuBarSettings
-            menuBarProviders
+            MenuBarIntegrationSettings(model: model)
             Section {
                 HStack(alignment: .firstTextBaseline) {
                     Toggle(isOn: $notificationsEnabled) {
@@ -125,7 +125,7 @@ struct SettingsView: View {
 
     private var menuBarSettings: some View {
         Section {
-            Toggle("Show provider logos", isOn: menuBarBinding(\.showLogos))
+            Toggle("Show integration logos", isOn: menuBarBinding(\.showLogos))
             Toggle("Show daily quota", isOn: menuBarBinding(\.showDailyQuota))
             Picker("Show values", selection: menuBarBinding(\.valueMode)) {
                 Text("Used and remaining").tag(MenuBarPreferences.ValueMode.both)
@@ -138,143 +138,6 @@ struct SettingsView: View {
         } header: {
             Text("Menu Bar")
         }
-    }
-
-    private var menuBarProviders: some View {
-        Section {
-            if providerPresentations.isEmpty {
-                Text("Add a quota to choose which provider limits appear in the menu bar.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(providerPresentations) { presentation in
-                    providerSettings(presentation)
-                }
-            }
-        } header: {
-            Text("Provider Limits")
-        } footer: {
-            Text("Choose the limits to display for each provider. Available limits depend on your plan.")
-        }
-    }
-
-    private var providerPresentations: [QuotaPresentation] {
-        var seen = Set<String>()
-        return model.presentations.filter {
-            seen.insert($0.summary.quota.providerID.rawValue).inserted
-        }
-    }
-
-    private func providerSettings(_ presentation: QuotaPresentation) -> some View {
-        let providerID = presentation.summary.quota.providerID.rawValue
-        let quotas = model.presentations.filter { $0.summary.quota.providerID.rawValue == providerID }
-        let selected = quotas.first { $0.id == model.menuBarPreferences.selectedQuotas[providerID] }
-            ?? (model.primaryPresentation.flatMap { primary in quotas.first { $0.id == primary.id } })
-            ?? presentation
-        let buckets = selected.summary.snapshot?.buckets ?? []
-        let unavailable = MenuBarLimits.known(for: providerID).filter { known in
-            !buckets.contains { $0.id == known.id }
-        }
-        return GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                Toggle("Show in menu bar", isOn: Binding(
-                    get: { !model.menuBarPreferences.hiddenProviders.contains(providerID) },
-                    set: { enabled in
-                        model.updateMenuBarPreferences {
-                            if enabled {
-                                $0.hiddenProviders.remove(providerID)
-                            } else {
-                                $0.hiddenProviders.insert(providerID)
-                            }
-                        }
-                    }
-                ))
-                .accessibilityLabel("Show \(providerID) in menu bar")
-                if !model.menuBarPreferences.hiddenProviders.contains(providerID) {
-                    if model.menuBarPreferences.showDailyQuota {
-                        Toggle("Today's planned quota", isOn: Binding(
-                            get: { !model.menuBarPreferences.hiddenDailyProviders.contains(providerID) },
-                            set: { enabled in
-                                model.updateMenuBarPreferences {
-                                    if enabled {
-                                        $0.hiddenDailyProviders.remove(providerID)
-                                    } else {
-                                        $0.hiddenDailyProviders.insert(providerID)
-                                    }
-                                }
-                            }
-                        ))
-                        .accessibilityLabel("\(providerID) today's planned quota")
-                    }
-                    if quotas.count > 1 {
-                        Picker("Planned quota", selection: Binding(
-                            get: { selected.id },
-                            set: { id in model.updateMenuBarPreferences { $0.selectedQuotas[providerID] = id } }
-                        )) {
-                            ForEach(quotas) { quota in
-                                Text(quota.summary.quota.name).tag(quota.id)
-                            }
-                        }
-                    }
-                    if !buckets.isEmpty {
-                        Text("Available limits")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    ForEach(buckets) { bucket in
-                        Toggle(bucket.displayName, isOn: limitBinding(providerID, bucket.id, available: true))
-                            .accessibilityLabel("\(providerID) \(bucket.displayName)")
-                    }
-                    if !unavailable.isEmpty {
-                        DisclosureGroup("Unavailable limits (\(unavailable.count))") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(
-                                    "These limits may be unavailable for your plan or missing from the latest update. Selected limits show a dash until data is available."
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                ForEach(unavailable) { limit in
-                                    Toggle(limit.name, isOn: limitBinding(providerID, limit.id, available: false))
-                                        .accessibilityLabel("\(providerID) \(limit.name), unavailable")
-                                }
-                            }
-                            .padding(.top, 8)
-                        }
-                    }
-                    if buckets.isEmpty {
-                        Text("No limits reported in the latest update.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-            HStack(spacing: 8) {
-                ProviderMark(providerID: providerID, size: 18, sizesNativeImage: true)
-                Text(model.sections.listing(id: providerID)?.displayName ?? presentation.summary.quota.name)
-                    .font(.headline)
-            }
-        }
-    }
-
-    private func limitBinding(_ providerID: String, _ bucketID: String, available: Bool) -> Binding<Bool> {
-        Binding(
-            get: {
-                let preferences = model.menuBarPreferences
-                return !(preferences.hiddenBuckets[providerID] ?? []).contains(bucketID)
-                    && (available || (preferences.shownUnavailableBuckets[providerID] ?? []).contains(bucketID))
-            },
-            set: { enabled in
-                model.updateMenuBarPreferences {
-                    if enabled {
-                        $0.hiddenBuckets[providerID, default: []].remove(bucketID)
-                        $0.shownUnavailableBuckets[providerID, default: []].insert(bucketID)
-                    } else {
-                        $0.hiddenBuckets[providerID, default: []].insert(bucketID)
-                        $0.shownUnavailableBuckets[providerID, default: []].remove(bucketID)
-                    }
-                }
-            }
-        )
     }
 
     private func menuBarBinding<Value>(_ keyPath: WritableKeyPath<MenuBarPreferences, Value>) -> Binding<Value> {

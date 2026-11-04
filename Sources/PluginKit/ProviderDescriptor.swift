@@ -30,13 +30,20 @@ public struct ProviderDescriptor: Codable, Sendable, Equatable {
     /// the app is the one that has to answer for the requests.
     public let suggestedRefreshIntervalSeconds: Double?
 
+    /// Every limit this integration meters, including ones a reading may omit.
+    ///
+    /// Empty for a plugin built before it had any to declare. A missing key is
+    /// that case, not a plugin that failed to answer.
+    public let limits: [ProviderLimit]
+
     public init(
         id: String,
         displayName: String,
         description: String,
         capabilities: ProviderCapabilities = [],
         protocolRange: ProtocolRange,
-        suggestedRefreshIntervalSeconds: Double? = nil
+        suggestedRefreshIntervalSeconds: Double? = nil,
+        limits: [ProviderLimit] = []
     ) {
         self.id = id
         self.displayName = displayName
@@ -44,6 +51,49 @@ public struct ProviderDescriptor: Codable, Sendable, Equatable {
         self.capabilities = capabilities
         self.protocolRange = protocolRange
         self.suggestedRefreshIntervalSeconds = suggestedRefreshIntervalSeconds
+        self.limits = limits
+    }
+}
+
+public extension ProviderDescriptor {
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case displayName
+        case description
+        case capabilities
+        case protocolRange
+        case suggestedRefreshIntervalSeconds
+        case limits
+    }
+
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            id: values.decode(String.self, forKey: .id),
+            displayName: values.decode(String.self, forKey: .displayName),
+            description: values.decode(String.self, forKey: .description),
+            capabilities: values.decode(ProviderCapabilities.self, forKey: .capabilities),
+            protocolRange: values.decode(ProtocolRange.self, forKey: .protocolRange),
+            suggestedRefreshIntervalSeconds: values.decodeIfPresent(
+                Double.self,
+                forKey: .suggestedRefreshIntervalSeconds
+            ),
+            limits: values.decodeIfPresent([ProviderLimit].self, forKey: .limits) ?? []
+        )
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(displayName, forKey: .displayName)
+        try values.encode(description, forKey: .description)
+        try values.encode(capabilities, forKey: .capabilities)
+        try values.encode(protocolRange, forKey: .protocolRange)
+        try values.encodeIfPresent(
+            suggestedRefreshIntervalSeconds,
+            forKey: .suggestedRefreshIntervalSeconds
+        )
+        try values.encode(limits, forKey: .limits)
     }
 }
 

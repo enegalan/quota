@@ -16,7 +16,8 @@ struct ClaudeProvider: ProviderPluginHandler {
         displayName: ClaudeConstants.displayName,
         description: ClaudeConstants.description,
         capabilities: [.automaticUsageRetrieval, .multipleQuotas, .automaticPeriodDetection],
-        suggestedRefreshIntervalSeconds: ClaudeConstants.suggestedRefreshIntervalSeconds
+        suggestedRefreshIntervalSeconds: ClaudeConstants.suggestedRefreshIntervalSeconds,
+        limits: ClaudeConstants.limits
     )
 
     func connect(_ request: ConnectRequest) throws -> ConnectResult {

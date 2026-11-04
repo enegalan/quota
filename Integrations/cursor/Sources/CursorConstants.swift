@@ -1,4 +1,5 @@
 import Foundation
+import PluginKit
 
 /// Named values for the Cursor provider plugin.
 enum CursorConstants {
@@ -52,6 +53,11 @@ enum CursorConstants {
     static let apiBucketDisplayName = "API / named models"
     static let planExternalID = "cursor-plan"
     static let apiExternalID = "cursor-api"
+
+    static let limits: [ProviderLimit] = [
+        ProviderLimit(id: planBucketID, name: planBucketDisplayName),
+        ProviderLimit(id: apiBucketID, name: apiBucketDisplayName),
+    ]
 
     /// Validated by the spike poll; clamped by the host to its own bounds.
     static let suggestedRefreshIntervalSeconds = 300.0

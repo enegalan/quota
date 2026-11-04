@@ -1,4 +1,5 @@
 import Foundation
+import PluginKit
 
 /// Named values for the Antigravity provider plugin.
 enum AntigravityConstants {
@@ -34,6 +35,11 @@ enum AntigravityConstants {
     static let creditsBucketDisplayName = "AI credits"
     static let planBucketID = "plan"
     static let planBucketDisplayName = "Plan usage"
+
+    static let limits: [ProviderLimit] = [
+        ProviderLimit(id: creditsBucketID, name: creditsBucketDisplayName),
+        ProviderLimit(id: planBucketID, name: planBucketDisplayName),
+    ]
 
     /// How often the provider would rather not be asked again, in seconds.
     static let suggestedRefreshIntervalSeconds = 300.0

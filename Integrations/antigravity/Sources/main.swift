@@ -16,7 +16,8 @@ struct AntigravityProvider: ProviderPluginHandler {
         displayName: AntigravityConstants.displayName,
         description: AntigravityConstants.description,
         capabilities: [.automaticUsageRetrieval, .multipleQuotas],
-        suggestedRefreshIntervalSeconds: AntigravityConstants.suggestedRefreshIntervalSeconds
+        suggestedRefreshIntervalSeconds: AntigravityConstants.suggestedRefreshIntervalSeconds,
+        limits: AntigravityConstants.limits
     )
 
     func connect(_ request: ConnectRequest) throws -> ConnectResult {
