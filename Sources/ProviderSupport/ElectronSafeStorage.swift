@@ -34,7 +34,7 @@ public enum ElectronSafeStorage {
     private static let iterations: UInt32 = 1003
     private static let keyLength = 16
     private static let versionPrefix = Data("v10".utf8)
-    private static let iv = Data(repeating: UInt8(ascii: " "), count: kCCBlockSizeAES128)
+    private static let aesIV = Data(repeating: UInt8(ascii: " "), count: kCCBlockSizeAES128)
 
     /// Prefix Cursor writes in front of the base64 OSCrypt blob.
     public static let cursorValuePrefix = "cursor-safe-storage:v1:"
@@ -108,7 +108,7 @@ public enum ElectronSafeStorage {
         let status = output.withUnsafeMutableBytes { outputBytes in
             ciphertext.withUnsafeBytes { cipherBytes in
                 key.withUnsafeBytes { keyBytes in
-                    iv.withUnsafeBytes { ivBytes in
+                    aesIV.withUnsafeBytes { ivBytes in
                         CCCrypt(
                             CCOperation(kCCDecrypt),
                             CCAlgorithm(kCCAlgorithmAES),
