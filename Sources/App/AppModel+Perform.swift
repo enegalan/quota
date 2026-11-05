@@ -13,7 +13,11 @@ extension AppModel {
     /// reload clears whatever error was on screen — and an action that failed
     /// with the reason in the banner and then a reload that wiped it is an
     /// action that failed with no reason at all.
-    func perform(_ action: @escaping @Sendable () async throws -> Void) async {
+    ///
+    /// Returns whether the action itself succeeded, so callers that must not
+    /// clean up after a failed write can leave related preferences alone.
+    @discardableResult
+    func perform(_ action: @escaping @Sendable () async throws -> Void) async -> Bool {
         var failure: Error?
         do {
             try await action()
@@ -22,6 +26,7 @@ extension AppModel {
         }
         await load()
         lastError = failure?.localizedDescription
+        return failure == nil
     }
 
     /// `perform`, for an action that has a provider busy while it runs.
