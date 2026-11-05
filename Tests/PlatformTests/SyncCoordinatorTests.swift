@@ -204,5 +204,4 @@ struct SyncCoordinatorTests {
         let stored = try #require(await harness.quotas.quota(id: typed.id))
         #expect(stored.name == "Work")
     }
-
 }
