@@ -48,10 +48,14 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         showLogos = try values.decodeIfPresent(Bool.self, forKey: .showLogos) ?? true
         showDailyQuota = try values.decodeIfPresent(Bool.self, forKey: .showDailyQuota) ?? true
-        showAvailableLimits = try values.decodeIfPresent(
-            Bool.self,
-            forKey: .showAvailableLimits
-        ) ?? false
+        // A missing key is not the same as false: older documents without the
+        // field kept a figure by showing limits whenever today's allowance was
+        // off. An explicit false still means off.
+        if values.contains(.showAvailableLimits) {
+            showAvailableLimits = try values.decode(Bool.self, forKey: .showAvailableLimits)
+        } else {
+            showAvailableLimits = !showDailyQuota
+        }
         valueMode = try values.decodeIfPresent(ValueMode.self, forKey: .valueMode) ?? .both
         hiddenIntegrations = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenIntegrations) ?? []
         // Before limits were off by default the only chosen set was the one for
@@ -171,15 +175,34 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
     }
 
     /// The limits of one integration the menu bar draws.
+    ///
+    /// Saved IDs that the integration no longer declares are dropped. When
+    /// nothing declared remains, the first declared limit stands in — not
+    /// today's allowance, which has its own switch.
     private func effectiveLimitIDs(
         integrationID: String,
         availableLimitIDs: [String]
     ) -> Set<String> {
         guard showAvailableLimits else { return [] }
+        let declared = Set(availableLimitIDs)
         if let chosen = shownBuckets[integrationID], !chosen.isEmpty {
-            return chosen
+            let retained = chosen.intersection(declared)
+            if !retained.isEmpty {
+                return retained
+            }
         }
         return availableLimitIDs.first.map { [$0] } ?? []
+    }
+
+    /// Drops a deleted quota from every integration's daily list.
+    ///
+    /// Empty lists keep falling back to the planned quota in
+    /// `effectiveDailyQuotaIDs`, so `canHideDailyQuota` only counts IDs that
+    /// still exist.
+    public mutating func deleteQuota(_ id: UUID) {
+        for integrationID in dailyQuotas.keys {
+            dailyQuotas[integrationID]?.remove(id)
+        }
     }
 
     /// Whether this quota's today's allowance belongs in the menu bar.

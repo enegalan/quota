@@ -169,10 +169,12 @@ struct InstallerTests {
         let providers = directory.appendingPathComponent(
             BundleConstants.providersDirectoryName, isDirectory: true
         )
-        // A second archive under the same version. Each packaging run produces
-        // different bytes (staging paths and timestamps), so the content hash
-        // moves even though the version number does not.
-        let secondBytes = try PluginArtifact.archive(identifier: InstallerFixture.id)
+        // A second archive under the same version with different executable
+        // contents, so the content hash moves even though the version does not.
+        let secondBytes = try PluginArtifact.archive(
+            identifier: InstallerFixture.id,
+            contents: "#!/bin/sh\nexit 1\n"
+        )
         #expect(secondBytes != firstBytes)
         try secondBytes.write(
             to: providers.appendingPathComponent(

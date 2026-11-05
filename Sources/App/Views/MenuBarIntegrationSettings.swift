@@ -208,13 +208,15 @@ struct IntegrationSlice {
         selected.summary.snapshot?.buckets ?? []
     }
 
-    var availableLimitIDs: [String] {
-        buckets.map(\.id)
-    }
-
     var unavailable: [KnownLimit] {
         let known = selected.summary.snapshot?.knownLimits ?? []
         return known.filter { limit in !buckets.contains { $0.id == limit.id } }
+    }
+
+    /// Declared limit IDs: those in the reading, then ones the integration
+    /// named that this reading omitted.
+    var availableLimitIDs: [String] {
+        buckets.map(\.id) + unavailable.map(\.id)
     }
 
     var shownInMenuBar: Binding<Bool> {

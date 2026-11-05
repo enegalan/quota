@@ -55,11 +55,12 @@ extension AppModel {
     /// keeps yesterday's plugin and a rename like Cursor Models → Included
     /// Models never reaches a reading. Failures are swallowed: a missing
     /// bundled artifact or a handshake that fails must not block launch.
-    func refreshBundledProviderBinaries() async {
+    /// Providers the user switched off are left alone.
+    func refreshBundledProviderBinaries(preferences: Preferences) async {
         for provider in environment.manager.available {
-            guard let previous = try? await environment.installed.provider(provider.id) else {
-                continue
-            }
+            guard !preferences.disabledProviders.contains(provider.id),
+                  let previous = try? await environment.installed.provider(provider.id)
+            else { continue }
             do {
                 _ = try await environment.installer.update(
                     provider,

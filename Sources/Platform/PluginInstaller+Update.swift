@@ -24,22 +24,22 @@ extension PluginInstaller {
         // that kept its version number — refuse that as "already installed"
         // and the machine keeps running yesterday's binary after every local
         // rebuild that did not bump the app version.
+        var preservedSameVersion: URL?
         if previous.version == provider.version, isActive(provider.id, at: provider.version) {
             let artifact = try await fetch(provider.id)
             if Self.sha256(artifact) == previous.contentHash {
                 return previous
             }
-            let destination = PluginLayout.versionDirectory(
-                provider.id, provider.version, in: pluginsDirectory
-            )
-            try FileManager.default.removeItem(at: destination)
+            preservedSameVersion = try moveActiveAside(provider)
         }
 
-        let previousDirectory = PluginLayout.activeVersionDirectory(provider.id, in: pluginsDirectory)
+        let previousDirectory = preservedSameVersion
+            ?? PluginLayout.activeVersionDirectory(provider.id, in: pluginsDirectory)
         let record: InstalledProvider
         do {
             record = try await install(provider)
         } catch {
+            try restorePreservedSameVersion(preservedSameVersion, provider: provider)
             try await repository.update(provider.id) { _ in
                 replacing(previous, state: previous.state, lastError: .pluginError)
             }
@@ -48,25 +48,75 @@ extension PluginInstaller {
         do {
             try await verifyTwice(verify, record: record)
         } catch {
-            // Roll back to what was there: the directory is still intact, because
-            // activation added a symlink rather than replacing anything.
-            try restoreSymlink(provider.id, to: previousDirectory)
-            try? FileManager.default.removeItem(
-                at: PluginLayout.versionDirectory(provider.id, provider.version, in: pluginsDirectory)
-            )
-            // The old version is running and stays launchable, and the record
-            // says so: the user asked for something that did not happen, and a
-            // record reading "installed" would leave them wondering why the
-            // version in the interface never moved. The state it had is kept,
-            // because the provider it describes is still the one that works.
-            try await repository.save(
-                replacing(previous, state: previous.state, lastError: .pluginError)
+            try await rollbackFailedVerification(
+                provider: provider,
+                previous: previous,
+                previousDirectory: previousDirectory,
+                preservedSameVersion: preservedSameVersion
             )
             throw error
+        }
+        if let preserved = preservedSameVersion {
+            try? FileManager.default.removeItem(at: preserved)
         }
         let connected = replacing(record, state: previous.state, lastError: nil)
         try await repository.save(connected)
         return connected
+    }
+
+    /// Moves the live version directory aside so a same-version rebuild can
+    /// install into the freed path without deleting yesterday's bytes yet.
+    private func moveActiveAside(_ provider: AvailableProvider) throws -> URL {
+        let destination = PluginLayout.versionDirectory(
+            provider.id, provider.version, in: pluginsDirectory
+        )
+        let preserved = destination.deletingLastPathComponent()
+            .appendingPathComponent(
+                "\(provider.version.description).previous-\(UUID().uuidString)"
+            )
+        try FileManager.default.moveItem(at: destination, to: preserved)
+        return preserved
+    }
+
+    /// Puts a same-version directory back when install failed before verify.
+    private func restorePreservedSameVersion(
+        _ preserved: URL?,
+        provider: AvailableProvider
+    ) throws {
+        guard let preserved else { return }
+        let destination = PluginLayout.versionDirectory(
+            provider.id, provider.version, in: pluginsDirectory
+        )
+        try? FileManager.default.removeItem(at: destination)
+        try? FileManager.default.moveItem(at: preserved, to: destination)
+        try restoreSymlink(provider.id, to: destination)
+    }
+
+    /// Restores the previous binary after a handshake failure and records it.
+    private func rollbackFailedVerification(
+        provider: AvailableProvider,
+        previous: InstalledProvider,
+        previousDirectory: URL?,
+        preservedSameVersion: URL?
+    ) async throws {
+        if let preserved = preservedSameVersion {
+            try restorePreservedSameVersion(preserved, provider: provider)
+        } else {
+            try restoreSymlink(provider.id, to: previousDirectory)
+            try? FileManager.default.removeItem(
+                at: PluginLayout.versionDirectory(
+                    provider.id, provider.version, in: pluginsDirectory
+                )
+            )
+        }
+        // The old version is running and stays launchable, and the record
+        // says so: the user asked for something that did not happen, and a
+        // record reading "installed" would leave them wondering why the
+        // version in the interface never moved. The state it had is kept,
+        // because the provider it describes is still the one that works.
+        try await repository.save(
+            replacing(previous, state: previous.state, lastError: .pluginError)
+        )
     }
 
     /// Runs the check that a new version answers, once more if the first

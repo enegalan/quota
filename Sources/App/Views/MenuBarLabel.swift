@@ -124,7 +124,9 @@ struct MenuBarLabel: View {
         let integrationID = presentation.summary.quota.providerID.rawValue
         let buckets = presentation.summary.snapshot?.buckets ?? []
         let limits = presentation.summary.snapshot?.knownLimits ?? []
-        let availableLimitIDs = buckets.map(\.id)
+        // Declared IDs include limits this reading omitted, so a saved choice
+        // for a missing limit still reconciles and can be drawn below.
+        let availableLimitIDs = declaredLimitIDs(buckets: buckets, limits: limits)
         let visible = buckets.filter {
             options.showsLimit(
                 $0.id,
@@ -197,6 +199,13 @@ struct MenuBarLabel: View {
             $0.summary.quota.providerID.rawValue == integrationID
         } ?? []
         return siblings.isEmpty ? [fallback] : siblings
+    }
+
+    /// Bucket IDs first, then declared limits this reading did not carry.
+    private func declaredLimitIDs(buckets: [UsageBucket], limits: [KnownLimit]) -> [String] {
+        buckets.map(\.id) + limits.map(\.id).filter { id in
+            !buckets.contains { $0.id == id }
+        }
     }
 
     /// A limit the integration declared that this reading did not carry.

@@ -47,4 +47,25 @@ struct MenuBarFigureSwitchPreferencesTests {
         #expect(preferences.showDailyQuota)
         #expect(!preferences.showAvailableLimits)
     }
+
+    @Test("A missing showAvailableLimits key follows the inverse of today's allowance")
+    func missingAvailableLimitsFollowsDaily() throws {
+        let dailyOff = try JSONDecoder().decode(
+            MenuBarPreferences.self,
+            from: Data("""
+            {"showDailyQuota":false}
+            """.utf8)
+        )
+        #expect(!dailyOff.showDailyQuota)
+        #expect(dailyOff.showAvailableLimits)
+
+        let dailyOn = try JSONDecoder().decode(
+            MenuBarPreferences.self,
+            from: Data("""
+            {"showDailyQuota":true}
+            """.utf8)
+        )
+        #expect(dailyOn.showDailyQuota)
+        #expect(!dailyOn.showAvailableLimits)
+    }
 }

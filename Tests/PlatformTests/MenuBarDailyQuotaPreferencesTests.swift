@@ -164,4 +164,40 @@ struct MenuBarDailyQuotaPreferencesTests {
         #expect(preferences.dailyQuotas.isEmpty)
         #expect(preferences.showDailyQuota)
     }
+
+    @Test("Deleting a quota removes it from every daily list")
+    func deleteQuotaClearsDailySelections() {
+        var menuBar = MenuBarPreferences()
+        let planned = UUID()
+        let other = UUID()
+        menuBar.setShowsDailyAllowance(
+            true,
+            for: other,
+            integrationID: "cursor",
+            plannedQuotaID: planned
+        )
+        menuBar.deleteQuota(other)
+
+        #expect(
+            menuBar.showsDailyAllowance(
+                quotaID: planned,
+                integrationID: "cursor",
+                plannedQuotaID: planned
+            )
+        )
+        #expect(
+            !menuBar.showsDailyAllowance(
+                quotaID: other,
+                integrationID: "cursor",
+                plannedQuotaID: planned
+            )
+        )
+        #expect(
+            !menuBar.canHideDailyQuota(
+                quotaID: planned,
+                integrationID: "cursor",
+                plannedQuotaID: planned
+            )
+        )
+    }
 }

@@ -94,4 +94,37 @@ struct MenuBarLimitPreferencesTests {
 
         #expect(preferences.showsLimit("5h", integrationID: "claude", availableLimitIDs: ["5h"]))
     }
+
+    @Test("Saved limit IDs that are no longer declared fall back to the first declared")
+    func undeclaredSelectionsFallBack() {
+        var menuBar = MenuBarPreferences()
+        menuBar.showAvailableLimits = true
+        menuBar.shownBuckets["claude"] = ["gone"]
+        let available = ["5h", "1w"]
+
+        #expect(menuBar.showsLimit("5h", integrationID: "claude", availableLimitIDs: available))
+        #expect(!menuBar.showsLimit("gone", integrationID: "claude", availableLimitIDs: available))
+    }
+
+    @Test("A declared limit missing from the reading can still be shown")
+    func missingDeclaredLimitCanShow() {
+        var menuBar = MenuBarPreferences()
+        menuBar.showAvailableLimits = true
+        let declared = ["5h", "1w"]
+        menuBar.setShowsLimit(
+            true,
+            limitID: "1w",
+            integrationID: "claude",
+            availableLimitIDs: declared
+        )
+        menuBar.setShowsLimit(
+            false,
+            limitID: "5h",
+            integrationID: "claude",
+            availableLimitIDs: declared
+        )
+
+        #expect(menuBar.showsLimit("1w", integrationID: "claude", availableLimitIDs: ["1w"]))
+        #expect(!menuBar.showsLimit("5h", integrationID: "claude", availableLimitIDs: ["1w"]))
+    }
 }

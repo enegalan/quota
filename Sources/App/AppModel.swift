@@ -145,7 +145,7 @@ final class AppModel {
             // Packaged providers can change bytes without a version bump. Refresh
             // those first so the list and the next reading speak for this build's
             // plugins rather than yesterday's still-active install.
-            await refreshBundledProviderBinaries()
+            await refreshBundledProviderBinaries(preferences: preferences)
             // The provider list is read before the quota panels, and on its own:
             // it depends on nothing but the store, and a panel that cannot be
             // built must not leave the list showing a provider that was updated
@@ -344,6 +344,7 @@ final class AppModel {
             try await self.environment.timelines.delete(quotaID: id)
             try await self.environment.plans.delete(quotaID: id)
         }
+        updateMenuBarPreferences { $0.deleteQuota(id) }
     }
 
     /// Replaces a quota's allocation policy and re-plans it.
