@@ -92,7 +92,7 @@ extension PluginInstaller {
             do {
                 try await self.verifyTwice(verify, record: record)
             } catch {
-                try self.rollbackSameVersionIncoming(paths, previous: previous)
+                try await self.rollbackSameVersionIncoming(paths, previous: previous)
                 throw error
             }
             try self.finalizeSameVersionIncoming(paths)
