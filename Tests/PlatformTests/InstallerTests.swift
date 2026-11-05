@@ -171,9 +171,10 @@ struct InstallerTests {
         )
         // A second archive under the same version with different executable
         // contents, so the content hash moves even though the version does not.
+        let replacementContents = "#!/bin/sh\nexit 1\n"
         let secondBytes = try PluginArtifact.archive(
             identifier: InstallerFixture.id,
-            contents: "#!/bin/sh\nexit 1\n"
+            contents: replacementContents
         )
         #expect(secondBytes != firstBytes)
         try secondBytes.write(
@@ -189,6 +190,16 @@ struct InstallerTests {
         )
         #expect(updated.contentHash == PluginInstaller.sha256(secondBytes))
         #expect(updated.contentHash != previous.contentHash)
+        let active = try #require(
+            PluginLayout.activeVersionDirectory(InstallerFixture.id, in: directory)
+        )
+        let installed = try String(
+            contentsOf: active.appendingPathComponent(
+                PluginLayout.executableName(for: InstallerFixture.id)
+            ),
+            encoding: .utf8
+        )
+        #expect(installed == replacementContents)
     }
 
     @Test("Uninstalling removes the provider's code and only its code")

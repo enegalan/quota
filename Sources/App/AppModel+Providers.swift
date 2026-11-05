@@ -59,7 +59,8 @@ extension AppModel {
     func refreshBundledProviderBinaries(preferences: Preferences) async {
         for provider in environment.manager.available {
             guard !preferences.disabledProviders.contains(provider.id),
-                  let previous = try? await environment.installed.provider(provider.id)
+                  let previous = try? await environment.installed.provider(provider.id),
+                  previous.version == provider.version
             else { continue }
             do {
                 _ = try await environment.installer.update(

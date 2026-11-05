@@ -82,11 +82,11 @@ final class AppModel {
     /// update had just replaced.
     private(set) var loadGeneration = 0
 
-    /// Whether this launch has already attempted a bundled-provider refresh.
+    /// The one bundled-provider refresh for this launch, if started.
     ///
-    /// Set before the refresh awaits, so overlapping `load()` calls share one
-    /// attempt and a failed refresh is not retried for the rest of the launch.
-    @ObservationIgnored private var didRefreshBundledProviderBinaries = false
+    /// Created before the first await so overlapping `load()` calls share it,
+    /// and kept after completion so a failed refresh is not retried.
+    @ObservationIgnored private var bundledProviderRefreshTask: Task<Void, Never>?
 
     /// Whether any quota exists, which is what the first-launch screen keys on.
     var isEmpty: Bool {
@@ -151,12 +151,14 @@ final class AppModel {
             // Packaged providers can change bytes without a version bump. Refresh
             // those first so the list and the next reading speak for this build's
             // plugins rather than yesterday's still-active install. Once per
-            // launch, including after failure: overlapping loads must not start
-            // another attempt.
-            if !didRefreshBundledProviderBinaries {
-                didRefreshBundledProviderBinaries = true
-                await refreshBundledProviderBinaries(preferences: preferences)
+            // launch, including after failure: every concurrent load awaits the
+            // same task before rebuilding provider state.
+            if bundledProviderRefreshTask == nil {
+                bundledProviderRefreshTask = Task {
+                    await self.refreshBundledProviderBinaries(preferences: preferences)
+                }
             }
+            await bundledProviderRefreshTask?.value
             // The provider list is read before the quota panels, and on its own:
             // it depends on nothing but the store, and a panel that cannot be
             // built must not leave the list showing a provider that was updated
@@ -348,17 +350,19 @@ final class AppModel {
     ///
     /// Deliberate: uninstalling a provider leaves quotas in place, so the
     /// only way to clear an orphaned panel is to delete the quota itself.
-    /// Menu-bar daily selection is cleared only after the delete succeeds, so a
-    /// failed deletion leaves the user's choice alone.
+    /// Menu-bar daily selection is cleared as soon as the quota row is gone, so
+    /// a later cleanup failure cannot leave a deleted quota still selected. A
+    /// failed quota delete leaves the user's choice alone.
     func deleteQuota(_ id: UUID) async {
-        let succeeded = await perform {
+        let deleted = await perform {
             try await self.environment.quotas.delete(id: id)
+        }
+        guard deleted else { return }
+        updateMenuBarPreferences { $0.deleteQuota(id) }
+        await perform {
             try await self.environment.snapshots.delete(quotaID: id)
             try await self.environment.timelines.delete(quotaID: id)
             try await self.environment.plans.delete(quotaID: id)
-        }
-        if succeeded {
-            updateMenuBarPreferences { $0.deleteQuota(id) }
         }
     }
 
