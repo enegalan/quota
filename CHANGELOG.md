@@ -7,14 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.11] - 2026-11-05
+
+### Added
+
+- Choose which limits each integration shows in the menu bar, and which quotas
+  show today's allowance. Each integration now declares the limits it meters,
+  including the short menu bar label and whether a missing limit stays visible,
+  so the menu bar no longer relies on matching display names and durations.
+- Cursor reads access tokens encrypted by Electron safeStorage, while older
+  plaintext tokens remain readable.
+- A quota's name can be edited in place from its detail view. A blank name is
+  refused, and the readings, plan, and watched limit stay put.
+
+### Changed
+
+- Quotas are named after the limit they watch, and a new quota on a provider
+  with several limits is seeded with that limit's name rather than the
+  provider's. The watched limit now appears in the detail, the list, and the
+  popover.
+- A limit already used by another quota can no longer be selected, and the
+  creation sheet scrolls its middle instead of pushing the step trail and
+  Create off screen.
+
 ### Fixed
 
 - Pin SwiftFormat to 0.64.5. Bootstrap failed after Homebrew moved past 0.64.4.
-- The quota detail, list, and popover now name the limit a quota watches. A
-  provider that meters several — Cursor's included plan and its API models —
-  no longer leaves two quotas that share the provider's name indistinguishable.
-  New quotas on a multi-limit provider are also seeded with the chosen limit's
-  name rather than the provider's.
+- Codex reads its credential storage mode from `config.toml`, defaults to
+  `file`, and handles inline comments and triple-quoted values when parsing it.
+- Credentials are only read from the Keychain when the stored token format
+  calls for it, with clearer feedback for integrations that meter several
+  limits.
+- Menu bar preference saves are serialised, so an older save can no longer
+  overwrite a newer one.
 
 ## [1.4.10] - 2026-10-29
 
