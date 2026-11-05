@@ -310,24 +310,41 @@ public struct SyncCoordinator: Sendable {
             accountLabel: accountLabel
         )
 
-        let alignedName = Self.seededNameFollowingLimitRename(
+        let next = Self.quotaAfterReading(
+            quota,
+            bucket: bucket,
+            previous: previous,
+            periodChanged: changed,
+            at: snapshot.updatedAt
+        )
+        try await quotas.save(next)
+        try await recordSuccess(snapshot, for: quota, accountLabel: accountLabel)
+        try await replan(for: next, bucket: bucket, at: snapshot.updatedAt, accountLabel: accountLabel)
+        return changed
+    }
+
+    /// The stored quota after a reading: period, timestamp, and a seeded name
+    /// that still tracked the limit's previous label.
+    static func quotaAfterReading(
+        _ quota: Quota,
+        bucket: UsageBucket,
+        previous: UsageSnapshot?,
+        periodChanged: Bool,
+        at date: Date
+    ) -> Quota {
+        let alignedName = seededNameFollowingLimitRename(
             quota: quota,
             bucket: bucket,
             previous: previous
         )
         var next = quota
         if let alignedName {
-            next = next.withName(alignedName, updatedAt: snapshot.updatedAt)
+            next = next.withName(alignedName, updatedAt: date)
         }
-        if changed {
-            next = next.withPeriod(bucket.period, updatedAt: snapshot.updatedAt)
-        } else if alignedName == nil {
-            next = next.withUpdatedAt(snapshot.updatedAt)
+        if periodChanged {
+            return next.withPeriod(bucket.period, updatedAt: date)
         }
-        try await quotas.save(next)
-        try await recordSuccess(snapshot, for: quota, accountLabel: accountLabel)
-        try await replan(for: next, bucket: bucket, at: snapshot.updatedAt, accountLabel: accountLabel)
-        return changed
+        return alignedName == nil ? next.withUpdatedAt(date) : next
     }
 
     /// The limit's current name when this quota's label still tracks that limit.
