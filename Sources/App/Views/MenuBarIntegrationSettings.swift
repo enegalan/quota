@@ -213,10 +213,14 @@ struct IntegrationSlice {
         return known.filter { limit in !buckets.contains { $0.id == limit.id } }
     }
 
-    /// Declared limit IDs: those in the reading, then ones the integration
-    /// named that this reading omitted.
+    /// Limit IDs present in the latest reading.
     var availableLimitIDs: [String] {
-        buckets.map(\.id) + unavailable.map(\.id)
+        buckets.map(\.id)
+    }
+
+    /// Declared limits this reading omitted.
+    var unavailableLimitIDs: [String] {
+        unavailable.map(\.id)
     }
 
     var shownInMenuBar: Binding<Bool> {
@@ -289,7 +293,8 @@ struct IntegrationSlice {
                 model.menuBarPreferences.showsLimit(
                     bucketID,
                     integrationID: integrationID,
-                    availableLimitIDs: availableLimitIDs
+                    availableLimitIDs: availableLimitIDs,
+                    unavailableLimitIDs: unavailableLimitIDs
                 )
             },
             set: { enabled in
@@ -298,7 +303,8 @@ struct IntegrationSlice {
                         enabled,
                         limitID: bucketID,
                         integrationID: integrationID,
-                        availableLimitIDs: availableLimitIDs
+                        availableLimitIDs: availableLimitIDs,
+                        unavailableLimitIDs: unavailableLimitIDs
                     )
                 }
             }
@@ -312,12 +318,14 @@ struct IntegrationSlice {
         let shown = preferences.showsLimit(
             limitID,
             integrationID: integrationID,
-            availableLimitIDs: availableLimitIDs
+            availableLimitIDs: availableLimitIDs,
+            unavailableLimitIDs: unavailableLimitIDs
         )
         return !shown || preferences.canHideLimit(
             limitID,
             integrationID: integrationID,
-            availableLimitIDs: availableLimitIDs
+            availableLimitIDs: availableLimitIDs,
+            unavailableLimitIDs: unavailableLimitIDs
         )
     }
 
@@ -328,7 +336,8 @@ struct IntegrationSlice {
         let shown = model.menuBarPreferences.showsLimit(
             limitID,
             integrationID: integrationID,
-            availableLimitIDs: availableLimitIDs
+            availableLimitIDs: availableLimitIDs,
+            unavailableLimitIDs: unavailableLimitIDs
         )
         return shown
             ? "Hide \(name) from the menu bar"

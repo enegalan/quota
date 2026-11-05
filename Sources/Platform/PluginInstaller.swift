@@ -70,6 +70,7 @@ public struct PluginInstaller: Sendable {
     /// directory it names is not yet in place is a record the host will resolve to
     /// an executable that is not there.
     private func performInstall(_ provider: AvailableProvider) async throws -> InstalledProvider {
+        try recoverSameVersionDebris(for: provider)
         // Claimed before the artifact is read, so an install that cannot proceed
         // is refused before it costs an unpack.
         _ = try reclaimableDestination(for: provider)
@@ -176,7 +177,7 @@ public struct PluginInstaller: Sendable {
     /// A directory that is being written to is a directory something else might
     /// read, and the only thing that should ever be readable under a version's
     /// name is a version that finished being written.
-    private func stagingDirectory(_ provider: AvailableProvider) throws -> URL {
+    func stagingDirectory(_ provider: AvailableProvider) throws -> URL {
         let root = pluginsDirectory.appendingPathComponent(
             InstallerConstants.stagingDirectoryName, isDirectory: true
         )
@@ -192,7 +193,7 @@ public struct PluginInstaller: Sendable {
     /// unpack is reported as an install error rather than as whatever error a
     /// subprocess happened to raise, and `InstallError` stays the single set of
     /// reasons the interface has to be able to word.
-    private func extract(_ artifact: Data, into directory: URL) throws -> URL {
+    func extract(_ artifact: Data, into directory: URL) throws -> URL {
         do {
             try archive.unarchive(artifact, to: directory)
         } catch {
@@ -207,7 +208,7 @@ public struct PluginInstaller: Sendable {
     /// declares, so this is the only place that knows whether the two agree — and
     /// an archive without it would install cleanly and then fail every launch
     /// afterwards, which is the worst of both outcomes.
-    private func requireExecutable(in directory: URL, id: String) throws {
+    func requireExecutable(in directory: URL, id: String) throws {
         let executable = directory.appendingPathComponent(PluginLayout.executableName(for: id))
         guard FileManager.default.fileExists(atPath: executable.path) else {
             throw InstallError.missingExecutable(id)
@@ -233,7 +234,7 @@ public struct PluginInstaller: Sendable {
     ///   the step at which activation either happened or did not, and a caller
     ///   that cannot tell those two apart will go on to write a record naming a
     ///   version that is not the one in use.
-    private func replaceSymlink(_ id: String, to directory: URL) throws {
+    func replaceSymlink(_ id: String, to directory: URL) throws {
         let link = PluginLayout.activeLink(id, in: pluginsDirectory)
         let parent = link.deletingLastPathComponent()
         // A relative target, so the plugins directory can be moved or restored
@@ -298,7 +299,7 @@ public struct PluginInstaller: Sendable {
     /// target is: the directory can be moved, restored from a backup or handed to
     /// another machine, and a record full of absolute paths stops pointing at
     /// anything the moment that happens.
-    private func relativePath(for provider: AvailableProvider) -> String {
+    func relativePath(for provider: AvailableProvider) -> String {
         "\(provider.id)/\(provider.version.description)"
     }
 

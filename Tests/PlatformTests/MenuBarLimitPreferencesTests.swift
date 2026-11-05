@@ -92,7 +92,59 @@ struct MenuBarLimitPreferencesTests {
 
         preferences.showAvailableLimits = true
 
-        #expect(preferences.showsLimit("5h", integrationID: "claude", availableLimitIDs: ["5h"]))
+        #expect(
+            preferences.showsLimit(
+                "5h",
+                integrationID: "claude",
+                availableLimitIDs: ["5h"],
+                unavailableLimitIDs: []
+            )
+        )
+    }
+
+    @Test("Legacy hidden available limits stay hidden after migration")
+    func legacyHiddenAvailableLimitsAreMigrated() throws {
+        var preferences = try JSONDecoder().decode(
+            MenuBarPreferences.self,
+            from: Data("""
+            {"hiddenBuckets":{"claude":["1w"]},"shownUnavailableBuckets":{"claude":["models"]}}
+            """.utf8)
+        )
+        preferences.showAvailableLimits = true
+        let available = ["5h", "1w"]
+        let unavailable = ["models"]
+
+        #expect(
+            preferences.showsLimit(
+                "5h",
+                integrationID: "claude",
+                availableLimitIDs: available,
+                unavailableLimitIDs: unavailable
+            )
+        )
+        #expect(
+            !preferences.showsLimit(
+                "1w",
+                integrationID: "claude",
+                availableLimitIDs: available,
+                unavailableLimitIDs: unavailable
+            )
+        )
+        #expect(
+            preferences.showsLimit(
+                "models",
+                integrationID: "claude",
+                availableLimitIDs: available,
+                unavailableLimitIDs: unavailable
+            )
+        )
+
+        preferences.materializeLegacyLimits(
+            integrationID: "claude",
+            availableLimitIDs: available,
+            unavailableLimitIDs: unavailable
+        )
+        #expect(preferences.shownBuckets["claude"] == ["5h", "models"])
     }
 
     @Test("Saved limit IDs that are no longer declared fall back to the first declared")
