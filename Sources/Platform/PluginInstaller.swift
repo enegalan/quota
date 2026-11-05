@@ -162,7 +162,9 @@ public struct PluginInstaller: Sendable {
     /// be code this application did not build and did not ship, and nothing about
     /// a file on disk or a URL says who wrote it — so a build that wanted one would
     /// have to answer for it, rather than this method quietly accepting it.
-    private func fetch(_ id: String) async throws -> Data {
+    /// The packaged bytes for `id`. Visible to the update path so a same-version
+    /// rebuild can be told apart from a no-op by its content hash.
+    func fetch(_ id: String) async throws -> Data {
         guard let artifact = try bundled.artifact(for: id) else {
             throw InstallError.notShipped(id)
         }
@@ -302,10 +304,10 @@ public struct PluginInstaller: Sendable {
 
     /// The hex SHA-256 of some bytes.
     ///
-    /// Recorded with the install so a later read can say which bytes produced this
-    /// record. Nothing compares it: with providers packaged into the application,
-    /// the trust is the application's own signature and there is no second claim
-    /// about the bytes for a digest to disagree with.
+    /// Recorded with the install and compared on update: a rebuild that kept the
+    /// same version number still has to replace yesterday's binary, and the hash
+    /// is what says the bytes changed. Trust in the bytes themselves remains the
+    /// application's signature.
     static func sha256(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }

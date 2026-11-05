@@ -8,14 +8,21 @@ struct MenuBarIntegrationSettings: View {
 
     fileprivate static let explanation = """
     Choose which quotas show today's allowance, and which limits to \
-    display. Available limits depend on your plan.
+    display. Available limits depend on your plan. Show available limits \
+    is off by default so the menu bar stays compact; switch it on to see \
+    each limit's total usage beside today's allowance.
 
     Show in menu bar includes that integration. When off, none of its \
-    figures are drawn.
+    figures are drawn. With only one integration, it stays on: Quota \
+    always shows at least one quota.
 
     Today's planned quota is the allowance for today. With more than one \
     quota, each can be included; one is labelled Today, and more than one \
-    are named. Those rows follow the Show daily quota switch.
+    are named. Those rows follow the Show daily quota switch, and each \
+    integration keeps at least one daily quota when it is on.
+
+    Each integration keeps at least one limit when Show available limits \
+    is on.
 
     The limits listed below are the ones in the latest update. Unavailable \
     limits may be missing from your plan or from that update. A selected \
@@ -86,6 +93,8 @@ private struct IntegrationLimitRowView: View {
                     }
                 }
                 .accessibilityLabel("Show \(slice.displayName) in menu bar")
+                .disabled(!slice.canToggle)
+                .help(slice.toggleHelp)
                 SettingInfoButton(explanation: MenuBarIntegrationSettings.explanation)
             }
             .padding(.top, item.separates ? LayoutMetrics.sectionSpacing : 0)
@@ -101,11 +110,15 @@ private struct IntegrationLimitRowView: View {
                         ? "\(slice.integrationID) \(title) today's planned quota"
                         : "\(slice.integrationID) today's planned quota"
                 )
+                .disabled(!slice.canToggleDailyQuota(quota.id))
+                .help(slice.dailyQuotaHelp(quota.id, title: title))
         case .limitsHeader:
             groupLabel("Available limits")
         case .limit(let bucket):
-            Toggle(bucket.displayName, isOn: slice.limitBinding(bucket.id, available: true))
+            Toggle(bucket.displayName, isOn: slice.limitBinding(bucket.id))
                 .accessibilityLabel("\(slice.integrationID) \(bucket.displayName)")
+                .disabled(!slice.canToggleLimit(bucket.id))
+                .help(slice.limitHelp(bucket.displayName, limitID: bucket.id))
         case .unavailable:
             DisclosureGroup("Unavailable limits (\(slice.unavailable.count))") {
                 VStack(alignment: .leading, spacing: LayoutMetrics.rowSpacing) {
@@ -115,15 +128,10 @@ private struct IntegrationLimitRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     ForEach(slice.unavailable) { limit in
-                        Toggle(
-                            limit.name,
-                            isOn: slice.limitBinding(
-                                limit.id,
-                                available: false,
-                                shownByDefault: limit.shownWhenUnavailable
-                            )
-                        )
-                        .accessibilityLabel("\(slice.integrationID) \(limit.name), unavailable")
+                        Toggle(limit.name, isOn: slice.limitBinding(limit.id))
+                            .accessibilityLabel("\(slice.integrationID) \(limit.name), unavailable")
+                            .disabled(!slice.canToggleLimit(limit.id))
+                            .help(slice.limitHelp(limit.name, limitID: limit.id))
                     }
                 }
                 .padding(.top, LayoutMetrics.rowSpacing)
@@ -148,7 +156,7 @@ private struct IntegrationLimitRowView: View {
 
 /// The quotas and limits of one integration, read the same way for every row.
 @MainActor
-private struct IntegrationSlice {
+struct IntegrationSlice {
     let model: AppModel
     let presentation: QuotaPresentation
 
@@ -158,6 +166,30 @@ private struct IntegrationSlice {
 
     var displayName: String {
         model.sections.listing(id: integrationID)?.displayName ?? presentation.summary.quota.name
+    }
+
+    /// Whether turning this integration off would leave the menu bar empty.
+    var canHide: Bool {
+        model.canHideIntegration(integrationID)
+    }
+
+    var isShownInMenuBar: Bool {
+        model.isIntegrationShownInMenuBar(integrationID)
+    }
+
+    /// A hidden integration can always be switched back on; the last visible
+    /// one cannot be switched off.
+    var canToggle: Bool {
+        !isShownInMenuBar || canHide
+    }
+
+    var toggleHelp: String {
+        guard canToggle else {
+            return "At least one integration must stay in the menu bar"
+        }
+        return isShownInMenuBar
+            ? "Exclude \(displayName) from the menu bar"
+            : "Include \(displayName) in the menu bar"
     }
 
     var quotas: [QuotaPresentation] {
@@ -176,6 +208,10 @@ private struct IntegrationSlice {
         selected.summary.snapshot?.buckets ?? []
     }
 
+    var availableLimitIDs: [String] {
+        buckets.map(\.id)
+    }
+
     var unavailable: [KnownLimit] {
         let known = selected.summary.snapshot?.knownLimits ?? []
         return known.filter { limit in !buckets.contains { $0.id == limit.id } }
@@ -183,15 +219,9 @@ private struct IntegrationSlice {
 
     var shownInMenuBar: Binding<Bool> {
         Binding(
-            get: { !model.menuBarPreferences.hiddenIntegrations.contains(integrationID) },
+            get: { isShownInMenuBar },
             set: { enabled in
-                model.updateMenuBarPreferences {
-                    if enabled {
-                        $0.hiddenIntegrations.remove(integrationID)
-                    } else {
-                        $0.hiddenIntegrations.insert(integrationID)
-                    }
-                }
+                model.setShowsIntegrationInMenuBar(enabled, integrationID: integrationID)
             }
         )
     }
@@ -219,115 +249,87 @@ private struct IntegrationSlice {
         )
     }
 
-    /// Whether this limit is drawn. Hiding and showing write opposite sets, so
-    /// a limit that is off stays off when a later reading marks it unavailable.
-    func limitBinding(
-        _ bucketID: String,
-        available: Bool,
-        shownByDefault: Bool = false
-    ) -> Binding<Bool> {
+    /// A daily quota that is on can be switched off only while another one
+    /// stays on; a hidden one can always be switched back on.
+    func canToggleDailyQuota(_ quotaID: UUID) -> Bool {
+        let preferences = model.menuBarPreferences
+        let shown = preferences.showsDailyAllowance(
+            quotaID: quotaID,
+            integrationID: integrationID,
+            plannedQuotaID: selected.id
+        )
+        return !shown || preferences.canHideDailyQuota(
+            quotaID: quotaID,
+            integrationID: integrationID,
+            plannedQuotaID: selected.id
+        )
+    }
+
+    func dailyQuotaHelp(_ quotaID: UUID, title: String) -> String {
+        guard canToggleDailyQuota(quotaID) else {
+            return "At least one daily quota must stay in the menu bar"
+        }
+        let shown = model.menuBarPreferences.showsDailyAllowance(
+            quotaID: quotaID,
+            integrationID: integrationID,
+            plannedQuotaID: selected.id
+        )
+        return shown
+            ? "Hide \(title) from the menu bar"
+            : "Show \(title) in the menu bar"
+    }
+
+    /// Whether this limit is drawn. Limits are off by default; choosing one
+    /// adds it to the menu bar whether or not the latest reading carried it.
+    func limitBinding(_ bucketID: String) -> Binding<Bool> {
         Binding(
-            get: { isShown(bucketID, available: available, shownByDefault: shownByDefault) },
+            get: {
+                model.menuBarPreferences.showsLimit(
+                    bucketID,
+                    integrationID: integrationID,
+                    availableLimitIDs: availableLimitIDs
+                )
+            },
             set: { enabled in
                 model.updateMenuBarPreferences {
-                    if enabled {
-                        $0.hiddenBuckets[integrationID, default: []].remove(bucketID)
-                        $0.shownUnavailableBuckets[integrationID, default: []].insert(bucketID)
-                    } else {
-                        $0.hiddenBuckets[integrationID, default: []].insert(bucketID)
-                        $0.shownUnavailableBuckets[integrationID, default: []].remove(bucketID)
-                    }
+                    $0.setShowsLimit(
+                        enabled,
+                        limitID: bucketID,
+                        integrationID: integrationID,
+                        availableLimitIDs: availableLimitIDs
+                    )
                 }
             }
         )
     }
 
-    /// An available limit is shown unless hidden. An unavailable one is shown
-    /// when the user chose it, or when the integration asks for it by default.
-    private func isShown(_ bucketID: String, available: Bool, shownByDefault: Bool) -> Bool {
+    /// A shown limit can be switched off only while another one stays on; a
+    /// hidden one can always be switched back on.
+    func canToggleLimit(_ limitID: String) -> Bool {
         let preferences = model.menuBarPreferences
-        let hidden = (preferences.hiddenBuckets[integrationID] ?? []).contains(bucketID)
-        if hidden {
-            return false
-        }
-        if available {
-            return true
-        }
-        let chosen = (preferences.shownUnavailableBuckets[integrationID] ?? []).contains(bucketID)
-        return chosen || shownByDefault
-    }
-}
-
-@MainActor
-private struct IntegrationLimitItem: Identifiable {
-    enum Kind {
-        case identity
-        case dailyHeader
-        case daily(QuotaPresentation)
-        case limitsHeader
-        case limit(UsageBucket)
-        case unavailable
-        case noLimits
-    }
-
-    let id: String
-    let presentation: QuotaPresentation
-    let kind: Kind
-    /// Extra space above a later integration, so two providers do not read as one list.
-    let separates: Bool
-
-    /// The form rows for one integration, in the order they are shown.
-    static func rows(
-        model: AppModel,
-        presentation: QuotaPresentation,
-        separates: Bool
-    ) -> [IntegrationLimitItem] {
-        let slice = IntegrationSlice(model: model, presentation: presentation)
-        let prefix = slice.integrationID
-        var built = [
-            IntegrationLimitItem(
-                id: "\(prefix)-identity",
-                presentation: presentation,
-                kind: .identity,
-                separates: separates
-            ),
-        ]
-        guard !model.menuBarPreferences.hiddenIntegrations.contains(prefix) else { return built }
-        if model.menuBarPreferences.showDailyQuota {
-            if slice.quotas.count > 1 {
-                built.append(item(prefix, "daily-header", presentation, .dailyHeader))
-            }
-            for quota in slice.quotas {
-                built.append(item(prefix, "daily-\(quota.id.uuidString)", presentation, .daily(quota)))
-            }
-        }
-        if slice.buckets.isEmpty {
-            built.append(item(prefix, "no-limits", presentation, .noLimits))
-        } else {
-            built.append(item(prefix, "limits-header", presentation, .limitsHeader))
-            for bucket in slice.buckets {
-                built.append(item(prefix, "limit-\(bucket.id)", presentation, .limit(bucket)))
-            }
-        }
-        if !slice.unavailable.isEmpty {
-            built.append(item(prefix, "unavailable", presentation, .unavailable))
-        }
-        return built
-    }
-
-    /// One row that does not open a gap above it. The identity row is the one
-    /// that separates a later integration.
-    private static func item(
-        _ prefix: String,
-        _ suffix: String,
-        _ presentation: QuotaPresentation,
-        _ kind: Kind
-    ) -> IntegrationLimitItem {
-        IntegrationLimitItem(
-            id: "\(prefix)-\(suffix)",
-            presentation: presentation,
-            kind: kind,
-            separates: false
+        let shown = preferences.showsLimit(
+            limitID,
+            integrationID: integrationID,
+            availableLimitIDs: availableLimitIDs
         )
+        return !shown || preferences.canHideLimit(
+            limitID,
+            integrationID: integrationID,
+            availableLimitIDs: availableLimitIDs
+        )
+    }
+
+    func limitHelp(_ name: String, limitID: String) -> String {
+        guard canToggleLimit(limitID) else {
+            return "At least one limit must stay in the menu bar"
+        }
+        let shown = model.menuBarPreferences.showsLimit(
+            limitID,
+            integrationID: integrationID,
+            availableLimitIDs: availableLimitIDs
+        )
+        return shown
+            ? "Hide \(name) from the menu bar"
+            : "Show \(name) in the menu bar"
     }
 }

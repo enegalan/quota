@@ -142,6 +142,10 @@ final class AppModel {
                 menuBarPreferences = preferences.menuBar
             }
             menuBarQuotaID = preferences.menuBarQuotaID
+            // Packaged providers can change bytes without a version bump. Refresh
+            // those first so the list and the next reading speak for this build's
+            // plugins rather than yesterday's still-active install.
+            await refreshBundledProviderBinaries()
             // The provider list is read before the quota panels, and on its own:
             // it depends on nothing but the store, and a panel that cannot be
             // built must not leave the list showing a provider that was updated

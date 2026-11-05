@@ -130,8 +130,16 @@ struct SettingsView: View {
                 SettingInfoButton(explanation: Self.logosExplanation)
             }
             HStack(alignment: .firstTextBaseline) {
-                Toggle("Show daily quota", isOn: menuBarBinding(\.showDailyQuota))
+                Toggle("Show daily quota", isOn: showsDailyQuotaBinding)
+                    .disabled(dailyQuotaSwitchIsDisabled)
+                    .help(dailyQuotaSwitchIsDisabled ? Self.figureSwitchHelp : "")
                 SettingInfoButton(explanation: Self.dailyQuotaExplanation)
+            }
+            HStack(alignment: .firstTextBaseline) {
+                Toggle("Show available limits", isOn: showsAvailableLimitsBinding)
+                    .disabled(availableLimitsSwitchIsDisabled)
+                    .help(availableLimitsSwitchIsDisabled ? Self.figureSwitchHelp : "")
+                SettingInfoButton(explanation: Self.availableLimitsExplanation)
             }
             HStack(alignment: .firstTextBaseline) {
                 Picker("Show values", selection: menuBarBinding(\.valueMode)) {
@@ -154,8 +162,21 @@ struct SettingsView: View {
     private static let dailyQuotaExplanation = """
     When on, the menu bar includes today's allowance for the quotas \
     switched on under Integration Limits. Remaining is the amount planned \
-    for today minus the amount used. When off, those Today figures are \
-    hidden.
+    for today minus the amount used. Each integration keeps at least one \
+    quota switched on. When off, those Today figures are hidden. If Show \
+    available limits is also off, this switch stays on so the menu bar \
+    keeps a figure.
+    """
+
+    private static let availableLimitsExplanation = """
+    When on, the menu bar includes the limits switched on under Integration \
+    Limits. Each integration keeps at least one limit switched on. When off, \
+    those limit figures are hidden. If Show daily quota is also off, this \
+    switch stays on so the menu bar keeps a figure.
+    """
+
+    private static let figureSwitchHelp = """
+    At least one of Show daily quota and Show available limits must stay on.
     """
 
     private static let valuesExplanation = """
@@ -170,6 +191,36 @@ struct SettingsView: View {
             get: { model.menuBarPreferences[keyPath: keyPath] },
             set: { value in model.updateMenuBarPreferences { $0[keyPath: keyPath] = value } }
         )
+    }
+
+    /// The daily switch, which stays on when it is the only figure shown.
+    private var showsDailyQuotaBinding: Binding<Bool> {
+        Binding(
+            get: { model.menuBarPreferences.showDailyQuota },
+            set: { enabled in
+                model.updateMenuBarPreferences { $0.setShowsDailyQuota(enabled) }
+            }
+        )
+    }
+
+    /// The limits switch, which stays on when it is the only figure shown.
+    private var showsAvailableLimitsBinding: Binding<Bool> {
+        Binding(
+            get: { model.menuBarPreferences.showAvailableLimits },
+            set: { enabled in
+                model.updateMenuBarPreferences { $0.setShowsAvailableLimits(enabled) }
+            }
+        )
+    }
+
+    private var dailyQuotaSwitchIsDisabled: Bool {
+        let preferences = model.menuBarPreferences
+        return preferences.showDailyQuota && !preferences.canTurnOffDailyQuota
+    }
+
+    private var availableLimitsSwitchIsDisabled: Bool {
+        let preferences = model.menuBarPreferences
+        return preferences.showAvailableLimits && !preferences.canTurnOffAvailableLimits
     }
 
     private var statusText: String {

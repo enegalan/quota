@@ -15,9 +15,18 @@ public struct ProviderLimit: Codable, Sendable, Equatable, Identifiable {
     /// no shorter one.
     public let menuBarLabel: String
 
-    /// Shown in the menu bar as an unknown figure when the latest reading omits
-    /// it, until the user hides it.
+    /// Whether the integration suggests keeping this limit visible when the
+    /// latest reading omits it. The user's choice decides which limits are
+    /// drawn, so this is only a hint; it stays on the wire so descriptors
+    /// still round-trip between builds.
     public let shownWhenUnavailable: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case menuBarLabel
+        case shownWhenUnavailable
+    }
 
     public init(
         id: String,
@@ -29,5 +38,21 @@ public struct ProviderLimit: Codable, Sendable, Equatable, Identifiable {
         self.name = name
         self.menuBarLabel = menuBarLabel ?? name
         self.shownWhenUnavailable = shownWhenUnavailable
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        menuBarLabel = try values.decodeIfPresent(String.self, forKey: .menuBarLabel) ?? name
+        shownWhenUnavailable = try values.decodeIfPresent(Bool.self, forKey: .shownWhenUnavailable) ?? false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(name, forKey: .name)
+        try values.encode(menuBarLabel, forKey: .menuBarLabel)
+        try values.encode(shownWhenUnavailable, forKey: .shownWhenUnavailable)
     }
 }

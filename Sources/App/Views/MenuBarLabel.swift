@@ -40,13 +40,17 @@ struct MenuBarLabel: View {
         }
 
         var seenIntegrations = Set<String>()
-        return candidates.compactMap { candidate in
+        let visible = candidates.compactMap { candidate -> QuotaPresentation? in
             let integrationID = candidate.summary.quota.providerID.rawValue
             guard !options.hiddenIntegrations.contains(integrationID),
                   seenIntegrations.insert(integrationID).inserted
             else { return nil }
             return candidate
         }
+        // At least one integration has to answer for the menu bar. A stored
+        // document can hide the only integration (from a build where that was
+        // allowed), and hiding every one must not leave the item blank.
+        return visible.isEmpty ? candidates.first.map { [$0] } ?? [] : visible
     }
 
     var body: some View {
@@ -120,8 +124,14 @@ struct MenuBarLabel: View {
         let integrationID = presentation.summary.quota.providerID.rawValue
         let buckets = presentation.summary.snapshot?.buckets ?? []
         let limits = presentation.summary.snapshot?.knownLimits ?? []
-        let hidden = options.hiddenBuckets[integrationID] ?? []
-        let visible = buckets.filter { !hidden.contains($0.id) }
+        let availableLimitIDs = buckets.map(\.id)
+        let visible = buckets.filter {
+            options.showsLimit(
+                $0.id,
+                integrationID: integrationID,
+                availableLimitIDs: availableLimitIDs
+            )
+        }
         var labels = visible.map { bucket in
             let label = menuBarLabel(for: bucket, limits: limits)
             let name = sharesLabel(label, besides: bucket.id, among: buckets, limits: limits)
@@ -130,7 +140,13 @@ struct MenuBarLabel: View {
             let figures = values(used: bucket.usagePercentage, remaining: 100 - bucket.usagePercentage)
             return "\(name) \(figures)"
         }
-        for limit in limits where isMissing(limit, from: buckets) && shows(limit, integrationID: integrationID) {
+        for limit in limits where isMissing(limit, from: buckets)
+            && shows(
+                limit,
+                integrationID: integrationID,
+                availableLimitIDs: availableLimitIDs
+            )
+        {
             labels.append("\(limit.menuBarLabel) \(values(used: nil, remaining: nil))")
         }
         return (dailyLines(for: presentation) + labels).joined(separator: "  ")
@@ -188,13 +204,17 @@ struct MenuBarLabel: View {
         !buckets.contains { $0.id == limit.id }
     }
 
-    /// Hidden wins. Otherwise an unavailable limit is drawn when the user
-    /// chose it, or when the integration asks for it by default.
-    private func shows(_ limit: KnownLimit, integrationID: String) -> Bool {
-        let hidden = options.hiddenBuckets[integrationID] ?? []
-        guard !hidden.contains(limit.id) else { return false }
-        let chosen = options.shownUnavailableBuckets[integrationID] ?? []
-        return chosen.contains(limit.id) || limit.shownWhenUnavailable
+    /// A missing limit is drawn only when the user chose it, like an available one.
+    private func shows(
+        _ limit: KnownLimit,
+        integrationID: String,
+        availableLimitIDs: [String]
+    ) -> Bool {
+        options.showsLimit(
+            limit.id,
+            integrationID: integrationID,
+            availableLimitIDs: availableLimitIDs
+        )
     }
 
     /// The short label the integration asked for, or the bucket's own name.

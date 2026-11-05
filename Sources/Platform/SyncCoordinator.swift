@@ -258,6 +258,10 @@ public struct SyncCoordinator: Sendable {
         accountLabel: String
     ) async throws -> Bool {
         let bucketID = quota.bucketID ?? snapshot.primaryBucket?.id ?? ""
+        // Read before the new snapshot replaces it: a seeded name is recognised
+        // by matching the limit's previous label, and that label lives only on
+        // the reading that is about to be overwritten.
+        let previous = try await latestReading(of: quota, accountLabel: accountLabel)?.snapshot
 
         // Filed before anything is decided about the quota, because the reading is
         // what the provider said whether or not this quota can use it.
@@ -306,14 +310,43 @@ public struct SyncCoordinator: Sendable {
             accountLabel: accountLabel
         )
 
-        if changed {
-            try await quotas.save(quota.withPeriod(bucket.period, updatedAt: snapshot.updatedAt))
-        } else {
-            try await quotas.save(quota.withUpdatedAt(snapshot.updatedAt))
+        let alignedName = Self.seededNameFollowingLimitRename(
+            quota: quota,
+            bucket: bucket,
+            previous: previous
+        )
+        var next = quota
+        if let alignedName {
+            next = next.withName(alignedName, updatedAt: snapshot.updatedAt)
         }
+        if changed {
+            next = next.withPeriod(bucket.period, updatedAt: snapshot.updatedAt)
+        } else if alignedName == nil {
+            next = next.withUpdatedAt(snapshot.updatedAt)
+        }
+        try await quotas.save(next)
         try await recordSuccess(snapshot, for: quota, accountLabel: accountLabel)
-        try await replan(for: quota, bucket: bucket, at: snapshot.updatedAt, accountLabel: accountLabel)
+        try await replan(for: next, bucket: bucket, at: snapshot.updatedAt, accountLabel: accountLabel)
         return changed
+    }
+
+    /// The limit's current name when this quota's label still tracks that limit.
+    ///
+    /// When the quota name still equals what the last reading called the limit,
+    /// a rename on the next reading moves the quota with it. No catalogue of
+    /// old names is kept: the previous snapshot is enough. A name the user
+    /// typed is left alone, because it will not match that previous label.
+    static func seededNameFollowingLimitRename(
+        quota: Quota,
+        bucket: UsageBucket,
+        previous: UsageSnapshot?
+    ) -> String? {
+        guard quota.name != bucket.displayName else { return nil }
+        let watchedID = quota.bucketID ?? bucket.id
+        let previousLabel = previous?.bucket(id: quota.bucketID)?.displayName
+            ?? previous?.knownLimits.first { $0.id == watchedID }?.name
+        guard quota.name == previousLabel else { return nil }
+        return bucket.displayName
     }
 
     /// Records a failure without disturbing the last good reading.

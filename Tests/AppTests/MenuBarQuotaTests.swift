@@ -74,6 +74,37 @@ struct MenuBarQuotaTests {
         #expect(model.primaryPresentation?.summary.quota.name == "First")
     }
 
+    @Test("The only integration cannot be hidden from the menu bar")
+    func onlyIntegrationStaysVisible() async {
+        let model = MenuBarQuotaFixture.model()
+        await MenuBarQuotaFixture.seed(model, names: ["Only"])
+        let integrationID = MenuBarQuotaFixture.providerIDs[0]
+
+        #expect(!model.canHideIntegration(integrationID))
+        model.setShowsIntegrationInMenuBar(false, integrationID: integrationID)
+
+        #expect(!model.menuBarPreferences.hiddenIntegrations.contains(integrationID))
+    }
+
+    @Test("One integration can be hidden while another remains")
+    func oneIntegrationCanBeHidden() async {
+        let model = MenuBarQuotaFixture.model()
+        await MenuBarQuotaFixture.seed(model, names: ["First", "Second"])
+        let integrationID = MenuBarQuotaFixture.providerIDs[0]
+
+        #expect(model.canHideIntegration(integrationID))
+        model.setShowsIntegrationInMenuBar(false, integrationID: integrationID)
+
+        #expect(model.menuBarPreferences.hiddenIntegrations.contains(integrationID))
+
+        // The remaining integration is now the only one drawn, so it cannot
+        // be hidden too.
+        let remaining = MenuBarQuotaFixture.providerIDs[1]
+        #expect(!model.canHideIntegration(remaining))
+        model.setShowsIntegrationInMenuBar(false, integrationID: remaining)
+        #expect(!model.menuBarPreferences.hiddenIntegrations.contains(remaining))
+    }
+
     @Test("Choosing again replaces the choice rather than keeping the first one")
     func choosingAgainReplacesTheChoice() async throws {
         // A choice that only ever recorded the first pick would leave a user who
@@ -93,6 +124,45 @@ struct MenuBarQuotaTests {
 
         #expect(model.menuBarQuotaID == third.id)
         #expect(model.primaryPresentation?.summary.quota.name == "Third")
+    }
+
+    @Test("Pinning a quota does not change which dailies settings chose")
+    func pinLeavesDailyQuotasAlone() async throws {
+        let store = CodableStore.inMemory()
+        let model = MenuBarQuotaFixture.model(store: store)
+        let providerID = QuotaCreationFixture.providerID
+        _ = await model.createQuota(
+            named: "Other Models",
+            providerID: providerID,
+            bucketID: "other",
+            period: nil,
+            policy: .even
+        )
+        _ = await model.createQuota(
+            named: "Cursor Models",
+            providerID: providerID,
+            bucketID: "models",
+            period: nil,
+            policy: .even
+        )
+        let other = try #require(
+            model.presentations.first { $0.summary.quota.name == "Other Models" }
+        )
+        let models = try #require(
+            model.presentations.first { $0.summary.quota.name == "Cursor Models" }
+        )
+
+        model.updateMenuBarPreferences {
+            $0.dailyQuotas[providerID] = [models.id]
+        }
+        await model.showInMenuBar(other)
+
+        #expect(model.menuBarQuotaID == other.id)
+        #expect(model.menuBarPreferences.dailyQuotas[providerID] == [models.id])
+
+        let stored = try await preferencesRepository(store).load()
+        #expect(stored.menuBarQuotaID == other.id)
+        #expect(stored.menuBar.dailyQuotas[providerID] == [models.id])
     }
 }
 
@@ -134,6 +204,17 @@ struct MenuBarPreferenceSaveTests {
         #expect(model.menuBarPreferences.showLogos)
     }
 
+    @Test("Turning off the last figure switch leaves today's allowance on")
+    func lastFigureSwitchStaysOn() async {
+        let model = MenuBarQuotaFixture.model()
+        await model.load()
+
+        model.updateMenuBarPreferences { $0.showDailyQuota = false }
+
+        #expect(model.menuBarPreferences.showDailyQuota)
+        #expect(!model.menuBarPreferences.showAvailableLimits)
+    }
+
     @Test("An older save does not let a load drop a newer one")
     func olderSaveDoesNotClearANewerOne() async throws {
         let backend = BlockingPreferencesBackend()
@@ -142,16 +223,16 @@ struct MenuBarPreferenceSaveTests {
         await backend.blockNextPreferencesWrite(skipping: 1)
 
         model.updateMenuBarPreferences { $0.showLogos = false }
-        model.updateMenuBarPreferences { $0.showDailyQuota = false }
+        model.updateMenuBarPreferences { $0.showAvailableLimits = true }
         await backend.waitUntilWriteBlocked()
         await model.load()
 
         #expect(!model.menuBarPreferences.showLogos)
-        #expect(!model.menuBarPreferences.showDailyQuota)
+        #expect(model.menuBarPreferences.showAvailableLimits)
         await backend.releaseBlockedWrite()
         try await waitUntil {
             let stored = try await preferencesRepository(store).load()
-            return !stored.menuBar.showLogos && !stored.menuBar.showDailyQuota
+            return !stored.menuBar.showLogos && stored.menuBar.showAvailableLimits
         }
     }
 

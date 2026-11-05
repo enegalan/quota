@@ -47,6 +47,36 @@ extension AppModel {
         await perform { try await self.environment.installer.uninstall(listing.provider.id) }
     }
 
+    /// Replaces an installed provider whose packaged bytes changed without a
+    /// version bump.
+    ///
+    /// Local rebuilds keep the app version, so the catalog still says 1.4.11
+    /// while the tarball holds a different binary. Without this, the machine
+    /// keeps yesterday's plugin and a rename like Cursor Models → Included
+    /// Models never reaches a reading. Failures are swallowed: a missing
+    /// bundled artifact or a handshake that fails must not block launch.
+    func refreshBundledProviderBinaries() async {
+        for provider in environment.manager.available {
+            guard let previous = try? await environment.installed.provider(provider.id) else {
+                continue
+            }
+            do {
+                _ = try await environment.installer.update(
+                    provider,
+                    previous: previous,
+                    verify: { record in
+                        try await ProviderConnector.verifyLaunch(
+                            providerID: ProviderID(record.id),
+                            environment: self.environment
+                        )
+                    }
+                )
+            } catch {
+                continue
+            }
+        }
+    }
+
     /// Replaces every installed provider this build packages that has an update
     /// available, one at a time.
     ///

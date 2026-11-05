@@ -19,13 +19,20 @@ extension PluginInstaller {
         previous: InstalledProvider,
         verify: @Sendable (InstalledProvider) async throws -> Void
     ) async throws -> InstalledProvider {
-        // An update of the version that is already installed and in use is not
-        // a failure: there is nothing to do, and the caller asked for a state
-        // the machine is already in. Refusing it as though the update had been
-        // attempted and failed is what turned a button with nothing to do into
-        // an error.
+        // Same version with the same bytes is already the state the caller
+        // asked for. Same version with different bytes is a rebuilt provider
+        // that kept its version number — refuse that as "already installed"
+        // and the machine keeps running yesterday's binary after every local
+        // rebuild that did not bump the app version.
         if previous.version == provider.version, isActive(provider.id, at: provider.version) {
-            return previous
+            let artifact = try await fetch(provider.id)
+            if Self.sha256(artifact) == previous.contentHash {
+                return previous
+            }
+            let destination = PluginLayout.versionDirectory(
+                provider.id, provider.version, in: pluginsDirectory
+            )
+            try FileManager.default.removeItem(at: destination)
         }
 
         let previousDirectory = PluginLayout.activeVersionDirectory(provider.id, in: pluginsDirectory)

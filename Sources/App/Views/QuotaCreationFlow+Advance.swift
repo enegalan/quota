@@ -142,16 +142,6 @@ extension QuotaCreationFlow {
         guard selected?.id == providerID else { return }
         buckets = loaded
         bucketID = buckets.first { !takenBucketIDs.contains($0.id) }?.id ?? buckets.first?.id
-        // A multi-limit provider needs the quota named after the limit it watches,
-        // not after the provider: two quotas both called "Cursor" cannot be told
-        // apart once the flow closes. A single-limit provider keeps the provider
-        // name — there is nothing else to distinguish.
-        if buckets.count > 1,
-           let bucketID,
-           let bucket = buckets.first(where: { $0.id == bucketID })
-        {
-            name = bucket.displayName
-        }
     }
 
     /// The current state of one provider, read from the live listings.

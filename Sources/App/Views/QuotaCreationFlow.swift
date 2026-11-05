@@ -155,18 +155,15 @@ struct QuotaCreationFlow: View {
             calendar: model.userCalendar,
             selection: $bucketID
         )
-        .onChange(of: bucketID) { _, newID in
-            // Keep the name on the chosen limit while it still looks seeded —
-            // either the provider's name or another of this provider's limits —
-            // so switching the picker does not leave a stale limit name on a
-            // different quota. A name the user typed is left alone.
-            guard let newID,
-                  let bucket = buckets.first(where: { $0.id == newID })
-            else { return }
-            let seeded = Set(buckets.map(\.displayName))
-                .union([selected?.displayName].compactMap(\.self))
+        .onChange(of: bucketID) { _, _ in
+            // Default name is the integration. While the field still looks
+            // seeded — the provider's name or a limit name left from an older
+            // build — keep it on the integration when the picker moves. A name
+            // the user typed is left alone.
+            guard let integration = selected?.displayName else { return }
+            let seeded = Set(buckets.map(\.displayName)).union([integration])
             if name.isEmpty || seeded.contains(name) {
-                name = bucket.displayName
+                name = integration
             }
         }
     }
