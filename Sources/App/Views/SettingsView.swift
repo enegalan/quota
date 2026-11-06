@@ -3,6 +3,7 @@ import Platform
 import ServiceManagement
 import SwiftUI
 
+// swiftlint:disable type_body_length
 /// User-level settings: notifications, refresh interval, and update checks.
 ///
 /// Shared by the management-window sidebar and the macOS Settings window, so
@@ -126,7 +127,9 @@ struct SettingsView: View {
             isReady = true
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { loginItemStatus = SMAppService.mainApp.status }
+            if phase == .active {
+                loginItemStatus = SMAppService.mainApp.status
+            }
         }
     }
 
@@ -313,6 +316,8 @@ struct SettingsView: View {
         return hours == 1 ? "1 hour" : "\(hours) hours"
     }
 }
+
+// swiftlint:enable type_body_length
 
 /// A compact “i” that shows what changing a setting does.
 struct SettingInfoButton: View {

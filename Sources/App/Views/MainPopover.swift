@@ -1,9 +1,11 @@
+// swiftlint:disable file_length
 import AppKit
 import Core
 import Platform
 import SwiftUI
 import UniformTypeIdentifiers
 
+// swiftlint:disable type_body_length
 /// A glanceable overview of every quota and the limits reported by its provider.
 struct MainPopover: View {
     let model: AppModel
@@ -17,7 +19,7 @@ struct MainPopover: View {
         VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
             if let launchFailure {
                 LaunchFailureView(message: launchFailure)
-            } else if model.isEmpty && model.unplannedProviders.isEmpty {
+            } else if model.isEmpty, model.unplannedProviders.isEmpty {
                 NoticeCard(
                     title: "Welcome to Quota",
                     message: "Connect an integration to start tracking usage."
@@ -39,7 +41,10 @@ struct MainPopover: View {
 
     private var groups: [PopoverProviderGroup] {
         let groups = PopoverProviderGroup.group(model.presentations, unplanned: model.unplannedProviders)
-        let ids = PopoverOrder.arranged(groups.map(\.orderKey), accordingTo: model.menuBarPreferences.popoverProviderOrder)
+        let ids = PopoverOrder.arranged(
+            groups.map(\.orderKey),
+            accordingTo: model.menuBarPreferences.popoverProviderOrder
+        )
         return ids.compactMap { id in groups.first { $0.orderKey == id } }
     }
 
@@ -49,7 +54,10 @@ struct MainPopover: View {
         }
         let items = buckets.map(PopoverItem.bucket)
             + group.presentations.map(PopoverItem.quota)
-        let ids = PopoverOrder.arranged(items.map(\.id), accordingTo: model.menuBarPreferences.popoverItemOrder[group.orderKey] ?? [])
+        let ids = PopoverOrder.arranged(
+            items.map(\.id),
+            accordingTo: model.menuBarPreferences.popoverItemOrder[group.orderKey] ?? []
+        )
         return ids.compactMap { id in items.first { $0.id == id } }
     }
 
@@ -64,7 +72,8 @@ struct MainPopover: View {
                     .foregroundStyle(.secondary)
             }
             if groups.count == 1, let group = groups.first,
-               (group.snapshot?.buckets.count ?? 0) <= 2 {
+               (group.snapshot?.buckets.count ?? 0) <= 2
+            {
                 providerCard(group)
             } else {
                 ScrollView {
@@ -79,6 +88,7 @@ struct MainPopover: View {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private func providerCard(_ group: PopoverProviderGroup) -> some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
             reorderable(HStack(spacing: LayoutMetrics.rowSpacing) {
@@ -111,9 +121,16 @@ struct MainPopover: View {
                 )
             } else if let provider = group.unplanned {
                 if provider.failed {
-                    Caption(text: provider.snapshot == nil ? "Unable to refresh usage." : "Refresh failed. Showing the last available reading.", isWarning: true)
+                    Caption(
+                        text: provider
+                            .snapshot == nil ? "Unable to refresh usage." :
+                            "Refresh failed. Showing the last available reading.",
+                        isWarning: true
+                    )
                 } else if let snapshot = provider.snapshot {
-                    Caption(text: "Updated \(RelativeTime(calendar: model.userCalendar).describe(since: snapshot.updatedAt, now: model.reference)).")
+                    Caption(
+                        text: "Updated \(RelativeTime(calendar: model.userCalendar).describe(since: snapshot.updatedAt, now: model.reference))."
+                    )
                 }
             }
         }
@@ -121,7 +138,10 @@ struct MainPopover: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
-        .onDrop(of: [PopoverDrag.type], delegate: dropDelegate(target: group.orderKey, ids: groups.map(\.orderKey), scope: nil))
+        .onDrop(
+            of: [PopoverDrag.type],
+            delegate: dropDelegate(target: group.orderKey, ids: groups.map(\.orderKey), scope: nil)
+        )
     }
 
     private func bucketRow(_ bucket: UsageBucket) -> some View {
@@ -142,7 +162,11 @@ struct MainPopover: View {
             if let description = bucket.limitDescription {
                 Caption(text: description)
             }
-            if let reset = ResetCaption.caption(for: bucket.period, asOf: model.reference, calendar: model.userCalendar) {
+            if let reset = ResetCaption.caption(
+                for: bucket.period,
+                asOf: model.reference,
+                calendar: model.userCalendar
+            ) {
                 Caption(text: reset)
             } else {
                 Caption(text: "Reset time unavailable.")
@@ -158,9 +182,11 @@ struct MainPopover: View {
                     .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
                 Spacer(minLength: LayoutMetrics.rowSpacing)
                 if let allowance = presentation.summary.todayAllowance {
-                    Text("\(formatter.preciseString(allowance.usedToday)) / \(formatter.preciseString(allowance.suggested)) today")
-                        .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
-                        .monospacedDigit()
+                    Text(
+                        "\(formatter.preciseString(allowance.usedToday)) / \(formatter.preciseString(allowance.suggested)) today"
+                    )
+                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
+                    .monospacedDigit()
                 }
             }
             if let allowance = presentation.summary.todayAllowance {
@@ -178,7 +204,8 @@ struct MainPopover: View {
                 Caption(text: "No daily plan available.")
             }
             if let bucketID = presentation.summary.quota.bucketID ?? presentation.summary.snapshot?.primaryBucket?.id,
-               let bucket = group.snapshot?.buckets.first(where: { $0.id == bucketID }) {
+               let bucket = group.snapshot?.buckets.first(where: { $0.id == bucketID })
+            {
                 Caption(text: "Limit: \(bucket.displayName)")
             }
             if presentation.summary.usage == nil {
@@ -189,35 +216,43 @@ struct MainPopover: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func reorderable<Content: View>(
-        _ content: Content, id: String, ids: [String], scope: String?
+    private func reorderable(
+        _ content: some View, id: String, ids: [String], scope: String?
     ) -> some View {
         let index = ids.firstIndex(of: id) ?? 0
         return content
-        .contentShape(Rectangle())
-        .help("Drag to reorder, or right-click to move up or down")
-        .onHover { hovering in
-            if hovering { NSCursor.openHand.push() } else { NSCursor.pop() }
-        }
-        .contextMenu {
-            if index > 0 {
-                Button("Move up") { move(id, to: ids[index - 1], ids: ids, scope: scope) }
+            .contentShape(Rectangle())
+            .help("Drag to reorder, or right-click to move up or down")
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.openHand.push()
+                } else {
+                    NSCursor.pop()
+                }
             }
-            if index + 1 < ids.count {
-                Button("Move down") { move(id, to: ids[index + 1], ids: ids, scope: scope) }
+            .contextMenu {
+                if index > 0 {
+                    Button("Move up") { move(id, to: ids[index - 1], ids: ids, scope: scope) }
+                }
+                if index + 1 < ids.count {
+                    Button("Move down") { move(id, to: ids[index + 1], ids: ids, scope: scope) }
+                }
             }
-        }
-        .accessibilityAction(named: Text("Move up")) {
-            if index > 0 { move(id, to: ids[index - 1], ids: ids, scope: scope) }
-        }
-        .accessibilityAction(named: Text("Move down")) {
-            if index + 1 < ids.count { move(id, to: ids[index + 1], ids: ids, scope: scope) }
-        }
-        .onDrag {
-            draggedItem = PopoverDrag(id: id, scope: scope)
-            return NSItemProvider(object: id as NSString)
-        }
-        .onDrop(of: [PopoverDrag.type], delegate: dropDelegate(target: id, ids: ids, scope: scope))
+            .accessibilityAction(named: Text("Move up")) {
+                if index > 0 {
+                    move(id, to: ids[index - 1], ids: ids, scope: scope)
+                }
+            }
+            .accessibilityAction(named: Text("Move down")) {
+                if index + 1 < ids.count {
+                    move(id, to: ids[index + 1], ids: ids, scope: scope)
+                }
+            }
+            .onDrag {
+                draggedItem = PopoverDrag(id: id, scope: scope)
+                return NSItemProvider(object: id as NSString)
+            }
+            .onDrop(of: [PopoverDrag.type], delegate: dropDelegate(target: id, ids: ids, scope: scope))
     }
 
     private func move(_ id: String, to target: String, ids: [String], scope: String?) {
@@ -271,6 +306,8 @@ struct MainPopover: View {
         .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
     }
 }
+
+// swiftlint:enable type_body_length
 
 private struct PopoverDrag {
     static let type = UTType.plainText
@@ -367,51 +404,4 @@ struct MenuBarRowButtonStyle: ButtonStyle {
     }
 }
 
-/// One provider account and the quotas that belong to its reported limits.
-struct PopoverProviderGroup: Identifiable {
-    struct ID: Hashable {
-        let providerID: String
-        let accountLabel: String?
-    }
-
-    let id: ID
-    var presentations: [QuotaPresentation]
-    var unplanned: UnplannedProvider? = nil
-
-    var providerID: String { id.providerID }
-    var accountLabel: String? { id.accountLabel }
-    var orderKey: String { PopoverOrder.key(providerID: providerID, account: accountLabel) }
-    var latestPresentation: QuotaPresentation? {
-        presentations.max { ($0.summary.snapshot?.updatedAt ?? .distantPast) < ($1.summary.snapshot?.updatedAt ?? .distantPast) }
-    }
-    var snapshot: UsageSnapshot? { latestPresentation?.summary.snapshot ?? unplanned?.snapshot }
-
-    func quotas(for bucketID: String) -> [QuotaPresentation] {
-        presentations.filter { ($0.summary.quota.bucketID ?? $0.summary.snapshot?.primaryBucket?.id) == bucketID }
-    }
-
-    var unmatchedQuotas: [QuotaPresentation] {
-        presentations.filter { presentation in
-            let bucketID = presentation.summary.quota.bucketID ?? presentation.summary.snapshot?.primaryBucket?.id
-            return !((snapshot?.buckets ?? []).contains { $0.id == bucketID })
-        }
-    }
-
-    static func group(_ presentations: [QuotaPresentation], unplanned: [UnplannedProvider] = []) -> [PopoverProviderGroup] {
-        var groups: [PopoverProviderGroup] = []
-        for presentation in presentations {
-            let id = ID(providerID: presentation.summary.quota.providerID.rawValue, accountLabel: presentation.accountLabel)
-            if let index = groups.firstIndex(where: { $0.id == id }) {
-                groups[index].presentations.append(presentation)
-            } else {
-                groups.append(PopoverProviderGroup(id: id, presentations: [presentation]))
-            }
-        }
-        for provider in unplanned {
-            let id = ID(providerID: provider.providerID, accountLabel: provider.accountLabel)
-            guard !groups.contains(where: { $0.id == id }) else { continue }
-            groups.append(PopoverProviderGroup(id: id, presentations: [], unplanned: provider))
-        }
-        return groups
-    }
-}
+// One provider account and the quotas that belong to its reported limits.

@@ -5,7 +5,11 @@ import Testing
 struct PopoverOrderTests {
     @Test("Saved order keeps available items and appends new ones")
     func savedOrder() {
-        #expect(PopoverOrder.arranged(["5h", "week", "quota"], accordingTo: ["quota", "gone", "quota", "5h"]) == ["quota", "5h", "week"])
+        #expect(PopoverOrder.arranged(["5h", "week", "quota"], accordingTo: ["quota", "gone", "quota", "5h"]) == [
+            "quota",
+            "5h",
+            "week",
+        ])
     }
 
     @Test("Moving items works in either direction and ignores missing items")
@@ -18,6 +22,9 @@ struct PopoverOrderTests {
 
     @Test("Provider accounts have independent saved orders")
     func accountKeys() {
-        #expect(PopoverOrder.key(providerID: "claude", account: "one") != PopoverOrder.key(providerID: "claude", account: "two"))
+        #expect(PopoverOrder.key(providerID: "claude", account: "one") != PopoverOrder.key(
+            providerID: "claude",
+            account: "two"
+        ))
     }
 }

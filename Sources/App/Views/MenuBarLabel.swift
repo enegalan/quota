@@ -57,7 +57,8 @@ struct MenuBarLabel: View {
         var providers = resolvedPresentations.map { MenuBarProvider(presentation: $0) }
         var seen = Set(providers.map(\.providerID))
         for provider in model?.unplannedProviders ?? [] where
-            !options.hiddenIntegrations.contains(provider.providerID) && seen.insert(provider.providerID).inserted {
+            !options.hiddenIntegrations.contains(provider.providerID) && seen.insert(provider.providerID).inserted
+        {
             providers.append(MenuBarProvider(unplanned: provider))
         }
         let ids = PopoverOrder.arranged(providers.map(\.id), accordingTo: options.popoverProviderOrder)
@@ -126,7 +127,8 @@ struct MenuBarLabel: View {
     /// Today's allowances and the visible limits, in the order the status item draws them.
     private func figures(for provider: MenuBarProvider) -> String {
         let integrationID = provider.providerID
-        let buckets = (provider.snapshot?.buckets ?? []).filter { provider.presentation != nil || $0.period.end > (model?.reference ?? Date()) }
+        let buckets = (provider.snapshot?.buckets ?? [])
+            .filter { provider.presentation != nil || $0.period.end > (model?.reference ?? Date()) }
         let limits = provider.snapshot?.knownLimits ?? []
         // Available and unavailable stay distinct so a legacy document can
         // migrate "all available minus hidden" without promoting unchosen
@@ -136,7 +138,9 @@ struct MenuBarLabel: View {
             !buckets.contains { $0.id == id }
         }
         var limitOptions = options
-        if provider.presentation == nil { limitOptions.showAvailableLimits = true }
+        if provider.presentation == nil {
+            limitOptions.showAvailableLimits = true
+        }
         let visible = buckets.filter {
             limitOptions.showsLimit(
                 $0.id,
@@ -297,7 +301,9 @@ private struct MenuBarProvider: Identifiable {
     let snapshot: UsageSnapshot?
     let presentation: QuotaPresentation?
 
-    var id: String { PopoverOrder.key(providerID: providerID, account: accountLabel) }
+    var id: String {
+        PopoverOrder.key(providerID: providerID, account: accountLabel)
+    }
 
     init(presentation: QuotaPresentation) {
         providerID = presentation.summary.quota.providerID.rawValue

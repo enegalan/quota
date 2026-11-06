@@ -4,6 +4,7 @@
 # before every commit: lint, tests, bundle, signature check.
 
 SHELL := /usr/bin/env bash
+export PATH := $(CURDIR)/.build/tools:$(PATH)
 .DEFAULT_GOAL := help
 
 BUILD_CONFIGURATION ?= debug

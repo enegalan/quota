@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Core
 import Foundation
 import Observation
@@ -311,8 +312,10 @@ final class AppModel {
         let interval = await effectiveRefreshIntervalSeconds()
         for provider in unplannedProviders {
             let now = environment.now()
-            if trigger == .scheduleElapsed || trigger == .launch {
-                if let last = unplannedAttempts[provider.orderKey], now.timeIntervalSince(last) < interval { continue }
+            if trigger == .scheduleElapsed || trigger == .launch, let last = unplannedAttempts[provider.orderKey],
+               now.timeIntervalSince(last) < interval
+            {
+                continue
             }
             guard let id = try? ProviderID(provider.providerID) else { continue }
             unplannedAttempts[provider.orderKey] = now
@@ -320,7 +323,8 @@ final class AppModel {
                 providerID: id, accountLabel: provider.accountLabel,
                 localDate: LocalDate(date: now, calendar: userCalendar)
             )
-            guard let index = unplannedProviders.firstIndex(where: { $0.orderKey == provider.orderKey }) else { continue }
+            guard let index = unplannedProviders.firstIndex(where: { $0.orderKey == provider.orderKey })
+            else { continue }
             switch outcome.result {
             case .success(let snapshot):
                 unplannedProviders[index].snapshot = snapshot

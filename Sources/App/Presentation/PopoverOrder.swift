@@ -6,7 +6,9 @@ struct UnplannedProvider {
     let accountLabel: String
     var snapshot: UsageSnapshot?
     var failed = false
-    var orderKey: String { PopoverOrder.key(providerID: providerID, account: accountLabel) }
+    var orderKey: String {
+        PopoverOrder.key(providerID: providerID, account: accountLabel)
+    }
 }
 
 enum PopoverItem: Identifiable {

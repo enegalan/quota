@@ -15,6 +15,7 @@ struct PopoverProviderGroupTests {
         #expect(groups[0].presentations.isEmpty)
         #expect(groups[0].orderKey == provider.orderKey)
     }
+
     @Test("Quotas stay with their provider, account, and reported limit")
     func groupsQuotasByLimit() throws {
         let now = MockUsageWorld.reference

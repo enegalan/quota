@@ -70,5 +70,4 @@ struct BackgroundRefreshTests {
         )
         #expect(await coordinator.effectiveSchedule(for: record).baseInterval == 60)
     }
-
 }

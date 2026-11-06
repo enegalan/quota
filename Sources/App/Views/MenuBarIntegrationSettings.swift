@@ -31,7 +31,7 @@ struct MenuBarIntegrationSettings: View {
 
     var body: some View {
         Section {
-            if items.isEmpty && unplannedProviders.isEmpty {
+            if items.isEmpty, unplannedProviders.isEmpty {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Add a quota to choose which integration limits appear in the menu bar.")
                         .foregroundStyle(.secondary)
@@ -51,7 +51,7 @@ struct MenuBarIntegrationSettings: View {
     }
 
     private var unplannedProviders: [UnplannedProvider] {
-        var seen = Set(model.presentations.map { $0.summary.quota.providerID.rawValue })
+        var seen = Set(model.presentations.map(\.summary.quota.providerID.rawValue))
         return model.unplannedProviders.filter { seen.insert($0.providerID).inserted }
     }
 
@@ -64,8 +64,11 @@ struct MenuBarIntegrationSettings: View {
                 get: { !model.menuBarPreferences.hiddenIntegrations.contains(integrationID) },
                 set: { enabled in
                     model.updateMenuBarPreferences {
-                        if enabled { $0.hiddenIntegrations.remove(integrationID) }
-                        else { $0.hiddenIntegrations.insert(integrationID) }
+                        if enabled {
+                            $0.hiddenIntegrations.remove(integrationID)
+                        } else {
+                            $0.hiddenIntegrations.insert(integrationID)
+                        }
                     }
                 }
             ))
@@ -80,7 +83,12 @@ struct MenuBarIntegrationSettings: View {
                         model.updateMenuBarPreferences {
                             let wasEnabled = $0.showAvailableLimits
                             $0.showAvailableLimits = true
-                            $0.setShowsLimit(enabled, limitID: bucket.id, integrationID: integrationID, availableLimitIDs: ids)
+                            $0.setShowsLimit(
+                                enabled,
+                                limitID: bucket.id,
+                                integrationID: integrationID,
+                                availableLimitIDs: ids
+                            )
                             $0.showAvailableLimits = wasEnabled
                         }
                     }
