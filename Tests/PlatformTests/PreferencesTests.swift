@@ -38,6 +38,7 @@ struct PreferencesTests {
         #expect(preferences.defaultPolicyKind == "monthly")
         #expect(preferences.hasCompletedOnboarding == true)
         #expect(preferences.refreshIntervalSeconds == 900)
+        #expect(preferences.refreshIntervalSecondsByProvider.isEmpty)
         #expect(preferences.disabledProviders.isEmpty)
         #expect(preferences.menuBarQuotaID == nil)
         #expect(
@@ -60,6 +61,17 @@ struct PreferencesTests {
         )
         try await repository.save(preferences)
         #expect(try await repository.load() == preferences)
+    }
+
+    @Test("An integration interval survives a round trip and can be cleared")
+    func providerIntervalRoundTrip() throws {
+        let stored = Preferences(refreshIntervalSeconds: 60).withRefreshInterval(300, for: "claude")
+        let decoded = try JSONDecoder().decode(Preferences.self, from: JSONEncoder().encode(stored))
+        #expect(decoded.refreshInterval(for: "claude") == 300)
+        #expect(decoded.refreshInterval(for: "codex") == 60)
+        let cleared = stored.withRefreshInterval(nil, for: "claude")
+        #expect(cleared.refreshIntervalSecondsByProvider.isEmpty)
+        #expect(cleared.refreshInterval(for: "claude") == 60)
     }
 
     @Test("Popover orders survive encoding and older menu preferences decode")

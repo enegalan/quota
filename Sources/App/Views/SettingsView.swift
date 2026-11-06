@@ -13,6 +13,7 @@ struct SettingsView: View {
 
     @State private var notificationsEnabled = PreferenceConstants.defaultNotificationsEnabled
     @State private var refreshIntervalSeconds = RefreshConstants.defaultPollInterval
+    @State private var providerIntervals: [String: TimeInterval] = [:]
     @State private var automaticUpdateChecksEnabled =
         PreferenceConstants.defaultAutomaticUpdateChecksEnabled
     @State private var isReady = false
@@ -62,15 +63,24 @@ struct SettingsView: View {
                     }
                     SettingInfoButton(
                         explanation: """
-                        How often Quota re-reads a connected provider. A shorter \
-                        interval keeps figures fresher and sends more requests; a \
-                        longer one is quieter on the network and may show older data \
-                        between polls.
+                        How often Quota re-reads a connected integration. An \
+                        integration set to General uses this interval. One with its \
+                        own interval uses that instead. A shorter interval keeps \
+                        figures fresher and sends more requests; a longer one is \
+                        quieter on the network and may show older data between polls.
                         """
                     )
                 }
+                ForEach(connectedIntegrations) { listing in
+                    Picker(listing.displayName, selection: pollSelection(for: listing.id)) {
+                        Text("General").tag(PollSelection.general)
+                        ForEach(UpdateConstants.refreshIntervalChoices, id: \.self) { seconds in
+                            Text(Self.label(for: seconds)).tag(PollSelection.interval(seconds))
+                        }
+                    }
+                }
             } header: {
-                Text("Providers Refresh")
+                Text("Refresh")
             }
 
             Section {
@@ -294,7 +304,32 @@ struct SettingsView: View {
         refreshIntervalSeconds = await Self.nearestChoice(
             model.effectiveRefreshIntervalSeconds()
         )
+        providerIntervals = await model.refreshIntervalsByProvider()
         automaticUpdateChecksEnabled = await model.automaticUpdateChecksEnabled()
+    }
+
+    private var connectedIntegrations: [ProviderListing] {
+        model.sections.connected.sorted { $0.displayName < $1.displayName }
+    }
+
+    private func pollSelection(for providerID: String) -> Binding<PollSelection> {
+        Binding(
+            get: {
+                guard let seconds = providerIntervals[providerID] else { return .general }
+                return .interval(Self.nearestChoice(seconds))
+            },
+            set: { selection in
+                guard isReady else { return }
+                switch selection {
+                case .general:
+                    providerIntervals[providerID] = nil
+                    Task { await model.setRefreshInterval(nil, for: providerID) }
+                case .interval(let seconds):
+                    providerIntervals[providerID] = seconds
+                    Task { await model.setRefreshInterval(seconds, for: providerID) }
+                }
+            }
+        )
     }
 
     /// The offered interval closest to a stored preference.
@@ -318,6 +353,12 @@ struct SettingsView: View {
 }
 
 // swiftlint:enable type_body_length
+
+/// One integration's poll interval, or the general interval.
+private enum PollSelection: Hashable {
+    case general
+    case interval(TimeInterval)
+}
 
 /// A compact “i” that shows what changing a setting does.
 struct SettingInfoButton: View {

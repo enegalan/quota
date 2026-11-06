@@ -48,12 +48,14 @@ struct MainPopover: View {
         return ids.compactMap { id in groups.first { $0.orderKey == id } }
     }
 
+    /// Limits, with the quotas that watch each one nested under it.
+    ///
+    /// A quota whose limit is no longer in the reading stays as its own row.
     private func items(for group: PopoverProviderGroup) -> [PopoverItem] {
         let buckets = (group.snapshot?.buckets ?? []).filter {
             group.unplanned == nil || $0.period.end > model.reference
         }
-        let items = buckets.map(PopoverItem.bucket)
-            + group.presentations.map(PopoverItem.quota)
+        let items = buckets.map(PopoverItem.bucket) + group.unmatchedQuotas.map(PopoverItem.quota)
         let ids = PopoverOrder.arranged(
             items.map(\.id),
             accordingTo: model.menuBarPreferences.popoverItemOrder[group.orderKey] ?? []
@@ -67,15 +69,11 @@ struct MainPopover: View {
                 Text("Usage overview")
                     .font(.system(size: LayoutMetrics.bodySize + 3, weight: .bold))
                 Spacer()
-                Text("\(groups.count) providers")
+                Text(integrationCount)
                     .font(.system(size: LayoutMetrics.footnoteSize))
                     .foregroundStyle(.secondary)
             }
-            if groups.count == 1, let group = groups.first,
-               (group.snapshot?.buckets.count ?? 0) <= 2
-            {
-                providerCard(group)
-            } else {
+            if scrollsOverview {
                 ScrollView {
                     VStack(spacing: LayoutMetrics.rowSpacing) {
                         ForEach(groups) { group in
@@ -84,13 +82,26 @@ struct MainPopover: View {
                     }
                 }
                 .frame(height: min(480, (NSScreen.main?.visibleFrame.height ?? 800) * 0.65))
+            } else if let group = groups.first {
+                providerCard(group)
             }
         }
     }
 
+    private var integrationCount: String {
+        groups.count == 1 ? "1 integration" : "\(groups.count) integrations"
+    }
+
+    /// One short card stays put. Several integrations, or several rows, scroll.
+    private var scrollsOverview: Bool {
+        guard groups.count == 1, let group = groups.first else { return true }
+        return items(for: group).count + group.presentations.count > 2
+    }
+
     // swiftlint:disable:next function_body_length
     private func providerCard(_ group: PopoverProviderGroup) -> some View {
-        VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
+        let rows = items(for: group)
+        return VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
             reorderable(HStack(spacing: LayoutMetrics.rowSpacing) {
                 ProviderMark(providerID: group.providerID, size: 20)
                 Text(model.sections.all.first { $0.id == group.providerID }?.displayName ?? group.providerID)
@@ -100,15 +111,18 @@ struct MainPopover: View {
                     .lineLimit(1)
             }, id: group.orderKey, ids: groups.map(\.orderKey), scope: nil)
 
-            if items(for: group).isEmpty {
+            if rows.isEmpty {
                 Caption(text: "No usage reading available.")
             }
-            ForEach(items(for: group)) { item in
-                let ids = items(for: group).map(\.id)
-                reorderable(HStack(alignment: .top, spacing: LayoutMetrics.unit) {
+            ForEach(rows) { item in
+                let ids = rows.map(\.id)
+                reorderable(VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
                     switch item {
                     case .bucket(let bucket):
                         bucketRow(bucket)
+                        ForEach(group.quotas(for: bucket.id)) { presentation in
+                            quotaDetails(presentation, in: group)
+                        }
                     case .quota(let presentation):
                         quotaDetails(presentation, in: group)
                     }
@@ -180,29 +194,21 @@ struct MainPopover: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Quota: \(presentation.summary.quota.name)")
                     .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
+                if !isPinned(presentation) {
+                    Button("Show") {
+                        Task { await model.showInMenuBar(presentation) }
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                }
                 Spacer(minLength: LayoutMetrics.rowSpacing)
                 if let allowance = presentation.summary.todayAllowance {
-                    Text(
-                        "\(formatter.preciseString(allowance.usedToday)) / \(formatter.preciseString(allowance.suggested)) today"
-                    )
-                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
-                    .monospacedDigit()
+                    Text(todayFigures(allowance))
+                        .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
+                        .monospacedDigit()
                 }
             }
-            if let allowance = presentation.summary.todayAllowance {
-                if let used = allowance.usedToday {
-                    UsageBar(
-                        value: used,
-                        maximum: allowance.suggested,
-                        tint: ShareTint.color(for: used, of: allowance.suggested)
-                    )
-                    Caption(text: "\(formatter.preciseString(max(0, allowance.suggested - used))) remaining today")
-                } else {
-                    Caption(text: "Today's consumption unavailable.")
-                }
-            } else {
-                Caption(text: "No daily plan available.")
-            }
+            todayAllowance(presentation)
             if let bucketID = presentation.summary.quota.bucketID ?? presentation.summary.snapshot?.primaryBucket?.id,
                let bucket = group.snapshot?.buckets.first(where: { $0.id == bucketID })
             {
@@ -216,6 +222,33 @@ struct MainPopover: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// The quota the menu bar item currently speaks for.
+    private func isPinned(_ presentation: QuotaPresentation) -> Bool {
+        presentation.id == (model.menuBarQuotaID ?? model.primaryPresentation?.id)
+    }
+
+    private func todayFigures(_ allowance: TodayAllowance) -> String {
+        "\(formatter.preciseString(allowance.usedToday)) / \(formatter.preciseString(allowance.suggested)) today"
+    }
+
+    @ViewBuilder
+    private func todayAllowance(_ presentation: QuotaPresentation) -> some View {
+        if let allowance = presentation.summary.todayAllowance {
+            if let used = allowance.usedToday {
+                UsageBar(
+                    value: used,
+                    maximum: allowance.suggested,
+                    tint: ShareTint.color(for: used, of: allowance.suggested)
+                )
+                Caption(text: "\(formatter.preciseString(max(0, allowance.suggested - used))) remaining today")
+            } else {
+                Caption(text: "Today's consumption unavailable.")
+            }
+        } else {
+            Caption(text: "No daily plan available.")
+        }
+    }
+
     private func reorderable(
         _ content: some View, id: String, ids: [String], scope: String?
     ) -> some View {
@@ -223,13 +256,6 @@ struct MainPopover: View {
         return content
             .contentShape(Rectangle())
             .help("Drag to reorder, or right-click to move up or down")
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.openHand.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
             .contextMenu {
                 if index > 0 {
                     Button("Move up") { move(id, to: ids[index - 1], ids: ids, scope: scope) }

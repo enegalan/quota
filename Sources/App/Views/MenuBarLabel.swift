@@ -59,10 +59,18 @@ struct MenuBarLabel: View {
         for provider in model?.unplannedProviders ?? [] where
             !options.hiddenIntegrations.contains(provider.providerID) && seen.insert(provider.providerID).inserted
         {
-            providers.append(MenuBarProvider(unplanned: provider))
+            providers.append(menuBarProvider(unplanned: provider))
+        }
+        if providers.isEmpty, let provider = model?.unplannedProviders.first {
+            providers = [menuBarProvider(unplanned: provider)]
         }
         let ids = PopoverOrder.arranged(providers.map(\.id), accordingTo: options.popoverProviderOrder)
         return ids.compactMap { id in providers.first { $0.id == id } }
+    }
+
+    private func menuBarProvider(unplanned: UnplannedProvider) -> MenuBarProvider {
+        let displayName = model?.sections.listing(id: unplanned.providerID)?.displayName ?? unplanned.providerID
+        return MenuBarProvider(unplanned: unplanned, displayName: displayName)
     }
 
     var body: some View {
@@ -137,12 +145,8 @@ struct MenuBarLabel: View {
         let unavailableLimitIDs = limits.map(\.id).filter { id in
             !buckets.contains { $0.id == id }
         }
-        var limitOptions = options
-        if provider.presentation == nil {
-            limitOptions.showAvailableLimits = true
-        }
         let visible = buckets.filter {
-            limitOptions.showsLimit(
+            options.showsLimit(
                 $0.id,
                 integrationID: integrationID,
                 availableLimitIDs: availableLimitIDs,
@@ -158,7 +162,7 @@ struct MenuBarLabel: View {
             return "\(name) \(figures)"
         }
         for limit in limits where isMissing(limit, from: buckets)
-            && limitOptions.showsLimit(
+            && options.showsLimit(
                 limit.id,
                 integrationID: integrationID,
                 availableLimitIDs: availableLimitIDs,
@@ -313,10 +317,10 @@ private struct MenuBarProvider: Identifiable {
         self.presentation = presentation
     }
 
-    init(unplanned: UnplannedProvider) {
+    init(unplanned: UnplannedProvider, displayName: String) {
         providerID = unplanned.providerID
         accountLabel = unplanned.accountLabel
-        name = unplanned.providerID
+        name = displayName
         snapshot = unplanned.snapshot
         presentation = nil
     }

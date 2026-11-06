@@ -284,6 +284,11 @@ final class AppModel {
         await runRefresh(trigger: .popoverOpened)
     }
 
+    /// Reads connected integrations that have no quota yet, so the menu bar has figures after launch.
+    func refreshUnplannedIfNeeded() async {
+        await refreshUnplanned(trigger: .launch)
+    }
+
     /// Plans, executes, and finishes a refresh for one trigger.
     func runRefresh(trigger: RefreshTrigger) async {
         guard !isRefreshing else { return }
@@ -309,8 +314,8 @@ final class AppModel {
     }
 
     private func refreshUnplanned(trigger: RefreshTrigger) async {
-        let interval = await effectiveRefreshIntervalSeconds()
-        for provider in unplannedProviders {
+        for provider in unplannedProviders where isIntegrationShownInMenuBar(provider.providerID) {
+            let interval = await refreshIntervalSeconds(for: provider.providerID)
             let now = environment.now()
             if trigger == .scheduleElapsed || trigger == .launch, let last = unplannedAttempts[provider.orderKey],
                now.timeIntervalSince(last) < interval

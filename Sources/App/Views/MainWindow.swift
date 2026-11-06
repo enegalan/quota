@@ -84,6 +84,7 @@ struct MainWindow: View {
         .task {
             await model.load()
         }
+        .background(ManagementWindowCloseMonitor())
     }
 
     @ViewBuilder
@@ -233,6 +234,20 @@ struct MainWindow: View {
             }
             .padding(LayoutMetrics.windowPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// Hands the management window to the delegate, which hides the Dock icon when it closes.
+private struct ManagementWindowCloseMonitor: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        NSView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let window = nsView.window else { return }
+            (NSApp.delegate as? AppDelegate)?.noteManagementWindow(window)
         }
     }
 }

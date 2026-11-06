@@ -59,37 +59,30 @@ struct MenuBarIntegrationSettings: View {
         let integrationID = provider.providerID
         let buckets = provider.snapshot?.buckets ?? []
         let ids = buckets.map(\.id)
+        let shown = model.isIntegrationShownInMenuBar(integrationID)
         return Group {
             Toggle(model.sections.listing(id: integrationID)?.displayName ?? integrationID, isOn: Binding(
-                get: { !model.menuBarPreferences.hiddenIntegrations.contains(integrationID) },
-                set: { enabled in
-                    model.updateMenuBarPreferences {
-                        if enabled {
-                            $0.hiddenIntegrations.remove(integrationID)
-                        } else {
-                            $0.hiddenIntegrations.insert(integrationID)
-                        }
-                    }
-                }
+                get: { model.isIntegrationShownInMenuBar(integrationID) },
+                set: { model.setShowsIntegrationInMenuBar($0, integrationID: integrationID) }
             ))
+            .disabled(shown && !model.canHideIntegration(integrationID))
             ForEach(buckets, id: \.id) { bucket in
                 Toggle(bucket.displayName, isOn: Binding(
                     get: {
-                        var preferences = model.menuBarPreferences
-                        preferences.showAvailableLimits = true
-                        return preferences.showsLimit(bucket.id, integrationID: integrationID, availableLimitIDs: ids)
+                        model.menuBarPreferences.showsLimit(
+                            bucket.id,
+                            integrationID: integrationID,
+                            availableLimitIDs: ids
+                        )
                     },
                     set: { enabled in
                         model.updateMenuBarPreferences {
-                            let wasEnabled = $0.showAvailableLimits
-                            $0.showAvailableLimits = true
                             $0.setShowsLimit(
                                 enabled,
                                 limitID: bucket.id,
                                 integrationID: integrationID,
                                 availableLimitIDs: ids
                             )
-                            $0.showAvailableLimits = wasEnabled
                         }
                     }
                 ))

@@ -103,6 +103,31 @@ extension AppModel {
         return RefreshConstants.clamped(preferences.refreshIntervalSeconds)
     }
 
+    /// Intervals the user set for individual integrations. Missing means the general one.
+    func refreshIntervalsByProvider() async -> [String: TimeInterval] {
+        let preferences = await (try? environment.preferences.load()) ?? .default
+        return preferences.refreshIntervalSecondsByProvider
+    }
+
+    /// Sets one integration's poll interval. Nil returns it to the general interval.
+    func setRefreshInterval(_ seconds: TimeInterval?, for providerID: String) async {
+        await perform {
+            try await self.savePreferences {
+                let current = try await self.environment.preferences.load()
+                try await self.environment.preferences.save(
+                    current.withRefreshInterval(seconds, for: providerID)
+                )
+            }
+            await self.environment.planner.invalidateSchedule()
+        }
+    }
+
+    /// The interval in force for one integration.
+    func refreshIntervalSeconds(for providerID: String) async -> TimeInterval {
+        let preferences = await (try? environment.preferences.load()) ?? .default
+        return preferences.refreshInterval(for: providerID)
+    }
+
     /// Whether quota notifications are enabled.
     func notificationsEnabled() async -> Bool {
         let preferences = await (try? environment.preferences.load()) ?? .default

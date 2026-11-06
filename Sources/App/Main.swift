@@ -36,6 +36,7 @@ struct Main: App {
                     delegate.model = model
                     delegate.onTogglePopover = { togglePopover() }
                     await model.load()
+                    await model.refreshUnplannedIfNeeded()
                     await model.maybeCheckForUpdatesAutomatically()
                 }
         }

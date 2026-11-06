@@ -21,14 +21,14 @@ extension AppModel {
                 total: pools.count,
                 taken: pools.filter { isWatched(providerID: listing.id, bucketID: $0.id) }.count
             )
-        return ProviderDetail(
+        return await ProviderDetail(
             listing: listing,
             accountLabel: record?.authenticatedAccountLabel,
             syncCaption: syncCaption(for: record),
             failureCaption: failureCaption(for: record),
             versionCaption: versionCaption(for: listing),
             protocolCaption: protocolCaption(for: listing),
-            refreshCaption: refreshCaption(for: listing, record: record),
+            refreshCaption: refreshCaption(for: listing),
             pools: pools,
             limitAdvice: limitAdvice
         )
@@ -113,14 +113,9 @@ extension AppModel {
         return "Speaks protocol \(range.minimum) to \(range.maximum)."
     }
 
-    /// How often the provider would rather not be asked.
-    private func refreshCaption(
-        for listing: ProviderListing,
-        record: ProviderRecord?
-    ) -> String? {
-        let seconds = record?.suggestedRefreshInterval
-            ?? listing.provider.described?.suggestedRefreshIntervalSeconds
-        guard let seconds else { return nil }
+    /// How often this integration is read: its own interval, or the general one.
+    private func refreshCaption(for listing: ProviderListing) async -> String {
+        let seconds = await refreshIntervalSeconds(for: listing.id)
         return "Asked every \(Self.interval(seconds))."
     }
 

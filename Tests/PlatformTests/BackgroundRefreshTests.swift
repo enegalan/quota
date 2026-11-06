@@ -54,8 +54,8 @@ struct BackgroundRefreshTests {
         #expect(schedule.baseInterval == 120)
     }
 
-    @Test("The configured interval overrides a provider suggestion")
-    func preferenceOverridesSuggestion() async throws {
+    @Test("The general interval is used when an integration has none of its own")
+    func generalIntervalFillsGap() async throws {
         let store = CodableStore.inMemory()
         let repositories = SyncFixture.Repositories(store: store)
         try await repositories.preferences.save(Preferences(refreshIntervalSeconds: 60))
@@ -69,5 +69,24 @@ struct BackgroundRefreshTests {
             suggestedRefreshInterval: 300
         )
         #expect(await coordinator.effectiveSchedule(for: record).baseInterval == 60)
+    }
+
+    @Test("An integration's own interval beats the general one")
+    func providerIntervalPrecedesGeneral() async throws {
+        let store = CodableStore.inMemory()
+        let repositories = SyncFixture.Repositories(store: store)
+        try await repositories.preferences.save(
+            Preferences(refreshIntervalSeconds: 60).withRefreshInterval(300, for: "mock")
+        )
+        let coordinator = SyncFixture.makeCoordinator(
+            repositories: repositories,
+            fetcher: ScriptedProvider([]),
+            now: { SyncFixture.periodStart }
+        )
+        let record = ProviderRecord(
+            providerID: try ProviderID("mock"), displayName: "Mock", installedVersion: "1",
+            suggestedRefreshInterval: 15 * 60
+        )
+        #expect(await coordinator.effectiveSchedule(for: record).baseInterval == 300)
     }
 }

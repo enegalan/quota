@@ -9,7 +9,7 @@ public struct Preferences: Codable, Sendable, Equatable {
     public let defaultPolicyKind: String
     public let hasCompletedOnboarding: Bool
 
-    /// How often a connected provider is polled when it has suggested nothing.
+    /// How often a connected integration is polled when it has no interval of its own.
     ///
     /// A stored number rather than an absence, because the setting is shown as a
     /// figure in the interface and the user changes it by choosing one. It
@@ -17,6 +17,12 @@ public struct Preferences: Codable, Sendable, Equatable {
     /// it: a preference holding 600 while the schedule polled at 900 would mean
     /// the platform default was unreachable and neither number was the truth.
     public let refreshIntervalSeconds: TimeInterval
+
+    /// Poll interval chosen for one integration, keyed by provider id.
+    ///
+    /// An integration with no entry uses `refreshIntervalSeconds`. The entry is
+    /// removed when the user chooses the general interval again.
+    public let refreshIntervalSecondsByProvider: [String: TimeInterval]
 
     /// Providers switched off without a release.
     ///
@@ -61,6 +67,7 @@ public struct Preferences: Codable, Sendable, Equatable {
         defaultPolicyKind: String = PreferenceConstants.defaultPolicyKind,
         hasCompletedOnboarding: Bool = false,
         refreshIntervalSeconds: TimeInterval = RefreshConstants.defaultPollInterval,
+        refreshIntervalSecondsByProvider: [String: TimeInterval] = [:],
         disabledProviders: Set<String> = [],
         menuBarQuotaID: UUID? = nil,
         notificationsEnabled: Bool = PreferenceConstants.defaultNotificationsEnabled,
@@ -72,6 +79,7 @@ public struct Preferences: Codable, Sendable, Equatable {
         self.defaultPolicyKind = defaultPolicyKind
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.refreshIntervalSeconds = refreshIntervalSeconds
+        self.refreshIntervalSecondsByProvider = refreshIntervalSecondsByProvider
         self.disabledProviders = disabledProviders
         self.menuBarQuotaID = menuBarQuotaID
         self.notificationsEnabled = notificationsEnabled
@@ -88,6 +96,10 @@ public struct Preferences: Codable, Sendable, Equatable {
         defaultPolicyKind = try container.decode(String.self, forKey: .defaultPolicyKind)
         hasCompletedOnboarding = try container.decode(Bool.self, forKey: .hasCompletedOnboarding)
         refreshIntervalSeconds = try container.decode(TimeInterval.self, forKey: .refreshIntervalSeconds)
+        refreshIntervalSecondsByProvider = try container.decodeIfPresent(
+            [String: TimeInterval].self,
+            forKey: .refreshIntervalSecondsByProvider
+        ) ?? [:]
         disabledProviders = try container.decode(Set<String>.self, forKey: .disabledProviders)
         menuBarQuotaID = try container.decodeIfPresent(UUID.self, forKey: .menuBarQuotaID)
         notificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .notificationsEnabled)
@@ -134,15 +146,34 @@ public struct Preferences: Codable, Sendable, Equatable {
         copy(announcedUpdateVersion: version)
     }
 
-    /// The same preferences with a different refresh interval.
+    /// The same preferences with a different general refresh interval.
     public func withRefreshIntervalSeconds(_ seconds: TimeInterval) -> Preferences {
         copy(refreshIntervalSeconds: seconds)
+    }
+
+    /// The interval in force for one integration: its own, or the general one.
+    public func refreshInterval(for providerID: String) -> TimeInterval {
+        RefreshConstants.clamped(refreshIntervalSecondsByProvider[providerID] ?? refreshIntervalSeconds)
+    }
+
+    /// The same preferences with one integration's interval set, or cleared.
+    ///
+    /// Nil removes the entry, so the integration goes back to the general interval.
+    public func withRefreshInterval(_ seconds: TimeInterval?, for providerID: String) -> Preferences {
+        var intervals = refreshIntervalSecondsByProvider
+        if let seconds {
+            intervals[providerID] = RefreshConstants.clamped(seconds)
+        } else {
+            intervals.removeValue(forKey: providerID)
+        }
+        return copy(refreshIntervalSecondsByProvider: intervals)
     }
 
     private func copy(
         defaultPolicyKind: String? = nil,
         hasCompletedOnboarding: Bool? = nil,
         refreshIntervalSeconds: TimeInterval? = nil,
+        refreshIntervalSecondsByProvider: [String: TimeInterval]? = nil,
         disabledProviders: Set<String>? = nil,
         menuBarQuotaID: UUID?? = nil,
         notificationsEnabled: Bool? = nil,
@@ -155,6 +186,8 @@ public struct Preferences: Codable, Sendable, Equatable {
             defaultPolicyKind: defaultPolicyKind ?? self.defaultPolicyKind,
             hasCompletedOnboarding: hasCompletedOnboarding ?? self.hasCompletedOnboarding,
             refreshIntervalSeconds: refreshIntervalSeconds ?? self.refreshIntervalSeconds,
+            refreshIntervalSecondsByProvider: refreshIntervalSecondsByProvider
+                ?? self.refreshIntervalSecondsByProvider,
             disabledProviders: disabledProviders ?? self.disabledProviders,
             menuBarQuotaID: menuBarQuotaID ?? self.menuBarQuotaID,
             notificationsEnabled: notificationsEnabled ?? self.notificationsEnabled,
