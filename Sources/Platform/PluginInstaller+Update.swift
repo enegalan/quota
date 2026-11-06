@@ -19,7 +19,12 @@ extension PluginInstaller {
         previous: InstalledProvider,
         verify: @escaping @Sendable (InstalledProvider) async throws -> Void
     ) async throws -> InstalledProvider {
-        try recoverSameVersionDebris(for: provider)
+        // Debris recovery mutates version directories; run it behind the same
+        // gate as installs so it cannot race an in-flight same-version swap.
+        // `isActive` must run after recovery, once the layout is settled.
+        try await InstallationGate.shared.serialise {
+            try self.recoverSameVersionDebris(for: provider)
+        }
 
         // Same version with the same bytes is already the state the caller
         // asked for. Same version with different bytes is a rebuilt provider
@@ -174,19 +179,28 @@ extension PluginInstaller {
         let canonical = PluginLayout.versionDirectory(
             provider.id, provider.version, in: pluginsDirectory
         )
-        let active = PluginLayout.activeVersionDirectory(provider.id, in: pluginsDirectory)
-        let context = SameVersionRecovery(
-            providerID: provider.id,
-            canonical: canonical,
-            active: active,
-            canonicalExists: FileManager.default.fileExists(atPath: canonical.path),
-            activeExists: active.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
-        )
         for name in entries {
             let url = parent.appendingPathComponent(name)
+            guard name.hasPrefix("\(version).next-")
+                || name.hasPrefix("\(version).previous-")
+            else { continue }
+            // Rebuild after each prior recovery: moving a `.previous-` into
+            // canonical changes what the next entry must do with the layout.
+            let active = PluginLayout.activeVersionDirectory(
+                provider.id, in: pluginsDirectory
+            )
+            let context = SameVersionRecovery(
+                providerID: provider.id,
+                canonical: canonical,
+                active: active,
+                canonicalExists: FileManager.default.fileExists(atPath: canonical.path),
+                activeExists: active.map {
+                    FileManager.default.fileExists(atPath: $0.path)
+                } ?? false
+            )
             if name.hasPrefix("\(version).next-") {
                 try recoverNextDebris(url, context: context)
-            } else if name.hasPrefix("\(version).previous-") {
+            } else {
                 try recoverPreviousDebris(url, context: context)
             }
         }

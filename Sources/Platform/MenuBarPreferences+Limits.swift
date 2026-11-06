@@ -93,11 +93,9 @@ public extension MenuBarPreferences {
         }
         legacyHiddenBuckets.removeValue(forKey: integrationID)
         legacyShownUnavailableBuckets.removeValue(forKey: integrationID)
-        if legacyHiddenBuckets.isEmpty, legacyShownUnavailableBuckets.isEmpty,
-           !shownBuckets.isEmpty
-        {
-            usesLegacyLimitDefaults = false
-        }
+        // Keep usesLegacyLimitDefaults set: other integrations may still rely on
+        // the implicit all-available rule until each has its own shownBuckets
+        // entry. Clearing the flag here would turn those into first-only.
     }
 }
 

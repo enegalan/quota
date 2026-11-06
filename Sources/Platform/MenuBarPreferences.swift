@@ -52,6 +52,7 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
         case dailyQuotas
         case legacyHiddenBuckets = "hiddenBuckets"
         case legacyShownUnavailableBuckets = "shownUnavailableBuckets"
+        case usesLegacyLimitDefaults
     }
 
     public init() {}
@@ -71,26 +72,29 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
         valueMode = try values.decodeIfPresent(ValueMode.self, forKey: .valueMode) ?? .both
         hiddenIntegrations = try values.decodeIfPresent(Set<String>.self, forKey: .hiddenIntegrations) ?? []
         dailyQuotas = try values.decodeIfPresent([String: Set<UUID>].self, forKey: .dailyQuotas) ?? [:]
-        // Older documents stored hidden available limits and chosen unavailable
-        // ones separately. Keep those until declared IDs exist; mapping them into
-        // shownBuckets here would drop every available limit the user had not
-        // hidden.
-        if values.contains(.shownBuckets) {
-            shownBuckets = try values.decodeIfPresent(
-                [String: Set<String>].self,
-                forKey: .shownBuckets
-            ) ?? [:]
-        } else {
+        // Always read both representations. A partially migrated document writes
+        // materialized shownBuckets for one integration while other integrations
+        // still live in the legacy maps; ignoring either side would drop them.
+        shownBuckets = try values.decodeIfPresent(
+            [String: Set<String>].self,
+            forKey: .shownBuckets
+        ) ?? [:]
+        legacyHiddenBuckets = try values.decodeIfPresent(
+            [String: Set<String>].self,
+            forKey: .legacyHiddenBuckets
+        ) ?? [:]
+        legacyShownUnavailableBuckets = try values.decodeIfPresent(
+            [String: Set<String>].self,
+            forKey: .legacyShownUnavailableBuckets
+        ) ?? [:]
+        if let flag = try values.decodeIfPresent(Bool.self, forKey: .usesLegacyLimitDefaults) {
+            usesLegacyLimitDefaults = flag
+        } else if !values.contains(.shownBuckets) {
             usesLegacyLimitDefaults = true
-            shownBuckets = [:]
-            legacyHiddenBuckets = try values.decodeIfPresent(
-                [String: Set<String>].self,
-                forKey: .legacyHiddenBuckets
-            ) ?? [:]
-            legacyShownUnavailableBuckets = try values.decodeIfPresent(
-                [String: Set<String>].self,
-                forKey: .legacyShownUnavailableBuckets
-            ) ?? [:]
+        } else if !legacyHiddenBuckets.isEmpty || !legacyShownUnavailableBuckets.isEmpty {
+            // Materialized some integrations before the flag was stored; pending
+            // legacy selections still need the all-available default.
+            usesLegacyLimitDefaults = true
         }
         // An older document could store both switches off. The menu bar needs
         // one of them to have a figure to draw, so today's allowance returns.
@@ -107,6 +111,11 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
         try values.encode(valueMode, forKey: .valueMode)
         try values.encode(hiddenIntegrations, forKey: .hiddenIntegrations)
         try values.encode(dailyQuotas, forKey: .dailyQuotas)
+        // Persist the legacy-default flag so materializing one integration does
+        // not make a reload treat untouched integrations as modern first-only.
+        if usesLegacyLimitDefaults {
+            try values.encode(true, forKey: .usesLegacyLimitDefaults)
+        }
         // Omit shownBuckets while still on the legacy path with nothing
         // materialized, so the next read keeps the all-available default.
         if !usesLegacyLimitDefaults || !shownBuckets.isEmpty {

@@ -147,6 +147,36 @@ struct MenuBarLimitPreferencesTests {
         #expect(preferences.shownBuckets["claude"] == ["5h", "models"])
     }
 
+    @Test("Materializing one integration keeps legacy defaults for the others")
+    func partialMigrationKeepsOtherIntegrations() throws {
+        var preferences = try JSONDecoder().decode(
+            MenuBarPreferences.self,
+            from: Data("""
+            {"hiddenBuckets":{"claude":["1w"],"cursor":["api"]}}
+            """.utf8)
+        )
+        preferences.showAvailableLimits = true
+        preferences.materializeLegacyLimits(
+            integrationID: "claude",
+            availableLimitIDs: ["5h", "1w"]
+        )
+
+        var decoded = try JSONDecoder().decode(
+            MenuBarPreferences.self,
+            from: JSONEncoder().encode(preferences)
+        )
+        decoded.showAvailableLimits = true
+        let claude = ["5h", "1w"]
+        let cursor = ["models", "api"]
+
+        #expect(decoded.shownBuckets["claude"] == ["5h"])
+        #expect(decoded.showsLimit("5h", integrationID: "claude", availableLimitIDs: claude))
+        #expect(!decoded.showsLimit("1w", integrationID: "claude", availableLimitIDs: claude))
+        // Cursor was never materialized: all available minus its hidden entry.
+        #expect(decoded.showsLimit("models", integrationID: "cursor", availableLimitIDs: cursor))
+        #expect(!decoded.showsLimit("api", integrationID: "cursor", availableLimitIDs: cursor))
+    }
+
     @Test("Saved limit IDs that are no longer declared fall back to the first declared")
     func undeclaredSelectionsFallBack() {
         var menuBar = MenuBarPreferences()
