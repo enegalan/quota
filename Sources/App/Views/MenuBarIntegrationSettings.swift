@@ -31,7 +31,7 @@ struct MenuBarIntegrationSettings: View {
 
     var body: some View {
         Section {
-            if items.isEmpty {
+            if items.isEmpty && unplannedProviders.isEmpty {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Add a quota to choose which integration limits appear in the menu bar.")
                         .foregroundStyle(.secondary)
@@ -41,9 +41,51 @@ struct MenuBarIntegrationSettings: View {
                 ForEach(items) { item in
                     IntegrationLimitRowView(model: model, item: item)
                 }
+                ForEach(unplannedProviders, id: \.orderKey) { provider in
+                    unplannedSettings(provider)
+                }
             }
         } header: {
             Text("Integration Limits")
+        }
+    }
+
+    private var unplannedProviders: [UnplannedProvider] {
+        var seen = Set(model.presentations.map { $0.summary.quota.providerID.rawValue })
+        return model.unplannedProviders.filter { seen.insert($0.providerID).inserted }
+    }
+
+    private func unplannedSettings(_ provider: UnplannedProvider) -> some View {
+        let integrationID = provider.providerID
+        let buckets = provider.snapshot?.buckets ?? []
+        let ids = buckets.map(\.id)
+        return Group {
+            Toggle(model.sections.listing(id: integrationID)?.displayName ?? integrationID, isOn: Binding(
+                get: { !model.menuBarPreferences.hiddenIntegrations.contains(integrationID) },
+                set: { enabled in
+                    model.updateMenuBarPreferences {
+                        if enabled { $0.hiddenIntegrations.remove(integrationID) }
+                        else { $0.hiddenIntegrations.insert(integrationID) }
+                    }
+                }
+            ))
+            ForEach(buckets, id: \.id) { bucket in
+                Toggle(bucket.displayName, isOn: Binding(
+                    get: {
+                        var preferences = model.menuBarPreferences
+                        preferences.showAvailableLimits = true
+                        return preferences.showsLimit(bucket.id, integrationID: integrationID, availableLimitIDs: ids)
+                    },
+                    set: { enabled in
+                        model.updateMenuBarPreferences {
+                            let wasEnabled = $0.showAvailableLimits
+                            $0.showAvailableLimits = true
+                            $0.setShowsLimit(enabled, limitID: bucket.id, integrationID: integrationID, availableLimitIDs: ids)
+                            $0.showAvailableLimits = wasEnabled
+                        }
+                    }
+                ))
+            }
         }
     }
 

@@ -125,6 +125,11 @@ public actor RefreshPlanner {
         nextDue[providerID]
     }
 
+    /// Recalculate scheduled times after the refresh interval changes.
+    public func invalidateSchedule() {
+        nextDue.removeAll()
+    }
+
     /// Every quota the coordinator knows about.
     ///
     /// Asked through the coordinator rather than from a repository of

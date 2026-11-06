@@ -14,7 +14,7 @@ struct ProviderSuggestionTests {
     ) async throws -> (SyncFixture.Harness, Date) {
         let now = Fixture.periodStart
         let provider = ScriptedProvider(always: .success(try Fixture.snapshot(updatedAt: now)))
-        let harness = try await Fixture.makeHarness(fetcher: provider, now: now)
+        let harness = try await Fixture.makeHarness(fetcher: provider, now: now, usePreferences: false)
         _ = try await harness.coordinator.refresh(quotaID: harness.quota.id)
         try await harness.coordinator.noteSuggestedRefreshInterval(
             suggestion,

@@ -20,6 +20,8 @@ import Platform
 final class AppModel {
     /// Every quota the app knows about, ready to render.
     private(set) var presentations: [QuotaPresentation] = []
+    private(set) var unplannedProviders: [UnplannedProvider] = []
+    @ObservationIgnored private var unplannedAttempts: [String: Date] = [:]
     private(set) var menuBarPreferences = MenuBarPreferences()
     /// The preferences save in flight, and which save is the latest.
     ///
@@ -167,6 +169,18 @@ final class AppModel {
             sections = try await environment.manager.sections(preferences: preferences)
             presentations = try await environment.presenter(at: reference).presentations()
             presentations = await enrich(presentations)
+            var unplanned: [UnplannedProvider] = []
+            for listing in sections.connected where listing.state == .connected || listing.state == .synchronizing {
+                guard let providerID = try? ProviderID(listing.id),
+                      let account = try await environment.providers.provider(providerID)?.authenticatedAccountLabel,
+                      !presentations.contains(where: {
+                          $0.summary.quota.providerID == providerID && $0.accountLabel == account
+                      }) else { continue }
+                unplanned.append(unplannedProviders.first { $0.providerID == listing.id && $0.accountLabel == account }
+                    ?? UnplannedProvider(providerID: listing.id, accountLabel: account))
+            }
+            unplannedProviders = unplanned
+            unplannedAttempts = unplannedAttempts.filter { key, _ in unplanned.contains { $0.orderKey == key } }
             lastError = nil
         } catch {
             report(error)
@@ -286,10 +300,35 @@ final class AppModel {
             failure = error
         }
         await load()
+        await refreshUnplanned(trigger: trigger)
         // After the reload, for the same reason `perform` puts its failure
         // there: the reload clears the error, and a refresh that failed with no
         // reason shown is a refresh that failed silently.
         lastError = failure?.localizedDescription
+    }
+
+    private func refreshUnplanned(trigger: RefreshTrigger) async {
+        let interval = await effectiveRefreshIntervalSeconds()
+        for provider in unplannedProviders {
+            let now = environment.now()
+            if trigger == .scheduleElapsed || trigger == .launch {
+                if let last = unplannedAttempts[provider.orderKey], now.timeIntervalSince(last) < interval { continue }
+            }
+            guard let id = try? ProviderID(provider.providerID) else { continue }
+            unplannedAttempts[provider.orderKey] = now
+            let outcome = await environment.fetcher.fetchUsage(
+                providerID: id, accountLabel: provider.accountLabel,
+                localDate: LocalDate(date: now, calendar: userCalendar)
+            )
+            guard let index = unplannedProviders.firstIndex(where: { $0.orderKey == provider.orderKey }) else { continue }
+            switch outcome.result {
+            case .success(let snapshot):
+                unplannedProviders[index].snapshot = snapshot
+                unplannedProviders[index].failed = false
+            case .failure:
+                unplannedProviders[index].failed = true
+            }
+        }
     }
 
     /// A calendar over one quota, at the instant the last load used.

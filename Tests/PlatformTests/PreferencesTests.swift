@@ -61,4 +61,18 @@ struct PreferencesTests {
         try await repository.save(preferences)
         #expect(try await repository.load() == preferences)
     }
+
+    @Test("Popover orders survive encoding and older menu preferences decode")
+    func popoverOrdersRoundTrip() throws {
+        var options = MenuBarPreferences()
+        options.keepRunningOnClose = true
+        options.popoverProviderOrder = ["claude:YWJj", "codex:ZGVm"]
+        options.popoverItemOrder = ["claude:YWJj": ["bucket:five_hour", "quota:123"]]
+        let decoded = try JSONDecoder().decode(MenuBarPreferences.self, from: JSONEncoder().encode(options))
+        #expect(decoded == options)
+        let old = try JSONDecoder().decode(MenuBarPreferences.self, from: Data("{}".utf8))
+        #expect(!old.keepRunningOnClose)
+        #expect(old.popoverProviderOrder.isEmpty)
+        #expect(old.popoverItemOrder.isEmpty)
+    }
 }

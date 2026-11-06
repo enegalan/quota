@@ -49,7 +49,7 @@ enum LayoutMetrics {
     /// A menu bar popover sizes to its content, and a popover that changes width
     /// as a quota name changes is a popover that moves under the pointer. The
     /// eleven elements are laid out in one column at this width.
-    static let popoverWidth: CGFloat = 320
+    static let popoverWidth: CGFloat = 400
 
     /// Side of the mark that says which quota the menu bar item is speaking for.
     static let menuBarMarkerSize: CGFloat = 6

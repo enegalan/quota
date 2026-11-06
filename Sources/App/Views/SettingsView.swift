@@ -1,5 +1,6 @@
 import Core
 import Platform
+import ServiceManagement
 import SwiftUI
 
 /// User-level settings: notifications, refresh interval, and update checks.
@@ -14,9 +15,13 @@ struct SettingsView: View {
     @State private var automaticUpdateChecksEnabled =
         PreferenceConstants.defaultAutomaticUpdateChecksEnabled
     @State private var isReady = false
+    @State private var loginItemStatus = SMAppService.mainApp.status
+    @State private var loginItemError: String?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Form {
+            launchSettings
             menuBarSettings
             MenuBarIntegrationSettings(model: model)
             Section {
@@ -56,8 +61,7 @@ struct SettingsView: View {
                     }
                     SettingInfoButton(
                         explanation: """
-                        How often Quota re-reads a connected provider when that \
-                        provider has not suggested a schedule of its own. A shorter \
+                        How often Quota re-reads a connected provider. A shorter \
                         interval keeps figures fresher and sends more requests; a \
                         longer one is quieter on the network and may show older data \
                         between polls.
@@ -121,10 +125,54 @@ struct SettingsView: View {
             await reloadFromPreferences()
             isReady = true
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { loginItemStatus = SMAppService.mainApp.status }
+        }
+    }
+
+    private var launchSettings: some View {
+        Section("Startup") {
+            Toggle("Open Quota at login", isOn: Binding(
+                get: { loginItemStatus == .enabled || loginItemStatus == .requiresApproval },
+                set: { enabled in
+                    do {
+                        if enabled {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                        loginItemError = nil
+                    } catch {
+                        loginItemError = error.localizedDescription
+                    }
+                    loginItemStatus = SMAppService.mainApp.status
+                }
+            ))
+            Text("Quota opens automatically when you sign in to your Mac.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if loginItemStatus == .requiresApproval {
+                Text("Allow Quota in Login Items in System Settings to finish setup.")
+                    .font(.caption)
+                Button("Open Login Items Settings") {
+                    SMAppService.openSystemSettingsLoginItems()
+                }
+            }
+            if let loginItemError {
+                Text(loginItemError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .onAppear { loginItemStatus = SMAppService.mainApp.status }
     }
 
     private var menuBarSettings: some View {
         Section {
+            Toggle("Keep Quota running in the menu bar when closed", isOn: menuBarBinding(\.keepRunningOnClose))
+            Text("Closing Quota hides its windows and Dock icon. Use Quit in the menu bar to exit completely.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline) {
                 Toggle("Show integration logos", isOn: menuBarBinding(\.showLogos))
                 SettingInfoButton(explanation: Self.logosExplanation)

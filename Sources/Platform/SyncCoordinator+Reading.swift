@@ -135,15 +135,14 @@ public extension SyncCoordinator {
     /// opened still backs off for the sixth. Counting in memory would back off
     /// exactly once per launch, and a menu bar app is mostly not running.
     ///
-    /// Preference order: the provider's own suggestion, then the user's configured
-    /// interval, then the platform default. All are clamped by the schedule.
+    /// The user's configured interval takes precedence over the provider suggestion.
     func effectiveSchedule(for record: ProviderRecord) async -> RefreshSchedule {
         let userPreferred: TimeInterval? = if let preferences {
             try? await preferences.load().refreshIntervalSeconds
         } else {
             nil
         }
-        let suggestion = record.suggestedRefreshInterval ?? userPreferred
+        let suggestion = userPreferred ?? record.suggestedRefreshInterval
         let base = suggestion.map { RefreshSchedule(providerSuggestion: $0) } ?? schedule
         guard let code = record.lastFailure?.code, code.backsOff else { return base }
         return base.withConsecutiveFailures(record.consecutiveFailures)

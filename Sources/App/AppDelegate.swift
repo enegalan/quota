@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 import Foundation
 
 /// The keyboard shortcuts the settings panel is reachable by.
@@ -38,6 +39,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Regular policy so the Dock icon can reopen the management window.
         NSApp.setActivationPolicy(.regular)
+    }
+
+    /// Closing the management window must leave the menu bar app running.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard model?.menuBarPreferences.keepRunningOnClose == true,
+              let event = NSAppleEventManager.shared().currentAppleEvent,
+              event.eventClass == AEEventClass(kCoreEventClass),
+              event.eventID == AEEventID(kAEQuitApplication),
+              event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) == nil,
+              event.paramDescriptor(forKeyword: AEKeyword(kAEQuitReason)) == nil,
+              let pid = event.attributeDescriptor(forKeyword: AEKeyword(keySenderPIDAttr))?.int32Value,
+              NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == "com.apple.dock"
+        else { return .terminateNow }
+
+        hideInMenuBar()
+        return .terminateCancel
     }
 
     /// Treats a second Dock click as a request for the management window.
@@ -124,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Quit with the platform-expected ⌘Q chord.
     private func quitMenuItem() -> NSMenuItem {
         let quit = item(
-            title: "Quit Quota",
+            title: "Close Quota",
             key: Shortcut.quitKey,
             action: #selector(quit),
             keyEquivalent: Shortcut.quitKeyEquivalent
@@ -189,7 +210,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
+        if model?.menuBarPreferences.keepRunningOnClose == true {
+            hideInMenuBar()
+            return
+        }
         NSApp.terminate(nil)
+    }
+
+    private func hideInMenuBar() {
+        NSApp.hide(nil)
+        NSApp.setActivationPolicy(.accessory)
     }
 }
 

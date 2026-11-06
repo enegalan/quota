@@ -54,11 +54,21 @@ struct BackgroundRefreshTests {
         #expect(schedule.baseInterval == 120)
     }
 
-    @Test("Low-power suspension is a boolean the controller can read")
-    func lowPowerFlagExists() {
-        // The controller suspends when this is true; the value itself is owned by
-        // the system. Asserting the type keeps the test offline and deterministic.
-        let suspended = ProcessInfo.processInfo.isLowPowerModeEnabled
-        #expect(suspended == true || suspended == false)
+    @Test("The configured interval overrides a provider suggestion")
+    func preferenceOverridesSuggestion() async throws {
+        let store = CodableStore.inMemory()
+        let repositories = SyncFixture.Repositories(store: store)
+        try await repositories.preferences.save(Preferences(refreshIntervalSeconds: 60))
+        let coordinator = SyncFixture.makeCoordinator(
+            repositories: repositories,
+            fetcher: ScriptedProvider([]),
+            now: { SyncFixture.periodStart }
+        )
+        let record = ProviderRecord(
+            providerID: try ProviderID("mock"), displayName: "Mock", installedVersion: "1",
+            suggestedRefreshInterval: 300
+        )
+        #expect(await coordinator.effectiveSchedule(for: record).baseInterval == 60)
     }
+
 }

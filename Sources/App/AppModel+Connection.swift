@@ -93,6 +93,7 @@ extension AppModel {
                     current.withRefreshIntervalSeconds(clamped)
                 )
             }
+            await self.environment.planner.invalidateSchedule()
         }
     }
 

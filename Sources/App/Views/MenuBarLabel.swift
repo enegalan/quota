@@ -53,12 +53,23 @@ struct MenuBarLabel: View {
         return visible.isEmpty ? candidates.first.map { [$0] } ?? [] : visible
     }
 
+    private var resolvedProviders: [MenuBarProvider] {
+        var providers = resolvedPresentations.map { MenuBarProvider(presentation: $0) }
+        var seen = Set(providers.map(\.providerID))
+        for provider in model?.unplannedProviders ?? [] where
+            !options.hiddenIntegrations.contains(provider.providerID) && seen.insert(provider.providerID).inserted {
+            providers.append(MenuBarProvider(unplanned: provider))
+        }
+        let ids = PopoverOrder.arranged(providers.map(\.id), accordingTo: options.popoverProviderOrder)
+        return ids.compactMap { id in providers.first { $0.id == id } }
+    }
+
     var body: some View {
         if let image = renderedLabel {
             Image(nsImage: image)
                 .renderingMode(.original)
-                .accessibilityLabel(resolvedPresentations.map {
-                    "\($0.summary.quota.name): \(figures(for: $0))"
+                .accessibilityLabel(resolvedProviders.map {
+                    "\($0.name): \(figures(for: $0))"
                 }.joined(separator: ", "))
         } else {
             Text("Quota · \(PercentageFormatter.unknown)")
@@ -75,15 +86,15 @@ struct MenuBarLabel: View {
 
     private var labelContent: some View {
         HStack(spacing: LayoutMetrics.rowSpacing) {
-            if resolvedPresentations.isEmpty {
+            if resolvedProviders.isEmpty {
                 Text("Quota · \(PercentageFormatter.unknown)")
             } else {
-                ForEach(resolvedPresentations) { presentation in
-                    if presentation.id != resolvedPresentations.first?.id {
+                ForEach(resolvedProviders) { provider in
+                    if provider.id != resolvedProviders.first?.id {
                         Text("|")
                             .foregroundStyle(.secondary)
                     }
-                    quotaLabel(presentation)
+                    quotaLabel(provider)
                 }
             }
         }
@@ -92,38 +103,31 @@ struct MenuBarLabel: View {
     }
 
     /// One integration's mark and figures, so a separator can sit between integrations.
-    private func quotaLabel(_ presentation: QuotaPresentation) -> some View {
-        let figures = figures(for: presentation)
+    private func quotaLabel(_ provider: MenuBarProvider) -> some View {
+        let figures = figures(for: provider)
         return HStack(spacing: LayoutMetrics.lineSpacing) {
             if options.showLogos {
                 ProviderMark(
-                    providerID: presentation.summary.quota.providerID.rawValue,
+                    providerID: provider.providerID,
                     size: LayoutMetrics.indicatorSize + 7,
                     sizesNativeImage: true
                 )
             } else {
-                Text(integrationName(for: presentation))
+                Text(model?.sections.listing(id: provider.providerID)?.displayName ?? provider.name)
             }
             if !figures.isEmpty {
                 Text(figures)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(presentation.summary.quota.name): \(figures)")
-    }
-
-    /// The provider's display name, or the quota name when the listing is gone.
-    private func integrationName(for presentation: QuotaPresentation) -> String {
-        let integrationID = presentation.summary.quota.providerID.rawValue
-        return model?.sections.listing(id: integrationID)?.displayName
-            ?? presentation.summary.quota.name
+        .accessibilityLabel("\(provider.name): \(figures)")
     }
 
     /// Today's allowances and the visible limits, in the order the status item draws them.
-    private func figures(for presentation: QuotaPresentation) -> String {
-        let integrationID = presentation.summary.quota.providerID.rawValue
-        let buckets = presentation.summary.snapshot?.buckets ?? []
-        let limits = presentation.summary.snapshot?.knownLimits ?? []
+    private func figures(for provider: MenuBarProvider) -> String {
+        let integrationID = provider.providerID
+        let buckets = (provider.snapshot?.buckets ?? []).filter { provider.presentation != nil || $0.period.end > (model?.reference ?? Date()) }
+        let limits = provider.snapshot?.knownLimits ?? []
         // Available and unavailable stay distinct so a legacy document can
         // migrate "all available minus hidden" without promoting unchosen
         // unavailable limits.
@@ -131,8 +135,10 @@ struct MenuBarLabel: View {
         let unavailableLimitIDs = limits.map(\.id).filter { id in
             !buckets.contains { $0.id == id }
         }
+        var limitOptions = options
+        if provider.presentation == nil { limitOptions.showAvailableLimits = true }
         let visible = buckets.filter {
-            options.showsLimit(
+            limitOptions.showsLimit(
                 $0.id,
                 integrationID: integrationID,
                 availableLimitIDs: availableLimitIDs,
@@ -148,8 +154,8 @@ struct MenuBarLabel: View {
             return "\(name) \(figures)"
         }
         for limit in limits where isMissing(limit, from: buckets)
-            && shows(
-                limit,
+            && limitOptions.showsLimit(
+                limit.id,
                 integrationID: integrationID,
                 availableLimitIDs: availableLimitIDs,
                 unavailableLimitIDs: unavailableLimitIDs
@@ -157,7 +163,8 @@ struct MenuBarLabel: View {
         {
             labels.append("\(limit.menuBarLabel) \(values(used: nil, remaining: nil))")
         }
-        return (dailyLines(for: presentation) + labels).joined(separator: "  ")
+        let daily = provider.presentation.map { dailyLines(for: $0) } ?? []
+        return (daily + labels).joined(separator: "  ")
     }
 
     /// Today's allowance for every quota of this integration the user chose.
@@ -280,5 +287,31 @@ struct MenuBarLabel: View {
         guard let allowance else { return PercentageFormatter.unknown }
         let used = allowance.usedToday.map { formatter.preciseString($0) } ?? PercentageFormatter.unknown
         return "\(used) / \(formatter.preciseString(allowance.suggested))"
+    }
+}
+
+private struct MenuBarProvider: Identifiable {
+    let providerID: String
+    let accountLabel: String?
+    let name: String
+    let snapshot: UsageSnapshot?
+    let presentation: QuotaPresentation?
+
+    var id: String { PopoverOrder.key(providerID: providerID, account: accountLabel) }
+
+    init(presentation: QuotaPresentation) {
+        providerID = presentation.summary.quota.providerID.rawValue
+        accountLabel = presentation.accountLabel
+        name = presentation.summary.quota.name
+        snapshot = presentation.summary.snapshot
+        self.presentation = presentation
+    }
+
+    init(unplanned: UnplannedProvider) {
+        providerID = unplanned.providerID
+        accountLabel = unplanned.accountLabel
+        name = unplanned.providerID
+        snapshot = unplanned.snapshot
+        presentation = nil
     }
 }
