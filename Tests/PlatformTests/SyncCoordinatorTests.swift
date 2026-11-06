@@ -159,4 +159,49 @@ struct SyncCoordinatorTests {
         #expect(stored.consecutiveFailures == 0)
         #expect(stored.lastSyncAt == after)
     }
+
+    @Test("A seeded quota name follows when the provider renames the limit")
+    func seededNameFollowsLimitRename() async throws {
+        let now = Fixture.periodStart
+        let first = try Fixture.snapshot(
+            updatedAt: now,
+            displayName: "Cursor Models"
+        )
+        let second = try Fixture.snapshot(
+            updatedAt: now.addingTimeInterval(600),
+            displayName: "Included Models"
+        )
+        let provider = ScriptedProvider([.success(first), .success(second)])
+        let harness = try await Fixture.makeHarness(fetcher: provider, now: now)
+        let seeded = harness.quota.withName("Cursor Models", updatedAt: now)
+        try await harness.quotas.save(seeded)
+
+        _ = try await harness.coordinator.refresh(quotaID: seeded.id)
+        _ = try await harness.coordinator(readingAt: now.addingTimeInterval(600))
+            .refresh(quotaID: seeded.id)
+
+        let stored = try #require(await harness.quotas.quota(id: seeded.id))
+        #expect(stored.name == "Included Models")
+    }
+
+    @Test("A typed quota name is left alone when the limit is renamed")
+    func typedNameSurvivesLimitRename() async throws {
+        let now = Fixture.periodStart
+        let first = try Fixture.snapshot(updatedAt: now, displayName: "Cursor Models")
+        let second = try Fixture.snapshot(
+            updatedAt: now.addingTimeInterval(600),
+            displayName: "Included Models"
+        )
+        let provider = ScriptedProvider([.success(first), .success(second)])
+        let harness = try await Fixture.makeHarness(fetcher: provider, now: now)
+        let typed = harness.quota.withName("Work", updatedAt: now)
+        try await harness.quotas.save(typed)
+
+        _ = try await harness.coordinator.refresh(quotaID: typed.id)
+        _ = try await harness.coordinator(readingAt: now.addingTimeInterval(600))
+            .refresh(quotaID: typed.id)
+
+        let stored = try #require(await harness.quotas.quota(id: typed.id))
+        #expect(stored.name == "Work")
+    }
 }

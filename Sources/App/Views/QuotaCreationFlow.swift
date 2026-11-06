@@ -18,6 +18,12 @@ struct QuotaCreationFlow: View {
     @State var policy: AllocationPolicy = .even
     @State var name = ""
 
+    /// Whether the name field holds something the user typed.
+    ///
+    /// Seeded defaults (provider name, or an older limit name) are replaced
+    /// when the picker moves. A typed name such as "Other Models" is not.
+    @State var nameEditedByUser = false
+
     /// The limits the chosen provider meters, once it has been connected and read.
     ///
     /// Empty until then, and empty still if the read fails — which the flow treats
@@ -122,8 +128,17 @@ struct QuotaCreationFlow: View {
                 // name is what they would have typed. An empty box would ask them
                 // to invent a name before knowing it matters, and says the
                 // interface is written against a provider without naming one.
-                TextField("Quota name", text: $name)
-                    .textFieldStyle(.roundedBorder)
+                TextField(
+                    "Quota name",
+                    text: Binding(
+                        get: { name },
+                        set: {
+                            name = $0
+                            nameEditedByUser = true
+                        }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
                 if buckets.count > 1 {
                     bucketChoice
                 }
@@ -155,19 +170,12 @@ struct QuotaCreationFlow: View {
             calendar: model.userCalendar,
             selection: $bucketID
         )
-        .onChange(of: bucketID) { _, newID in
-            // Keep the name on the chosen limit while it still looks seeded —
-            // either the provider's name or another of this provider's limits —
-            // so switching the picker does not leave a stale limit name on a
-            // different quota. A name the user typed is left alone.
-            guard let newID,
-                  let bucket = buckets.first(where: { $0.id == newID })
-            else { return }
-            let seeded = Set(buckets.map(\.displayName))
-                .union([selected?.displayName].compactMap(\.self))
-            if name.isEmpty || seeded.contains(name) {
-                name = bucket.displayName
-            }
+        .onChange(of: bucketID) { _, _ in
+            // Default name is the integration. A name the user typed is left
+            // alone — `seeded.contains` would treat "Other Models" as a default
+            // just because a limit used that label.
+            guard !nameEditedByUser, let integration = selected?.displayName else { return }
+            name = integration
         }
     }
 
@@ -225,6 +233,7 @@ struct QuotaCreationFlow: View {
                 guard !isWorking else { return }
                 selected = listing
                 name = listing.displayName
+                nameEditedByUser = false
                 // Drop the previous provider's limits so a stale full set
                 // cannot keep Next disabled for a freshly chosen provider.
                 buckets = []

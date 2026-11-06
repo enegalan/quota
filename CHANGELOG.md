@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A quota still named for a limit the provider renamed follows onto the new
+  name on refresh when that name matched the previous reading. A name the
+  user typed is left alone.
+- A packaged provider whose bytes changed without a version bump replaces the
+  installed binary on launch, so a local rebuild no longer leaves yesterday's
+  plugin answering under today's version number.
+
+### Changed
+
+- A new quota is seeded with the integration's name, not the limit's. The
+  watched limit still shows beside it in the list and the popover.
+- Cursor's plan limit is named Included Models (formerly Cursor Models).
+- Limits are off by default, so the menu bar starts with today's allowance and
+  stays compact. A new Show available limits switch turns them on, and each
+  integration keeps at least one limit while it is on.
+- Each integration keeps at least one daily quota while Show daily quota is on,
+  so an integration cannot lose its allowance figure.
+- At least one of Show daily quota and Show available limits stays on, so the
+  menu bar always has a figure to draw.
+- The only integration on the menu bar can no longer be turned off, since that
+  would leave Quota with no quota to show.
+
 ## [1.4.11] - 2026-11-05
 
 ### Added

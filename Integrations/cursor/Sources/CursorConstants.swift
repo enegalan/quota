@@ -54,7 +54,7 @@ enum CursorConstants {
 
     static let planBucketID = "plan"
     static let apiBucketID = "api"
-    static let planBucketDisplayName = "Cursor Models"
+    static let planBucketDisplayName = "Included Models"
     static let apiBucketDisplayName = "Other Models"
     static let planExternalID = "cursor-plan"
     static let apiExternalID = "cursor-api"

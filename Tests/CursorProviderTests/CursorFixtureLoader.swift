@@ -75,7 +75,7 @@ enum CursorFixtureLoader {
         )
     }
 
-    /// Cursor Models, plus Other Models only when `apiPercentUsed` is present.
+    /// Included Models, plus Other Models only when `apiPercentUsed` is present.
     private static func usages(
         planPercent: Double,
         apiPercent: Double?,
@@ -86,9 +86,9 @@ enum CursorFixtureLoader {
         var quotas = [
             ProviderUsage(
                 externalID: "cursor-plan",
-                displayName: "Cursor Models",
+                displayName: "Included Models",
                 bucketID: "plan",
-                bucketDisplayName: "Cursor Models",
+                bucketDisplayName: "Included Models",
                 usagePercentage: planPercent,
                 periodStart: start,
                 periodEnd: end,

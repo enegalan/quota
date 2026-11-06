@@ -3,6 +3,46 @@ import Foundation
 import Platform
 
 extension AppModel {
+    /// The integrations the menu bar actually draws.
+    ///
+    /// A stored preference can hide every integration — from an older build
+    /// where that was allowed, or after the visible ones were deleted — so the
+    /// quota the menu bar speaks for stands in rather than leaving the item blank.
+    private var shownIntegrationIDs: Set<String> {
+        let visible = Set(presentations.map(\.summary.quota.providerID.rawValue))
+            .subtracting(menuBarPreferences.hiddenIntegrations)
+        if visible.isEmpty, let primary = primaryPresentation {
+            return [primary.summary.quota.providerID.rawValue]
+        }
+        return visible
+    }
+
+    /// Whether this integration is currently drawn in the menu bar.
+    func isIntegrationShownInMenuBar(_ integrationID: String) -> Bool {
+        shownIntegrationIDs.contains(integrationID)
+    }
+
+    /// Whether this integration can be removed from the menu bar.
+    ///
+    /// Turning off the last visible integration would leave the menu bar with
+    /// no quota to show, so it stays on.
+    func canHideIntegration(_ integrationID: String) -> Bool {
+        let visible = shownIntegrationIDs
+        return visible.count > 1 && visible.contains(integrationID)
+    }
+
+    /// Includes or excludes one integration from the menu bar.
+    func setShowsIntegrationInMenuBar(_ shown: Bool, integrationID: String) {
+        guard shown || canHideIntegration(integrationID) else { return }
+        updateMenuBarPreferences {
+            if shown {
+                $0.hiddenIntegrations.remove(integrationID)
+            } else {
+                $0.hiddenIntegrations.insert(integrationID)
+            }
+        }
+    }
+
     /// Applies a menu-bar preference change and saves it.
     ///
     /// The screen updates before the write. A failed write puts the stored
@@ -10,6 +50,12 @@ extension AppModel {
     func updateMenuBarPreferences(_ update: (inout MenuBarPreferences) -> Void) {
         var preferences = menuBarPreferences
         update(&preferences)
+        // The menu bar needs at least one family of figures. A caller that
+        // turns both off keeps today's allowance rather than leaving the item
+        // with nothing to draw.
+        if !preferences.showDailyQuota, !preferences.showAvailableLimits {
+            preferences.showDailyQuota = true
+        }
         storeMenuBarPreferences(preferences)
         let options = menuBarPreferences
         Task {
@@ -84,6 +130,7 @@ extension AppModel {
     ///
     /// Pinning one quota unpins the previous one — there is no separate unpin
     /// action, because picking another quota is itself the way to change it.
+    /// Daily quotas stay as settings left them: Show only changes the card.
     ///
     /// Not routed through `perform`, which reloads everything: the choice touches
     /// no reading, no plan, and no quota, and a popover that re-read the whole

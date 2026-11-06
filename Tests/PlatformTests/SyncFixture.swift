@@ -29,7 +29,9 @@ enum SyncFixture {
         usage: Double = 40,
         periodStart: Date? = nil,
         updatedAt: Date,
-        bucketID: String = "primary"
+        bucketID: String = "primary",
+        displayName: String = "Primary",
+        knownLimits: [KnownLimit] = []
     ) throws -> UsageSnapshot {
         let start = periodStart ?? SyncFixture.periodStart
         return try UsageSnapshot(
@@ -37,11 +39,12 @@ enum SyncFixture {
             buckets: [
                 try UsageBucket(
                     id: bucketID,
-                    displayName: "Primary",
+                    displayName: displayName,
                     usagePercentage: usage,
                     period: try period(start, days: 30)
                 ),
-            ]
+            ],
+            knownLimits: knownLimits
         )
     }
 

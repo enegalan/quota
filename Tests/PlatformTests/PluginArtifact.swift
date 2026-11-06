@@ -14,10 +14,13 @@ enum PluginArtifact {
     ///   - nested: how many directories deep to put the executable. One is the
     ///     shape a real artifact has; more builds the archive a provider that
     ///     would install cleanly and then never start.
+    ///   - contents: the executable body. Distinct contents make two archives
+    ///     differ by content hash rather than by staging paths or timestamps.
     static func archive(
         identifier: String = "mock",
         executable: String? = nil,
-        nested: Int = 1
+        nested: Int = 1,
+        contents: String = "#!/bin/sh\nexit 0\n"
     ) throws -> Data {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("quota-artifact-\(UUID().uuidString)")
@@ -31,7 +34,7 @@ enum PluginArtifact {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let binary = container.appendingPathComponent(name)
-        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: binary)
+        try Data(contents.utf8).write(to: binary)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755], ofItemAtPath: binary.path
         )

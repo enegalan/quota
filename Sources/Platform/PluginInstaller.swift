@@ -70,6 +70,7 @@ public struct PluginInstaller: Sendable {
     /// directory it names is not yet in place is a record the host will resolve to
     /// an executable that is not there.
     private func performInstall(_ provider: AvailableProvider) async throws -> InstalledProvider {
+        try recoverSameVersionDebris(for: provider)
         // Claimed before the artifact is read, so an install that cannot proceed
         // is refused before it costs an unpack.
         _ = try reclaimableDestination(for: provider)
@@ -162,7 +163,9 @@ public struct PluginInstaller: Sendable {
     /// be code this application did not build and did not ship, and nothing about
     /// a file on disk or a URL says who wrote it — so a build that wanted one would
     /// have to answer for it, rather than this method quietly accepting it.
-    private func fetch(_ id: String) async throws -> Data {
+    /// The packaged bytes for `id`. Visible to the update path so a same-version
+    /// rebuild can be told apart from a no-op by its content hash.
+    func fetch(_ id: String) async throws -> Data {
         guard let artifact = try bundled.artifact(for: id) else {
             throw InstallError.notShipped(id)
         }
@@ -174,7 +177,7 @@ public struct PluginInstaller: Sendable {
     /// A directory that is being written to is a directory something else might
     /// read, and the only thing that should ever be readable under a version's
     /// name is a version that finished being written.
-    private func stagingDirectory(_ provider: AvailableProvider) throws -> URL {
+    func stagingDirectory(_ provider: AvailableProvider) throws -> URL {
         let root = pluginsDirectory.appendingPathComponent(
             InstallerConstants.stagingDirectoryName, isDirectory: true
         )
@@ -190,7 +193,7 @@ public struct PluginInstaller: Sendable {
     /// unpack is reported as an install error rather than as whatever error a
     /// subprocess happened to raise, and `InstallError` stays the single set of
     /// reasons the interface has to be able to word.
-    private func extract(_ artifact: Data, into directory: URL) throws -> URL {
+    func extract(_ artifact: Data, into directory: URL) throws -> URL {
         do {
             try archive.unarchive(artifact, to: directory)
         } catch {
@@ -205,7 +208,7 @@ public struct PluginInstaller: Sendable {
     /// declares, so this is the only place that knows whether the two agree — and
     /// an archive without it would install cleanly and then fail every launch
     /// afterwards, which is the worst of both outcomes.
-    private func requireExecutable(in directory: URL, id: String) throws {
+    func requireExecutable(in directory: URL, id: String) throws {
         let executable = directory.appendingPathComponent(PluginLayout.executableName(for: id))
         guard FileManager.default.fileExists(atPath: executable.path) else {
             throw InstallError.missingExecutable(id)
@@ -231,7 +234,7 @@ public struct PluginInstaller: Sendable {
     ///   the step at which activation either happened or did not, and a caller
     ///   that cannot tell those two apart will go on to write a record naming a
     ///   version that is not the one in use.
-    private func replaceSymlink(_ id: String, to directory: URL) throws {
+    func replaceSymlink(_ id: String, to directory: URL) throws {
         let link = PluginLayout.activeLink(id, in: pluginsDirectory)
         let parent = link.deletingLastPathComponent()
         // A relative target, so the plugins directory can be moved or restored
@@ -296,16 +299,16 @@ public struct PluginInstaller: Sendable {
     /// target is: the directory can be moved, restored from a backup or handed to
     /// another machine, and a record full of absolute paths stops pointing at
     /// anything the moment that happens.
-    private func relativePath(for provider: AvailableProvider) -> String {
+    func relativePath(for provider: AvailableProvider) -> String {
         "\(provider.id)/\(provider.version.description)"
     }
 
     /// The hex SHA-256 of some bytes.
     ///
-    /// Recorded with the install so a later read can say which bytes produced this
-    /// record. Nothing compares it: with providers packaged into the application,
-    /// the trust is the application's own signature and there is no second claim
-    /// about the bytes for a digest to disagree with.
+    /// Recorded with the install and compared on update: a rebuild that kept the
+    /// same version number still has to replace yesterday's binary, and the hash
+    /// is what says the bytes changed. Trust in the bytes themselves remains the
+    /// application's signature.
     static func sha256(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }

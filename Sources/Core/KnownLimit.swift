@@ -9,6 +9,9 @@ public struct KnownLimit: Sendable, Hashable, Codable, Identifiable {
     public let id: String
     public let name: String
     public let menuBarLabel: String
+
+    /// The integration's hint about a missing limit. The user's own choice
+    /// decides what the menu bar draws.
     public let shownWhenUnavailable: Bool
 
     public init(

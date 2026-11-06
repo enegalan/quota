@@ -158,6 +158,50 @@ struct InstallerTests {
         }
     }
 
+    @Test("Updating the same version with different bytes replaces the install")
+    func sameVersionWithNewBytesIsReplaced() async throws {
+        let directory = try InstallerFixture.makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let firstBytes = try PluginArtifact.archive(identifier: InstallerFixture.id)
+        let fixture = try await InstallerFixture.installer(artifact: firstBytes, in: directory)
+        let previous = try await fixture.install()
+
+        let providers = directory.appendingPathComponent(
+            BundleConstants.providersDirectoryName, isDirectory: true
+        )
+        // A second archive under the same version with different executable
+        // contents, so the content hash moves even though the version does not.
+        let replacementContents = "#!/bin/sh\nexit 1\n"
+        let secondBytes = try PluginArtifact.archive(
+            identifier: InstallerFixture.id,
+            contents: replacementContents
+        )
+        #expect(secondBytes != firstBytes)
+        try secondBytes.write(
+            to: providers.appendingPathComponent(
+                "\(InstallerFixture.id).\(BundleConstants.artifactFileExtension)"
+            )
+        )
+
+        let updated = try await fixture.installer.update(
+            fixture.provider,
+            previous: previous,
+            verify: { _ in }
+        )
+        #expect(updated.contentHash == PluginInstaller.sha256(secondBytes))
+        #expect(updated.contentHash != previous.contentHash)
+        let active = try #require(
+            PluginLayout.activeVersionDirectory(InstallerFixture.id, in: directory)
+        )
+        let installed = try String(
+            contentsOf: active.appendingPathComponent(
+                PluginLayout.executableName(for: InstallerFixture.id)
+            ),
+            encoding: .utf8
+        )
+        #expect(installed == replacementContents)
+    }
+
     @Test("Uninstalling removes the provider's code and only its code")
     func uninstallRemovesOnlyTheProvidersCode() async throws {
         let directory = try InstallerFixture.makeDirectory()

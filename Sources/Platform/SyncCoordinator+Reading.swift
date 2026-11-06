@@ -63,7 +63,7 @@ public extension SyncCoordinator {
     /// bucket alone would then search for a bucket that does not exist and report
     /// a quota that has been read all along as never synced, so the bucket is
     /// taken from the reading when the quota does not say.
-    private func latestReading(of quota: Quota, accountLabel: String) async throws -> SnapshotRecord? {
+    func latestReading(of quota: Quota, accountLabel: String) async throws -> SnapshotRecord? {
         if let bucketID = quota.bucketID {
             return try await snapshots.snapshot(
                 quotaID: quota.id, bucketID: bucketID, accountLabel: accountLabel
