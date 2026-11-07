@@ -27,6 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var onTogglePopover: (() -> Void)?
 
     private let backgroundRefresh = BackgroundRefreshController()
+    private weak var managementWindow: NSWindow?
+    private var isHidingInMenuBar = false
 
     /// Shows the Dock icon, without which the management window cannot be
     /// found again.
@@ -40,22 +42,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
     }
 
-    /// Treats a second Dock click as a request for the management window.
+    /// Closing the management window must leave the menu bar app running.
     ///
-    /// Only when nothing is already visible: clicking the icon of an app
-    /// whose window is on screen should do what every other app does,
-    /// which is bring that window forward — and `NSApp` does that on its
-    /// own once the reopen is accepted, so opening a second window here
-    /// would be the surprising outcome.
+    /// Hiding the Dock icon is a separate choice, made when the window closes
+    /// and Keep Quota running is on. Quit still ends the process.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    /// Treats a Dock click as a request for the management window.
+    ///
+    /// AppKit's `hasVisibleWindows` is ignored: the MenuBarExtra panel keeps
+    /// that flag true after the dashboard is closed, so trusting it would
+    /// only activate Quota and never reopen the window. Visibility is taken
+    /// from titled management windows alone.
+    ///
+    /// When one of those is already on screen, AppKit brings it forward once
+    /// the reopen is accepted — opening another would be the wrong outcome.
     ///
     /// - Returns: always true, so AppKit treats the reopen as handled and
-    ///   leaves the existing windows alone rather than restoring state of
-    ///   its own.
+    ///   leaves restoration of its own alone.
     func applicationShouldHandleReopen(
         _ sender: NSApplication,
-        hasVisibleWindows flag: Bool
+        hasVisibleWindows _: Bool
     ) -> Bool {
-        if !flag {
+        if !MainWindowOpener.hasVisibleManagementWindow() {
             MainWindowOpener.request()
         }
         return true
@@ -117,6 +128,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: "d"
         ))
         menu.addItem(.separator())
+        menu.addItem(item(
+            title: "Close Quota",
+            key: "Close",
+            action: #selector(closeQuota),
+            keyEquivalent: ""
+        ))
         menu.addItem(quitMenuItem())
         return menu
     }
@@ -190,6 +207,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+
+    /// Closes the management window, and hides the Dock icon when that is the preference.
+    @objc private func closeQuota() {
+        if model?.menuBarPreferences.keepRunningOnClose == true {
+            hideInMenuBar()
+            return
+        }
+        managementWindow?.performClose(nil)
+    }
+
+    /// The management window, so Close can reach it after the menu has been built.
+    func noteManagementWindow(_ window: NSWindow) {
+        guard managementWindow !== window else { return }
+        if let managementWindow {
+            NotificationCenter.default.removeObserver(
+                self,
+                name: NSWindow.willCloseNotification,
+                object: managementWindow
+            )
+        }
+        managementWindow = window
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(managementWindowWillClose(_:)),
+            name: NSWindow.willCloseNotification,
+            object: window
+        )
+    }
+
+    /// Closing the management window hides the Dock icon when that preference is on.
+    @objc private func managementWindowWillClose(_ notification: Notification) {
+        guard model?.menuBarPreferences.keepRunningOnClose == true else { return }
+        hideInMenuBar(except: notification.object as? NSWindow)
+    }
+
+    /// Closes ordinary windows and leaves Quota in the menu bar.
+    ///
+    /// The window already closing is left alone: it is going away, and closing
+    /// it again from its own close notification would re-enter this method.
+    func hideInMenuBar(except excluded: NSWindow? = nil) {
+        guard !isHidingInMenuBar else { return }
+        isHidingInMenuBar = true
+        for window in NSApp.windows where window.level == .normal && window !== excluded {
+            window.close()
+        }
+        NSApp.setActivationPolicy(.accessory)
+        isHidingInMenuBar = false
     }
 }
 

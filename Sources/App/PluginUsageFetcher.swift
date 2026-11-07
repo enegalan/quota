@@ -98,21 +98,27 @@ struct PluginUsageFetcher: UsageFetching {
         }
         let host = PluginHost(launch: launch, launcher: launcher, logDirectory: logDirectory)
 
+        let outcome: UsageFetchOutcome
         do {
             let descriptor = try await host.launch()
             try await connect(host: host, provider: provider, providerID: providerID)
             let result = try await host.fetchUsage(localDate: localDate.description)
-            return normalise(
+            outcome = normalise(
                 result,
                 at: now,
                 suggestion: descriptor.suggestedRefreshIntervalSeconds,
                 limits: descriptor.limits
             )
         } catch let error as ProviderError {
-            return .failure(Self.failure(error.code, at: now))
+            outcome = .failure(Self.failure(error.code, at: now))
         } catch {
-            return .failure(Self.failure(.pluginError, at: now))
+            outcome = .failure(Self.failure(.pluginError, at: now))
         }
+        // On every path. A plugin reads stdin until it closes, so a host that is
+        // merely released leaves the process waiting forever — one orphan per
+        // read. `shutdown` closes stdin, then kills a plugin that does not exit.
+        await host.shutdown()
+        return outcome
     }
 
     /// Connects the plugin, if it is not already.

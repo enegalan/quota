@@ -32,10 +32,12 @@ struct Main: App {
                 }
         } label: {
             MenuBarLabel(model: model)
+                .background(MainWindowOpenBridge())
                 .task {
                     delegate.model = model
                     delegate.onTogglePopover = { togglePopover() }
                     await model.load()
+                    await model.refreshUnplannedIfNeeded()
                     await model.maybeCheckForUpdatesAutomatically()
                 }
         }

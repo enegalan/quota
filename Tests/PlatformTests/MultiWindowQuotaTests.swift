@@ -133,6 +133,25 @@ private enum MultiWindowFixture {
 struct MultiWindowQuotaTests {
     private typealias Fixture = MultiWindowFixture
 
+    @Test("Two quotas on one provider are read with one plugin launch, and both are filed")
+    func oneReadPerProvider() async throws {
+        let now = SyncFixture.periodStart
+        let arrangement = try await Fixture.arrange()
+        let provider = ScriptedProvider(always: .success(try Fixture.reading(at: now)))
+        let coordinator = Fixture.coordinator(arrangement, provider: provider, at: now)
+
+        let outcomes = try await coordinator.refresh(
+            quotaIDs: [arrangement.fiveHours.id, arrangement.week.id]
+        )
+
+        #expect(await provider.callCount == 1)
+        #expect(outcomes.map(\.quotaID) == [arrangement.fiveHours.id, arrangement.week.id])
+        let succeeded = outcomes.map(\.result.succeeded)
+        #expect(succeeded == [true, true])
+        #expect(try await Fixture.points(for: arrangement.fiveHours, in: arrangement).count == 1)
+        #expect(try await Fixture.points(for: arrangement.week, in: arrangement).count == 1)
+    }
+
     @Test("Each quota is corrected to its own pool's window, not to the reading's first")
     func eachQuotaTakesItsOwnWindow() async throws {
         let now = SyncFixture.periodStart

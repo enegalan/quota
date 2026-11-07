@@ -7,6 +7,13 @@ import Platform
 /// A dump that echoed a Keychain value would be a security failure
 /// so this type never opens the Keychain and never asks a plugin for one.
 enum DiagnosticDump {
+    /// One integration's interval per entry, in a stable order.
+    private static func providerIntervals(_ preferences: Preferences) -> String {
+        preferences.refreshIntervalSecondsByProvider.keys.sorted().map { id in
+            "\(id)=\(Int(preferences.refreshIntervalSecondsByProvider[id] ?? 0))"
+        }.joined(separator: ",")
+    }
+
     /// Renders everything support would ask for, as one block of text.
     ///
     /// Every repository is read through `try?` and falls back to an empty
@@ -23,9 +30,8 @@ enum DiagnosticDump {
         lines.append("generatedAt=\(ISO8601DateFormatter().string(from: environment.now()))")
 
         let preferences = await (try? environment.preferences.load()) ?? .default
-        lines.append(
-            "refreshIntervalSeconds=\(Int(preferences.refreshIntervalSeconds))"
-        )
+        lines.append("refreshIntervalSeconds=\(Int(preferences.refreshIntervalSeconds))")
+        lines.append("refreshIntervalSecondsByProvider=\(providerIntervals(preferences))")
         lines.append(
             "disabledProviders=\(preferences.disabledProviders.sorted().joined(separator: ","))"
         )

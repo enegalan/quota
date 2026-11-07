@@ -84,6 +84,7 @@ struct MainWindow: View {
         .task {
             await model.load()
         }
+        .background(ManagementWindowCloseMonitor())
     }
 
     @ViewBuilder
@@ -92,7 +93,7 @@ struct MainWindow: View {
             ContentUnavailableView {
                 Label("No Quotas", systemImage: "chart.bar")
             } description: {
-                Text("Create a quota after connecting a provider.")
+                Text("Create a quota after connecting an integration.")
             } actions: {
                 Button {
                     isCreating = true
@@ -153,7 +154,7 @@ struct MainWindow: View {
         }
         .keyboardShortcut("r", modifiers: .command)
         .disabled(model.isRefreshing)
-        .help("Ask every provider for a new reading (⌘R)")
+        .help("Ask every integration for a new reading (⌘R)")
     }
 
     @ToolbarContentBuilder
@@ -233,6 +234,22 @@ struct MainWindow: View {
             }
             .padding(LayoutMetrics.windowPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// Hands the management window to the delegate, which hides the Dock icon when it closes.
+private struct ManagementWindowCloseMonitor: NSViewRepresentable {
+    /// An empty host view whose window is the management window once mounted.
+    func makeNSView(context: Context) -> NSView {
+        NSView()
+    }
+
+    /// Passes the host's window to the app delegate whenever the view updates.
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let window = nsView.window else { return }
+            (NSApp.delegate as? AppDelegate)?.noteManagementWindow(window)
         }
     }
 }

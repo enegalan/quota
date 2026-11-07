@@ -105,7 +105,7 @@ public struct SyncCoordinator: Sendable {
     // reading extension already does for the repositories.
     let plans: AllocationPlanRepository
     let engine: AllocationEngine
-    private let fetcher: any UsageFetching
+    let fetcher: any UsageFetching
     let relativeTime: RelativeTime
     let schedule: RefreshSchedule
     let calendar: Calendar
@@ -185,42 +185,27 @@ public struct SyncCoordinator: Sendable {
         guard let quota = try await quotas.quota(id: quotaID) else {
             throw SyncError.noQuota(quotaID)
         }
-        let today = LocalDate(date: now(), calendar: calendar)
-
-        guard
-            let provider = try await providers.provider(quota.providerID),
-            let accountLabel = provider.authenticatedAccountLabel
-        else {
-            // No account is a state the interface shows, not a mistake the user
-            // made, so it comes back as a result rather than as a thrown error.
-            let failure = SyncFailure(
-                code: .notAuthenticated,
-                message: "This provider is not connected to an account.",
-                occurredAt: now()
-            )
-            try await note(failure, alongside: quota.providerID)
-            return SyncOutcome(quotaID: quotaID, result: .failure(failure))
-        }
-
-        let outcome = await fetcher.fetchUsage(
-            providerID: quota.providerID,
-            accountLabel: accountLabel,
-            localDate: today
-        )
-        if let suggestion = outcome.suggestedRefreshInterval {
-            try await noteSuggestedRefreshInterval(suggestion, for: quota.providerID)
-        }
-        switch outcome.result {
-        case .success(let snapshot):
-            let changed = try await file(snapshot, for: quota, accountLabel: accountLabel)
-            return SyncOutcome(quotaID: quotaID, result: outcome.result, periodChanged: changed)
-        case .failure(let failure):
-            try await note(failure, alongside: quota.providerID)
-            return SyncOutcome(quotaID: quotaID, result: outcome.result)
-        }
+        return try await refresh([quota])[0]
     }
 
-    /// Reads every quota once, one at a time.
+    /// Reads several quotas, asking each provider once.
+    ///
+    /// Quotas on the same provider share one reading: every read launches the
+    /// provider's plugin, so reading per quota would start the same process once
+    /// for each limit the account meters. Identifiers with no quota are skipped,
+    /// so one quota deleted mid-refresh does not stop the others.
+    @discardableResult
+    public func refresh(quotaIDs: [UUID]) async throws -> [SyncOutcome] {
+        var found: [Quota] = []
+        for quotaID in quotaIDs {
+            if let quota = try await quotas.quota(id: quotaID) {
+                found.append(quota)
+            }
+        }
+        return try await refresh(found)
+    }
+
+    /// Reads every quota once, one provider at a time.
     ///
     /// Sequentially, and that is a decision rather than an oversight: providers
     /// are external services with rate limits, and a burst of simultaneous polls
@@ -228,11 +213,7 @@ public struct SyncCoordinator: Sendable {
     /// user ever sees. requires the frequency to respect rate limits, and
     /// honouring that means not firing everything at once either.
     public func refreshAll() async throws -> [SyncOutcome] {
-        var outcomes: [SyncOutcome] = []
-        for quota in try await quotas.all() {
-            await outcomes.append(try refresh(quotaID: quota.id))
-        }
-        return outcomes
+        try await refresh(try quotas.all())
     }
 
     // MARK: - Recording
@@ -252,7 +233,7 @@ public struct SyncCoordinator: Sendable {
     ///   means the window the timeline and plan are built on has moved — the
     ///   history behind it now starts at the new window's first instant.
     @discardableResult
-    private func file(
+    func file(
         _ snapshot: UsageSnapshot,
         for quota: Quota,
         accountLabel: String
@@ -367,7 +348,7 @@ public struct SyncCoordinator: Sendable {
     }
 
     /// Records a failure without disturbing the last good reading.
-    private func note(_ failure: SyncFailure, alongside providerID: ProviderID) async throws {
+    func note(_ failure: SyncFailure, alongside providerID: ProviderID) async throws {
         let existing = try await providers.provider(providerID)
         let record = existing ?? ProviderRecord(
             providerID: providerID,
