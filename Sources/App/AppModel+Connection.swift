@@ -83,49 +83,45 @@ extension AppModel {
         }
     }
 
-    /// Sets the preferred poll interval, clamped to the platform bounds.
-    func setRefreshInterval(_ seconds: TimeInterval) async {
-        await perform {
-            let clamped = RefreshConstants.clamped(seconds)
-            try await self.savePreferences {
-                let current = try await self.environment.preferences.load()
-                try await self.environment.preferences.save(
-                    current.withRefreshIntervalSeconds(clamped)
-                )
-            }
-            await self.environment.planner.invalidateSchedule()
-        }
-    }
-
-    /// Effective poll interval shown in settings.
-    func effectiveRefreshIntervalSeconds() async -> TimeInterval {
-        let preferences = await (try? environment.preferences.load()) ?? .default
-        return RefreshConstants.clamped(preferences.refreshIntervalSeconds)
-    }
-
-    /// Intervals the user set for individual integrations. Missing means the general one.
-    func refreshIntervalsByProvider() async -> [String: TimeInterval] {
+    /// Intervals the user set for individual integrations. Missing means the default.
+    func refreshIntervalsByIntegration() async -> [String: TimeInterval] {
         let preferences = await (try? environment.preferences.load()) ?? .default
         return preferences.refreshIntervalSecondsByProvider
     }
 
-    /// Sets one integration's poll interval. Nil returns it to the general interval.
-    func setRefreshInterval(_ seconds: TimeInterval?, for providerID: String) async {
+    /// Sets one integration's poll interval. Nil returns it to its default.
+    func setRefreshInterval(_ seconds: TimeInterval?, for integrationID: String) async {
         await perform {
             try await self.savePreferences {
                 let current = try await self.environment.preferences.load()
                 try await self.environment.preferences.save(
-                    current.withRefreshInterval(seconds, for: providerID)
+                    current.withRefreshInterval(seconds, for: integrationID)
                 )
             }
             await self.environment.planner.invalidateSchedule()
         }
     }
 
+    /// The suggested default poll interval for one integration, when it has one.
+    func suggestedRefreshIntervalSeconds(for integrationID: String) async -> TimeInterval? {
+        if let id = try? ProviderID(integrationID),
+           let suggested = try? await environment.providers.provider(id)?.suggestedRefreshInterval
+        {
+            return RefreshConstants.clamped(suggested)
+        }
+        if let suggested = sections.listing(id: integrationID)?.provider.described?
+            .suggestedRefreshIntervalSeconds
+        {
+            return RefreshConstants.clamped(suggested)
+        }
+        return nil
+    }
+
     /// The interval in force for one integration.
-    func refreshIntervalSeconds(for providerID: String) async -> TimeInterval {
+    func refreshIntervalSeconds(for integrationID: String) async -> TimeInterval {
         let preferences = await (try? environment.preferences.load()) ?? .default
-        return preferences.refreshInterval(for: providerID)
+        let suggested = await suggestedRefreshIntervalSeconds(for: integrationID)
+        return preferences.refreshInterval(for: integrationID, suggested: suggested)
     }
 
     /// Whether quota notifications are enabled.

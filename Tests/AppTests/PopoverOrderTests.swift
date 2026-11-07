@@ -20,10 +20,10 @@ struct PopoverOrderTests {
         #expect(PopoverOrder.moving("missing", to: "5h", in: ids) == ids)
     }
 
-    @Test("Provider accounts have independent saved orders")
+    @Test("Integration accounts have independent saved orders")
     func accountKeys() {
-        #expect(PopoverOrder.key(providerID: "claude", account: "one") != PopoverOrder.key(
-            providerID: "claude",
+        #expect(PopoverOrder.key(integrationID: "claude", account: "one") != PopoverOrder.key(
+            integrationID: "claude",
             account: "two"
         ))
     }

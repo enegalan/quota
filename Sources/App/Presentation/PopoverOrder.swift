@@ -1,13 +1,13 @@
 import Core
 import Foundation
 
-struct UnplannedProvider {
-    let providerID: String
+struct UnplannedIntegration {
+    let integrationID: String
     let accountLabel: String
     var snapshot: UsageSnapshot?
     var failed = false
     var orderKey: String {
-        PopoverOrder.key(providerID: providerID, account: accountLabel)
+        PopoverOrder.key(integrationID: integrationID, account: accountLabel)
     }
 }
 
@@ -39,7 +39,7 @@ enum PopoverOrder {
         return result
     }
 
-    static func key(providerID: String, account: String?) -> String {
-        providerID + ":" + Data((account ?? "").utf8).base64EncodedString()
+    static func key(integrationID: String, account: String?) -> String {
+        integrationID + ":" + Data((account ?? "").utf8).base64EncodedString()
     }
 }

@@ -113,7 +113,7 @@ extension AppModel {
         return "Speaks protocol \(range.minimum) to \(range.maximum)."
     }
 
-    /// How often this integration is read: its own interval, or the general one.
+    /// How often this integration is read: override, suggested default, or fallback.
     private func refreshCaption(for listing: ProviderListing) async -> String {
         let seconds = await refreshIntervalSeconds(for: listing.id)
         return "Asked every \(Self.interval(seconds))."

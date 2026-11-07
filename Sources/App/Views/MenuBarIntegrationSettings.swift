@@ -31,7 +31,7 @@ struct MenuBarIntegrationSettings: View {
 
     var body: some View {
         Section {
-            if items.isEmpty, unplannedProviders.isEmpty {
+            if items.isEmpty, unplannedIntegrations.isEmpty {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Add a quota to choose which integration limits appear in the menu bar.")
                         .foregroundStyle(.secondary)
@@ -41,7 +41,7 @@ struct MenuBarIntegrationSettings: View {
                 ForEach(items) { item in
                     IntegrationLimitRowView(model: model, item: item)
                 }
-                ForEach(unplannedProviders, id: \.orderKey) { provider in
+                ForEach(unplannedIntegrations, id: \.orderKey) { provider in
                     unplannedSettings(provider)
                 }
             }
@@ -50,13 +50,13 @@ struct MenuBarIntegrationSettings: View {
         }
     }
 
-    private var unplannedProviders: [UnplannedProvider] {
+    private var unplannedIntegrations: [UnplannedIntegration] {
         var seen = Set(model.presentations.map(\.summary.quota.providerID.rawValue))
-        return model.unplannedProviders.filter { seen.insert($0.providerID).inserted }
+        return model.unplannedIntegrations.filter { seen.insert($0.integrationID).inserted }
     }
 
-    private func unplannedSettings(_ provider: UnplannedProvider) -> some View {
-        let integrationID = provider.providerID
+    private func unplannedSettings(_ provider: UnplannedIntegration) -> some View {
+        let integrationID = provider.integrationID
         let buckets = provider.snapshot?.buckets ?? []
         let ids = buckets.map(\.id)
         let shown = model.isIntegrationShownInMenuBar(integrationID)

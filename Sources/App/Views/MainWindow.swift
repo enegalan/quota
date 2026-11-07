@@ -93,7 +93,7 @@ struct MainWindow: View {
             ContentUnavailableView {
                 Label("No Quotas", systemImage: "chart.bar")
             } description: {
-                Text("Create a quota after connecting a provider.")
+                Text("Create a quota after connecting an integration.")
             } actions: {
                 Button {
                     isCreating = true
@@ -154,7 +154,7 @@ struct MainWindow: View {
         }
         .keyboardShortcut("r", modifiers: .command)
         .disabled(model.isRefreshing)
-        .help("Ask every provider for a new reading (⌘R)")
+        .help("Ask every integration for a new reading (⌘R)")
     }
 
     @ToolbarContentBuilder

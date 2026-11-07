@@ -21,7 +21,7 @@ import Platform
 final class AppModel {
     /// Every quota the app knows about, ready to render.
     private(set) var presentations: [QuotaPresentation] = []
-    private(set) var unplannedProviders: [UnplannedProvider] = []
+    private(set) var unplannedIntegrations: [UnplannedIntegration] = []
     @ObservationIgnored private var unplannedAttempts: [String: Date] = [:]
     private(set) var menuBarPreferences = MenuBarPreferences()
     /// The preferences save in flight, and which save is the latest.
@@ -170,17 +170,17 @@ final class AppModel {
             sections = try await environment.manager.sections(preferences: preferences)
             presentations = try await environment.presenter(at: reference).presentations()
             presentations = await enrich(presentations)
-            var unplanned: [UnplannedProvider] = []
+            var unplanned: [UnplannedIntegration] = []
             for listing in sections.connected where listing.state == .connected || listing.state == .synchronizing {
                 guard let providerID = try? ProviderID(listing.id),
                       let account = try await environment.providers.provider(providerID)?.authenticatedAccountLabel,
                       !presentations.contains(where: {
                           $0.summary.quota.providerID == providerID && $0.accountLabel == account
                       }) else { continue }
-                unplanned.append(unplannedProviders.first { $0.providerID == listing.id && $0.accountLabel == account }
-                    ?? UnplannedProvider(providerID: listing.id, accountLabel: account))
+                unplanned.append(unplannedIntegrations.first { $0.integrationID == listing.id && $0.accountLabel == account }
+                    ?? UnplannedIntegration(integrationID: listing.id, accountLabel: account))
             }
-            unplannedProviders = unplanned
+            unplannedIntegrations = unplanned
             unplannedAttempts = unplannedAttempts.filter { key, _ in unplanned.contains { $0.orderKey == key } }
             lastError = nil
         } catch {
@@ -256,9 +256,9 @@ final class AppModel {
         case .disabled:
             "This integration was disabled. Last known data is still shown."
         case .missing:
-            "This provider is no longer installed. Last known data is still shown."
+            "This integration is no longer installed. Last known data is still shown."
         case .notInstalled:
-            "Unable to synchronise. The provider is not installed."
+            "Unable to synchronise. The integration is not installed."
         default:
             "Unable to synchronise. Last known data is still shown."
         }
@@ -312,31 +312,32 @@ final class AppModel {
     }
 
     private func refreshUnplanned(trigger: RefreshTrigger) async {
-        for provider in unplannedProviders where isIntegrationShownInMenuBar(provider.providerID) {
+        for integration in unplannedIntegrations where isIntegrationShownInMenuBar(integration.integrationID) {
             // Every read launches the provider's plugin, so no trigger reads without a
             // floor: an explicit refresh waits out the minimum poll interval, and
             // anything automatic (opening the popover included) the configured one.
             let interval = trigger == .manual
                 ? RefreshConstants.minimumPollInterval
-                : await refreshIntervalSeconds(for: provider.providerID)
+                : await refreshIntervalSeconds(for: integration.integrationID)
             let now = environment.now()
-            if let last = unplannedAttempts[provider.orderKey], now.timeIntervalSince(last) < interval {
+            if let last = unplannedAttempts[integration.orderKey], now.timeIntervalSince(last) < interval {
                 continue
             }
-            guard let id = try? ProviderID(provider.providerID) else { continue }
-            unplannedAttempts[provider.orderKey] = now
+            guard let id = try? ProviderID(integration.integrationID) else { continue }
+            unplannedAttempts[integration.orderKey] = now
             let outcome = await environment.fetcher.fetchUsage(
-                providerID: id, accountLabel: provider.accountLabel,
+                providerID: id,
+                accountLabel: integration.accountLabel,
                 localDate: LocalDate(date: now, calendar: userCalendar)
             )
-            guard let index = unplannedProviders.firstIndex(where: { $0.orderKey == provider.orderKey })
+            guard let index = unplannedIntegrations.firstIndex(where: { $0.orderKey == integration.orderKey })
             else { continue }
             switch outcome.result {
             case .success(let snapshot):
-                unplannedProviders[index].snapshot = snapshot
-                unplannedProviders[index].failed = false
+                unplannedIntegrations[index].snapshot = snapshot
+                unplannedIntegrations[index].failed = false
             case .failure:
-                unplannedProviders[index].failed = true
+                unplannedIntegrations[index].failed = true
             }
         }
     }

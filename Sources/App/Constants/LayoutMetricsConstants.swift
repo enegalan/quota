@@ -51,6 +51,18 @@ enum LayoutMetrics {
     /// eleven elements are laid out in one column at this width.
     static let popoverWidth: CGFloat = 400
 
+    /// Ceiling for the scrollable usage overview in the menu-bar popover.
+    static let popoverScrollMaximumHeight: CGFloat = 480
+
+    /// Fallback screen height when the main display's visible frame is unknown.
+    static let popoverScrollFallbackScreenHeight: CGFloat = 800
+
+    /// Fraction of the visible screen height the overview may occupy while scrolling.
+    static let popoverScrollScreenFraction: CGFloat = 0.65
+
+    /// When a single integration has more rows than this, the overview scrolls.
+    static let popoverScrollRowThreshold = 2
+
     /// Side of the mark that says which quota the menu bar item is speaking for.
     static let menuBarMarkerSize: CGFloat = 6
 

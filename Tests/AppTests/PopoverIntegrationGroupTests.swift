@@ -3,20 +3,20 @@ import Foundation
 import Testing
 @testable import App
 
-@Suite("Popover provider grouping")
-struct PopoverProviderGroupTests {
-    @Test("A connected provider without a quota has its own overview group")
-    func includesProviderWithoutQuota() {
-        let provider = UnplannedProvider(providerID: "claude", accountLabel: "account")
-        let groups = PopoverProviderGroup.group([], unplanned: [provider, provider])
+@Suite("Popover integration grouping")
+struct PopoverIntegrationGroupTests {
+    @Test("A connected integration without a quota has its own overview group")
+    func includesIntegrationWithoutQuota() {
+        let integration = UnplannedIntegration(integrationID: "claude", accountLabel: "account")
+        let groups = PopoverIntegrationGroup.group([], unplanned: [integration, integration])
         #expect(groups.count == 1)
-        #expect(groups[0].providerID == "claude")
+        #expect(groups[0].integrationID == "claude")
         #expect(groups[0].accountLabel == "account")
         #expect(groups[0].presentations.isEmpty)
-        #expect(groups[0].orderKey == provider.orderKey)
+        #expect(groups[0].orderKey == integration.orderKey)
     }
 
-    @Test("Quotas stay with their provider, account, and reported limit")
+    @Test("Quotas stay with their integration, account, and reported limit")
     func groupsQuotasByLimit() throws {
         let now = MockUsageWorld.reference
         let period = try QuotaPeriod.month(containing: now, calendar: MockUsageWorld.calendar)
@@ -35,7 +35,7 @@ struct PopoverProviderGroupTests {
         let api = try presentation("API", "api", "one")
         let missing = try presentation("Missing", "missing", "one")
         let otherAccount = try presentation("Other", "plan", "two")
-        let groups = PopoverProviderGroup.group([plan, api, missing, otherAccount])
+        let groups = PopoverIntegrationGroup.group([plan, api, missing, otherAccount])
 
         #expect(groups.count == 2)
         #expect(groups[0].quotas(for: "plan").map(\.id) == [plan.id])

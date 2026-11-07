@@ -53,31 +53,36 @@ struct MenuBarLabel: View {
         return visible.isEmpty ? candidates.first.map { [$0] } ?? [] : visible
     }
 
-    private var resolvedProviders: [MenuBarProvider] {
-        var providers = resolvedPresentations.map { MenuBarProvider(presentation: $0) }
-        var seen = Set(providers.map(\.providerID))
-        for provider in model?.unplannedProviders ?? [] where
-            !options.hiddenIntegrations.contains(provider.providerID) && seen.insert(provider.providerID).inserted
+    private var resolvedIntegrations: [MenuBarIntegration] {
+        var integrations = resolvedPresentations.map { MenuBarIntegration(presentation: $0) }
+        var seen = Set(integrations.map(\.integrationID))
+        for integration in model?.unplannedIntegrations ?? [] where
+            !options.hiddenIntegrations.contains(integration.integrationID)
+            && seen.insert(integration.integrationID).inserted
         {
-            providers.append(menuBarProvider(unplanned: provider))
+            integrations.append(menuBarIntegration(unplanned: integration))
         }
-        if providers.isEmpty, let provider = model?.unplannedProviders.first {
-            providers = [menuBarProvider(unplanned: provider)]
+        if integrations.isEmpty, let integration = model?.unplannedIntegrations.first {
+            integrations = [menuBarIntegration(unplanned: integration)]
         }
-        let ids = PopoverOrder.arranged(providers.map(\.id), accordingTo: options.popoverProviderOrder)
-        return ids.compactMap { id in providers.first { $0.id == id } }
+        let ids = PopoverOrder.arranged(
+            integrations.map(\.id),
+            accordingTo: options.popoverIntegrationOrder
+        )
+        return ids.compactMap { id in integrations.first { $0.id == id } }
     }
 
-    private func menuBarProvider(unplanned: UnplannedProvider) -> MenuBarProvider {
-        let displayName = model?.sections.listing(id: unplanned.providerID)?.displayName ?? unplanned.providerID
-        return MenuBarProvider(unplanned: unplanned, displayName: displayName)
+    private func menuBarIntegration(unplanned: UnplannedIntegration) -> MenuBarIntegration {
+        let displayName = model?.sections.listing(id: unplanned.integrationID)?.displayName
+            ?? unplanned.integrationID
+        return MenuBarIntegration(unplanned: unplanned, displayName: displayName)
     }
 
     var body: some View {
         if let image = renderedLabel {
             Image(nsImage: image)
                 .renderingMode(.original)
-                .accessibilityLabel(resolvedProviders.map {
+                .accessibilityLabel(resolvedIntegrations.map {
                     "\($0.name): \(figures(for: $0))"
                 }.joined(separator: ", "))
         } else {
@@ -95,15 +100,15 @@ struct MenuBarLabel: View {
 
     private var labelContent: some View {
         HStack(spacing: LayoutMetrics.rowSpacing) {
-            if resolvedProviders.isEmpty {
+            if resolvedIntegrations.isEmpty {
                 Text("Quota · \(PercentageFormatter.unknown)")
             } else {
-                ForEach(resolvedProviders) { provider in
-                    if provider.id != resolvedProviders.first?.id {
+                ForEach(resolvedIntegrations) { integration in
+                    if integration.id != resolvedIntegrations.first?.id {
                         Text("|")
                             .foregroundStyle(.secondary)
                     }
-                    quotaLabel(provider)
+                    quotaLabel(integration)
                 }
             }
         }
@@ -112,17 +117,17 @@ struct MenuBarLabel: View {
     }
 
     /// One integration's mark and figures, so a separator can sit between integrations.
-    private func quotaLabel(_ provider: MenuBarProvider) -> some View {
+    private func quotaLabel(_ provider: MenuBarIntegration) -> some View {
         let figures = figures(for: provider)
         return HStack(spacing: LayoutMetrics.lineSpacing) {
             if options.showLogos {
                 ProviderMark(
-                    providerID: provider.providerID,
+                    providerID: provider.integrationID,
                     size: LayoutMetrics.indicatorSize + 7,
                     sizesNativeImage: true
                 )
             } else {
-                Text(model?.sections.listing(id: provider.providerID)?.displayName ?? provider.name)
+                Text(model?.sections.listing(id: provider.integrationID)?.displayName ?? provider.name)
             }
             if !figures.isEmpty {
                 Text(figures)
@@ -133,8 +138,8 @@ struct MenuBarLabel: View {
     }
 
     /// Today's allowances and the visible limits, in the order the status item draws them.
-    private func figures(for provider: MenuBarProvider) -> String {
-        let integrationID = provider.providerID
+    private func figures(for provider: MenuBarIntegration) -> String {
+        let integrationID = provider.integrationID
         let buckets = (provider.snapshot?.buckets ?? [])
             .filter { provider.presentation != nil || $0.period.end > (model?.reference ?? Date()) }
         let limits = provider.snapshot?.knownLimits ?? []
@@ -298,27 +303,27 @@ struct MenuBarLabel: View {
     }
 }
 
-private struct MenuBarProvider: Identifiable {
-    let providerID: String
+private struct MenuBarIntegration: Identifiable {
+    let integrationID: String
     let accountLabel: String?
     let name: String
     let snapshot: UsageSnapshot?
     let presentation: QuotaPresentation?
 
     var id: String {
-        PopoverOrder.key(providerID: providerID, account: accountLabel)
+        PopoverOrder.key(integrationID: integrationID, account: accountLabel)
     }
 
     init(presentation: QuotaPresentation) {
-        providerID = presentation.summary.quota.providerID.rawValue
+        integrationID = presentation.summary.quota.providerID.rawValue
         accountLabel = presentation.accountLabel
         name = presentation.summary.quota.name
         snapshot = presentation.summary.snapshot
         self.presentation = presentation
     }
 
-    init(unplanned: UnplannedProvider, displayName: String) {
-        providerID = unplanned.providerID
+    init(unplanned: UnplannedIntegration, displayName: String) {
+        integrationID = unplanned.integrationID
         accountLabel = unplanned.accountLabel
         name = displayName
         snapshot = unplanned.snapshot

@@ -8,7 +8,7 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
     public var showLogos = true
     public var showDailyQuota = true
     public var keepRunningOnClose = false
-    public var popoverProviderOrder: [String] = []
+    public var popoverIntegrationOrder: [String] = []
     public var popoverItemOrder: [String: [String]] = [:]
 
     /// Whether the limits chosen under each integration are drawn.
@@ -49,7 +49,7 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
         case showLogos
         case showDailyQuota
         case keepRunningOnClose
-        case popoverProviderOrder
+        case popoverIntegrationOrder = "popoverProviderOrder"
         case popoverItemOrder
         case showAvailableLimits
         case valueMode
@@ -68,7 +68,7 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
         showLogos = try values.decodeIfPresent(Bool.self, forKey: .showLogos) ?? true
         showDailyQuota = try values.decodeIfPresent(Bool.self, forKey: .showDailyQuota) ?? true
         keepRunningOnClose = try values.decodeIfPresent(Bool.self, forKey: .keepRunningOnClose) ?? false
-        popoverProviderOrder = try values.decodeIfPresent([String].self, forKey: .popoverProviderOrder) ?? []
+        popoverIntegrationOrder = try values.decodeIfPresent([String].self, forKey: .popoverIntegrationOrder) ?? []
         popoverItemOrder = try values.decodeIfPresent([String: [String]].self, forKey: .popoverItemOrder) ?? [:]
         // A missing key is not the same as false: older documents without the
         // field kept a figure by showing limits whenever today's allowance was
@@ -117,7 +117,7 @@ public struct MenuBarPreferences: Codable, Sendable, Equatable {
         try values.encode(showLogos, forKey: .showLogos)
         try values.encode(showDailyQuota, forKey: .showDailyQuota)
         try values.encode(keepRunningOnClose, forKey: .keepRunningOnClose)
-        try values.encode(popoverProviderOrder, forKey: .popoverProviderOrder)
+        try values.encode(popoverIntegrationOrder, forKey: .popoverIntegrationOrder)
         try values.encode(popoverItemOrder, forKey: .popoverItemOrder)
         try values.encode(showAvailableLimits, forKey: .showAvailableLimits)
         try values.encode(valueMode, forKey: .valueMode)

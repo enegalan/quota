@@ -1,18 +1,18 @@
 import Core
 import Foundation
 
-struct PopoverProviderGroup: Identifiable {
+struct PopoverIntegrationGroup: Identifiable {
     struct Identity: Hashable {
-        let providerID: String
+        let integrationID: String
         let accountLabel: String?
     }
 
     let id: Identity
     var presentations: [QuotaPresentation]
-    var unplanned: UnplannedProvider?
+    var unplanned: UnplannedIntegration?
 
-    var providerID: String {
-        id.providerID
+    var integrationID: String {
+        id.integrationID
     }
 
     var accountLabel: String? {
@@ -20,7 +20,7 @@ struct PopoverProviderGroup: Identifiable {
     }
 
     var orderKey: String {
-        PopoverOrder.key(providerID: providerID, account: accountLabel)
+        PopoverOrder.key(integrationID: integrationID, account: accountLabel)
     }
 
     var latestPresentation: QuotaPresentation? {
@@ -45,24 +45,24 @@ struct PopoverProviderGroup: Identifiable {
 
     static func group(
         _ presentations: [QuotaPresentation],
-        unplanned: [UnplannedProvider] = []
-    ) -> [PopoverProviderGroup] {
-        var groups: [PopoverProviderGroup] = []
+        unplanned: [UnplannedIntegration] = []
+    ) -> [PopoverIntegrationGroup] {
+        var groups: [PopoverIntegrationGroup] = []
         for presentation in presentations {
             let id = Identity(
-                providerID: presentation.summary.quota.providerID.rawValue,
+                integrationID: presentation.summary.quota.providerID.rawValue,
                 accountLabel: presentation.accountLabel
             )
             if let index = groups.firstIndex(where: { $0.id == id }) {
                 groups[index].presentations.append(presentation)
             } else {
-                groups.append(PopoverProviderGroup(id: id, presentations: [presentation]))
+                groups.append(PopoverIntegrationGroup(id: id, presentations: [presentation]))
             }
         }
-        for provider in unplanned {
-            let id = Identity(providerID: provider.providerID, accountLabel: provider.accountLabel)
+        for integration in unplanned {
+            let id = Identity(integrationID: integration.integrationID, accountLabel: integration.accountLabel)
             guard !groups.contains(where: { $0.id == id }) else { continue }
-            groups.append(PopoverProviderGroup(id: id, presentations: [], unplanned: provider))
+            groups.append(PopoverIntegrationGroup(id: id, presentations: [], unplanned: integration))
         }
         return groups
     }

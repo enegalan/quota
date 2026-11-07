@@ -50,22 +50,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    /// Treats a second Dock click as a request for the management window.
+    /// Treats a Dock click as a request for the management window.
     ///
-    /// Only when nothing is already visible: clicking the icon of an app
-    /// whose window is on screen should do what every other app does,
-    /// which is bring that window forward — and `NSApp` does that on its
-    /// own once the reopen is accepted, so opening a second window here
-    /// would be the surprising outcome.
+    /// AppKit's `hasVisibleWindows` is ignored: the MenuBarExtra panel keeps
+    /// that flag true after the dashboard is closed, so trusting it would
+    /// only activate Quota and never reopen the window. Visibility is taken
+    /// from titled management windows alone.
+    ///
+    /// When one of those is already on screen, AppKit brings it forward once
+    /// the reopen is accepted — opening another would be the wrong outcome.
     ///
     /// - Returns: always true, so AppKit treats the reopen as handled and
-    ///   leaves the existing windows alone rather than restoring state of
-    ///   its own.
+    ///   leaves restoration of its own alone.
     func applicationShouldHandleReopen(
         _ sender: NSApplication,
-        hasVisibleWindows flag: Bool
+        hasVisibleWindows _: Bool
     ) -> Bool {
-        if !flag {
+        if !MainWindowOpener.hasVisibleManagementWindow() {
             MainWindowOpener.request()
         }
         return true

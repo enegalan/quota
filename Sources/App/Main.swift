@@ -32,6 +32,7 @@ struct Main: App {
                 }
         } label: {
             MenuBarLabel(model: model)
+                .background(MainWindowOpenBridge())
                 .task {
                     delegate.model = model
                     delegate.onTogglePopover = { togglePopover() }

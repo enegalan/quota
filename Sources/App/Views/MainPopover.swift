@@ -6,7 +6,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 // swiftlint:disable type_body_length
-/// A glanceable overview of every quota and the limits reported by its provider.
+/// A glanceable overview of every quota and the limits reported by its integration.
 struct MainPopover: View {
     let model: AppModel
     let launchFailure: String?
@@ -19,7 +19,7 @@ struct MainPopover: View {
         VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
             if let launchFailure {
                 LaunchFailureView(message: launchFailure)
-            } else if model.isEmpty, model.unplannedProviders.isEmpty {
+            } else if model.isEmpty, model.unplannedIntegrations.isEmpty {
                 NoticeCard(
                     title: "Welcome to Quota",
                     message: "Connect an integration to start tracking usage."
@@ -34,16 +34,13 @@ struct MainPopover: View {
         }
         .padding(LayoutMetrics.inset)
         .frame(width: LayoutMetrics.popoverWidth)
-        .onReceive(NotificationCenter.default.publisher(for: .openMainWindow)) { _ in
-            MainWindowOpener.open(using: openWindow)
-        }
     }
 
-    private var groups: [PopoverProviderGroup] {
-        let groups = PopoverProviderGroup.group(model.presentations, unplanned: model.unplannedProviders)
+    private var groups: [PopoverIntegrationGroup] {
+        let groups = PopoverIntegrationGroup.group(model.presentations, unplanned: model.unplannedIntegrations)
         let ids = PopoverOrder.arranged(
             groups.map(\.orderKey),
-            accordingTo: model.menuBarPreferences.popoverProviderOrder
+            accordingTo: model.menuBarPreferences.popoverIntegrationOrder
         )
         return ids.compactMap { id in groups.first { $0.orderKey == id } }
     }
@@ -51,7 +48,7 @@ struct MainPopover: View {
     /// Limits, with the quotas that watch each one nested under it.
     ///
     /// A quota whose limit is no longer in the reading stays as its own row.
-    private func items(for group: PopoverProviderGroup) -> [PopoverItem] {
+    private func items(for group: PopoverIntegrationGroup) -> [PopoverItem] {
         let buckets = (group.snapshot?.buckets ?? []).filter {
             group.unplanned == nil || $0.period.end > model.reference
         }
@@ -77,13 +74,17 @@ struct MainPopover: View {
                 ScrollView {
                     VStack(spacing: LayoutMetrics.rowSpacing) {
                         ForEach(groups) { group in
-                            providerCard(group)
+                            integrationCard(group)
                         }
                     }
                 }
-                .frame(height: min(480, (NSScreen.main?.visibleFrame.height ?? 800) * 0.65))
+                .frame(height: min(
+                    LayoutMetrics.popoverScrollMaximumHeight,
+                    (NSScreen.main?.visibleFrame.height ?? LayoutMetrics.popoverScrollFallbackScreenHeight)
+                        * LayoutMetrics.popoverScrollScreenFraction
+                ))
             } else if let group = groups.first {
-                providerCard(group)
+                integrationCard(group)
             }
         }
     }
@@ -95,16 +96,17 @@ struct MainPopover: View {
     /// One short card stays put. Several integrations, or several rows, scroll.
     private var scrollsOverview: Bool {
         guard groups.count == 1, let group = groups.first else { return true }
-        return items(for: group).count + group.presentations.count > 2
+        return items(for: group).count + group.presentations.count
+            > LayoutMetrics.popoverScrollRowThreshold
     }
 
     // swiftlint:disable:next function_body_length
-    private func providerCard(_ group: PopoverProviderGroup) -> some View {
+    private func integrationCard(_ group: PopoverIntegrationGroup) -> some View {
         let rows = items(for: group)
         return VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
             reorderable(HStack(spacing: LayoutMetrics.rowSpacing) {
-                ProviderMark(providerID: group.providerID, size: 20)
-                Text(model.sections.all.first { $0.id == group.providerID }?.displayName ?? group.providerID)
+                ProviderMark(providerID: group.integrationID, size: 20)
+                Text(model.sections.all.first { $0.id == group.integrationID }?.displayName ?? group.integrationID)
                     .font(.system(size: LayoutMetrics.bodySize, weight: .semibold))
                 Spacer()
                 Caption(text: group.accountLabel ?? QuotaPresentation.disconnectedAccountCaption)
@@ -189,7 +191,7 @@ struct MainPopover: View {
         .padding(.vertical, LayoutMetrics.lineSpacing)
     }
 
-    private func quotaDetails(_ presentation: QuotaPresentation, in group: PopoverProviderGroup) -> some View {
+    private func quotaDetails(_ presentation: QuotaPresentation, in group: PopoverIntegrationGroup) -> some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Quota: \(presentation.summary.quota.name)")
@@ -287,7 +289,7 @@ struct MainPopover: View {
             if let scope {
                 preferences.popoverItemOrder[scope] = updated
             } else {
-                preferences.popoverProviderOrder = updated
+                preferences.popoverIntegrationOrder = updated
             }
         }
     }

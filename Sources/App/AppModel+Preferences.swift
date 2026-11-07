@@ -10,13 +10,13 @@ extension AppModel {
     /// quota the menu bar speaks for stands in rather than leaving the item blank.
     private var shownIntegrationIDs: Set<String> {
         let quotaIDs = Set(presentations.map(\.summary.quota.providerID.rawValue))
-        let connectedIDs = Set(unplannedProviders.map(\.providerID))
+        let connectedIDs = Set(unplannedIntegrations.map(\.integrationID))
         let visible = quotaIDs.union(connectedIDs).subtracting(menuBarPreferences.hiddenIntegrations)
         if visible.isEmpty, let primary = primaryPresentation {
             return [primary.summary.quota.providerID.rawValue]
         }
-        if visible.isEmpty, let provider = unplannedProviders.first {
-            return [provider.providerID]
+        if visible.isEmpty, let integration = unplannedIntegrations.first {
+            return [integration.integrationID]
         }
         return visible
     }

@@ -9,19 +9,14 @@ public struct Preferences: Codable, Sendable, Equatable {
     public let defaultPolicyKind: String
     public let hasCompletedOnboarding: Bool
 
-    /// How often a connected integration is polled when it has no interval of its own.
-    ///
-    /// A stored number rather than an absence, because the setting is shown as a
-    /// figure in the interface and the user changes it by choosing one. It
-    /// defaults to the scheduler's own default rather than to a second copy of
-    /// it: a preference holding 600 while the schedule polled at 900 would mean
-    /// the platform default was unreachable and neither number was the truth.
+    /// Legacy global poll interval kept for documents written before per-integration
+    /// intervals. Scheduling no longer reads it; each integration has its own value.
     public let refreshIntervalSeconds: TimeInterval
 
-    /// Poll interval chosen for one integration, keyed by provider id.
+    /// Poll interval chosen for one integration, keyed by integration id.
     ///
-    /// An integration with no entry uses `refreshIntervalSeconds`. The entry is
-    /// removed when the user chooses the general interval again.
+    /// An integration with no entry uses its own suggested interval, then the
+    /// platform default. The entry is removed when the user returns to that default.
     public let refreshIntervalSecondsByProvider: [String: TimeInterval]
 
     /// Providers switched off without a release.
@@ -146,25 +141,38 @@ public struct Preferences: Codable, Sendable, Equatable {
         copy(announcedUpdateVersion: version)
     }
 
-    /// The same preferences with a different general refresh interval.
+    /// The same preferences with a different legacy global refresh interval.
     public func withRefreshIntervalSeconds(_ seconds: TimeInterval) -> Preferences {
         copy(refreshIntervalSeconds: seconds)
     }
 
-    /// The interval in force for one integration: its own, or the general one.
-    public func refreshInterval(for providerID: String) -> TimeInterval {
-        RefreshConstants.clamped(refreshIntervalSecondsByProvider[providerID] ?? refreshIntervalSeconds)
+    /// The interval in force for one integration.
+    ///
+    /// Order: the user's override, then the integration's suggested default, then
+    /// the platform default. Every path is clamped to the platform bounds.
+    public func refreshInterval(
+        for integrationID: String,
+        suggested: TimeInterval? = nil
+    ) -> TimeInterval {
+        if let override = refreshIntervalSecondsByProvider[integrationID] {
+            return RefreshConstants.clamped(override)
+        }
+        if let suggested {
+            return RefreshConstants.clamped(suggested)
+        }
+        return RefreshConstants.clamped(RefreshConstants.defaultPollInterval)
     }
 
     /// The same preferences with one integration's interval set, or cleared.
     ///
-    /// Nil removes the entry, so the integration goes back to the general interval.
-    public func withRefreshInterval(_ seconds: TimeInterval?, for providerID: String) -> Preferences {
+    /// Nil removes the entry, so the integration goes back to its suggested
+    /// default (or the platform default when it has none).
+    public func withRefreshInterval(_ seconds: TimeInterval?, for integrationID: String) -> Preferences {
         var intervals = refreshIntervalSecondsByProvider
         if let seconds {
-            intervals[providerID] = RefreshConstants.clamped(seconds)
+            intervals[integrationID] = RefreshConstants.clamped(seconds)
         } else {
-            intervals.removeValue(forKey: providerID)
+            intervals.removeValue(forKey: integrationID)
         }
         return copy(refreshIntervalSecondsByProvider: intervals)
     }
