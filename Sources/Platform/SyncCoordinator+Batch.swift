@@ -15,11 +15,19 @@ extension SyncCoordinator {
             providerOrder.append(quota.providerID)
         }
         var outcomes: [UUID: SyncOutcome] = [:]
+        var firstError: Error?
         for providerID in providerOrder {
             let members = group.filter { $0.providerID == providerID }
-            for outcome in try await refresh(members, of: providerID, on: today) {
-                outcomes[outcome.quotaID] = outcome
+            do {
+                for outcome in try await refresh(members, of: providerID, on: today) {
+                    outcomes[outcome.quotaID] = outcome
+                }
+            } catch {
+                firstError = firstError ?? error
             }
+        }
+        if let firstError {
+            throw firstError
         }
         return group.compactMap { outcomes[$0.id] }
     }
@@ -56,9 +64,17 @@ extension SyncCoordinator {
         switch outcome.result {
         case .success(let snapshot):
             var filed: [SyncOutcome] = []
+            var firstError: Error?
             for quota in members {
-                let changed = try await file(snapshot, for: quota, accountLabel: accountLabel)
-                filed.append(SyncOutcome(quotaID: quota.id, result: outcome.result, periodChanged: changed))
+                do {
+                    let changed = try await file(snapshot, for: quota, accountLabel: accountLabel)
+                    filed.append(SyncOutcome(quotaID: quota.id, result: outcome.result, periodChanged: changed))
+                } catch {
+                    firstError = firstError ?? error
+                }
+            }
+            if let firstError {
+                throw firstError
             }
             return filed
         case .failure(let failure):

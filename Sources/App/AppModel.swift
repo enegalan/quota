@@ -312,6 +312,7 @@ final class AppModel {
         lastError = failure?.localizedDescription
     }
 
+    /// Reads each visible connected integration that still has no quota.
     private func refreshUnplanned(trigger: RefreshTrigger) async {
         for integration in unplannedIntegrations where isIntegrationShownInMenuBar(integration.integrationID) {
             // Every read launches the provider's plugin, so no trigger reads without a

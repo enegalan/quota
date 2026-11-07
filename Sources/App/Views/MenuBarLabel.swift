@@ -72,6 +72,7 @@ struct MenuBarLabel: View {
         return ids.compactMap { id in integrations.first { $0.id == id } }
     }
 
+    /// Adapts a connected-but-unplanned reading into the menu bar's row model.
     private func menuBarIntegration(unplanned: UnplannedIntegration) -> MenuBarIntegration {
         let displayName = model?.sections.listing(id: unplanned.integrationID)?.displayName
             ?? unplanned.integrationID

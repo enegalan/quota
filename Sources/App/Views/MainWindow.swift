@@ -240,10 +240,12 @@ struct MainWindow: View {
 
 /// Hands the management window to the delegate, which hides the Dock icon when it closes.
 private struct ManagementWindowCloseMonitor: NSViewRepresentable {
+    /// An empty host view whose window is the management window once mounted.
     func makeNSView(context: Context) -> NSView {
         NSView()
     }
 
+    /// Passes the host's window to the app delegate whenever the view updates.
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
             guard let window = nsView.window else { return }

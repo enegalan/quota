@@ -32,6 +32,7 @@ struct PopoverIntegrationGroup: Identifiable {
         latestPresentation?.summary.snapshot ?? unplanned?.snapshot
     }
 
+    /// Quotas that watch this limit, including ones still keyed only by the reading.
     func quotas(for bucketID: String) -> [QuotaPresentation] {
         presentations.filter { ($0.summary.quota.bucketID ?? $0.summary.snapshot?.primaryBucket?.id) == bucketID }
     }
@@ -43,6 +44,7 @@ struct PopoverIntegrationGroup: Identifiable {
         }
     }
 
+    /// One group per integration account, with unplanned accounts filling the gaps.
     static func group(
         _ presentations: [QuotaPresentation],
         unplanned: [UnplannedIntegration] = []

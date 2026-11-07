@@ -123,6 +123,7 @@ struct SettingsView: View {
             await reloadFromPreferences()
             isReady = true
         }
+        .onChange(of: model.loadGeneration) { _, _ in Task { await reloadFromPreferences() } }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 loginItemStatus = SMAppService.mainApp.status
@@ -310,14 +311,17 @@ struct SettingsView: View {
         model.sections.connected.sorted { $0.displayName < $1.displayName }
     }
 
+    /// Suggested poll interval, or the app-wide default.
     private func defaultInterval(for integrationID: String) -> TimeInterval {
         suggestedIntervals[integrationID] ?? RefreshConstants.defaultPollInterval
     }
 
+    /// Picker caption for the default interval choice.
     private func defaultLabel(for integrationID: String) -> String {
         "Default (\(Self.label(for: defaultInterval(for: integrationID))))"
     }
 
+    /// Binding for a custom interval, or clearing it back to the default.
     private func pollSelection(for integrationID: String) -> Binding<PollSelection> {
         Binding(
             get: {
@@ -371,13 +375,10 @@ private enum PollSelection: Hashable {
 /// A compact “i” that shows what changing a setting does.
 struct SettingInfoButton: View {
     let explanation: String
-
     @State private var isPresented = false
 
     var body: some View {
-        Button {
-            isPresented.toggle()
-        } label: {
+        Button { isPresented.toggle() } label: {
             Image(systemName: "info.circle")
                 .font(.body)
                 .foregroundStyle(.secondary)

@@ -82,6 +82,7 @@ final class BackgroundRefreshController {
         ProcessInfo.processInfo.isLowPowerModeEnabled
     }
 
+    /// Stops the timer in Low Power Mode and restarts it when power returns.
     private func powerStateChanged() {
         if isSuspended {
             timer?.invalidate()

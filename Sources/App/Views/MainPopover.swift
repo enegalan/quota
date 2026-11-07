@@ -78,7 +78,7 @@ struct MainPopover: View {
                         }
                     }
                 }
-                .frame(height: min(
+                .frame(maxHeight: min(
                     LayoutMetrics.popoverScrollMaximumHeight,
                     (NSScreen.main?.visibleFrame.height ?? LayoutMetrics.popoverScrollFallbackScreenHeight)
                         * LayoutMetrics.popoverScrollScreenFraction
@@ -100,8 +100,10 @@ struct MainPopover: View {
             > LayoutMetrics.popoverScrollRowThreshold
     }
 
-    // swiftlint:disable:next function_body_length
-    private func integrationCard(_ group: PopoverIntegrationGroup) -> some View {
+    /// One integration's limits and quotas, with drag handles for reordering.
+    private func integrationCard( // swiftlint:disable:this function_body_length
+        _ group: PopoverIntegrationGroup
+    ) -> some View {
         let rows = items(for: group)
         return VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
             reorderable(HStack(spacing: LayoutMetrics.rowSpacing) {
@@ -160,6 +162,7 @@ struct MainPopover: View {
         )
     }
 
+    /// A limit's name, bar, and reset caption.
     private func bucketRow(_ bucket: UsageBucket) -> some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
             HStack(alignment: .firstTextBaseline) {
@@ -191,6 +194,7 @@ struct MainPopover: View {
         .padding(.vertical, LayoutMetrics.lineSpacing)
     }
 
+    /// One quota under its limit, with today's plan and a pin control.
     private func quotaDetails(_ presentation: QuotaPresentation, in group: PopoverIntegrationGroup) -> some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
             HStack(alignment: .firstTextBaseline) {
@@ -229,10 +233,12 @@ struct MainPopover: View {
         presentation.id == (model.menuBarQuotaID ?? model.primaryPresentation?.id)
     }
 
+    /// Used over today's plan, for the trailing figure on a quota row.
     private func todayFigures(_ allowance: TodayAllowance) -> String {
         "\(formatter.preciseString(allowance.usedToday)) / \(formatter.preciseString(allowance.suggested)) today"
     }
 
+    /// Today's bar and remaining caption when the plan is known.
     @ViewBuilder
     private func todayAllowance(_ presentation: QuotaPresentation) -> some View {
         if let allowance = presentation.summary.todayAllowance {
@@ -251,6 +257,7 @@ struct MainPopover: View {
         }
     }
 
+    /// Drag, drop, and move-up/down for one row in a shared order list.
     private func reorderable(
         _ content: some View, id: String, ids: [String], scope: String?
     ) -> some View {
@@ -283,6 +290,7 @@ struct MainPopover: View {
             .onDrop(of: [PopoverDrag.type], delegate: dropDelegate(target: id, ids: ids, scope: scope))
     }
 
+    /// Writes a reordered list into the matching menu-bar preference scope.
     private func move(_ id: String, to target: String, ids: [String], scope: String?) {
         let updated = PopoverOrder.moving(id, to: target, in: ids)
         model.updateMenuBarPreferences { preferences in
@@ -294,6 +302,7 @@ struct MainPopover: View {
         }
     }
 
+    /// Drop target that reorders only within the same integration or overview list.
     private func dropDelegate(target: String, ids: [String], scope: String?) -> PopoverDropDelegate {
         PopoverDropDelegate(draggedItem: $draggedItem, target: target, scope: scope) { source in
             move(source, to: target, ids: ids, scope: scope)
@@ -349,19 +358,23 @@ private struct PopoverDropDelegate: DropDelegate {
     let scope: String?
     let move: (String) -> Void
 
+    /// Accepts a drag only from the same scope and not onto itself.
     func validateDrop(info: DropInfo) -> Bool {
         draggedItem?.scope == scope && draggedItem?.id != target && draggedItem != nil
     }
 
+    /// Keeps the insertion cursor on a move operation while the drag is over this row.
     func dropUpdated(info: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
     }
 
+    /// Reorders as the pointer crosses a row, so the list follows the drag.
     func dropEntered(info: DropInfo) {
         guard let item = draggedItem, item.scope == scope, item.id != target else { return }
         move(item.id)
     }
 
+    /// Clears the drag; the move already happened on entry.
     func performDrop(info: DropInfo) -> Bool {
         guard let item = draggedItem, item.scope == scope, item.id != target else { return false }
         draggedItem = nil

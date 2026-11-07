@@ -55,6 +55,7 @@ struct MenuBarIntegrationSettings: View {
         return model.unplannedIntegrations.filter { seen.insert($0.integrationID).inserted }
     }
 
+    /// Visibility toggles for a connected integration that still has no quota.
     private func unplannedSettings(_ provider: UnplannedIntegration) -> some View {
         let integrationID = provider.integrationID
         let buckets = provider.snapshot?.buckets ?? []
