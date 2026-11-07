@@ -298,9 +298,7 @@ final class AppModel {
         do {
             let quotaIDs = try await environment.planner.plan(for: trigger)
             await environment.planner.begin(quotaIDs)
-            for quotaID in quotaIDs {
-                _ = try? await environment.coordinator.refresh(quotaID: quotaID)
-            }
+            _ = try? await environment.coordinator.refresh(quotaIDs: quotaIDs)
             await environment.planner.finish(quotaIDs)
         } catch {
             failure = error
@@ -315,11 +313,14 @@ final class AppModel {
 
     private func refreshUnplanned(trigger: RefreshTrigger) async {
         for provider in unplannedProviders where isIntegrationShownInMenuBar(provider.providerID) {
-            let interval = await refreshIntervalSeconds(for: provider.providerID)
+            // Every read launches the provider's plugin, so no trigger reads without a
+            // floor: an explicit refresh waits out the minimum poll interval, and
+            // anything automatic (opening the popover included) the configured one.
+            let interval = trigger == .manual
+                ? RefreshConstants.minimumPollInterval
+                : await refreshIntervalSeconds(for: provider.providerID)
             let now = environment.now()
-            if trigger == .scheduleElapsed || trigger == .launch, let last = unplannedAttempts[provider.orderKey],
-               now.timeIntervalSince(last) < interval
-            {
+            if let last = unplannedAttempts[provider.orderKey], now.timeIntervalSince(last) < interval {
                 continue
             }
             guard let id = try? ProviderID(provider.providerID) else { continue }
