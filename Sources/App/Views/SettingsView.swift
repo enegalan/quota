@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Core
 import Platform
 import ServiceManagement
@@ -17,6 +18,10 @@ struct SettingsView: View {
     @State private var automaticUpdateChecksEnabled =
         PreferenceConstants.defaultAutomaticUpdateChecksEnabled
     @State private var isReady = false
+    /// Bumped on user edits so an in-flight reload cannot replace them.
+    @State private var reloadEpoch = 0
+    /// Bumped when a reload starts so an older reload cannot finish later.
+    @State private var reloadSerial = 0
     @State private var loginItemStatus = SMAppService.mainApp.status
     @State private var loginItemError: String?
     @Environment(\.scenePhase) private var scenePhase
@@ -28,12 +33,8 @@ struct SettingsView: View {
             MenuBarIntegrationSettings(model: model)
             Section {
                 HStack(alignment: .firstTextBaseline) {
-                    Toggle(isOn: $notificationsEnabled) {
+                    Toggle(isOn: writing($notificationsEnabled, to: model.setNotificationsEnabled)) {
                         Label("Enable notifications", systemImage: "bell")
-                    }
-                    .onChange(of: notificationsEnabled) { _, newValue in
-                        guard isReady else { return }
-                        Task { await model.setNotificationsEnabled(newValue) }
                     }
                     SettingInfoButton(
                         explanation: """
@@ -72,15 +73,16 @@ struct SettingsView: View {
 
             Section {
                 HStack(alignment: .firstTextBaseline) {
-                    Toggle(isOn: $automaticUpdateChecksEnabled) {
+                    Toggle(
+                        isOn: writing(
+                            $automaticUpdateChecksEnabled,
+                            to: model.setAutomaticUpdateChecksEnabled
+                        )
+                    ) {
                         Label(
                             "Check for updates automatically",
                             systemImage: "arrow.down.app"
                         )
-                    }
-                    .onChange(of: automaticUpdateChecksEnabled) { _, newValue in
-                        guard isReady else { return }
-                        Task { await model.setAutomaticUpdateChecksEnabled(newValue) }
                     }
                     SettingInfoButton(
                         explanation: """
@@ -119,10 +121,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(maxWidth: LayoutMetrics.providerListWidth, alignment: .leading)
-        .task {
-            await reloadFromPreferences()
-            isReady = true
-        }
+        .task { await reloadFromPreferences() }
         .onChange(of: model.loadGeneration) { _, _ in Task { await reloadFromPreferences() } }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -294,17 +293,44 @@ struct SettingsView: View {
         }
     }
 
+    /// Binding that persists only user edits, not values applied by a reload.
+    private func writing(
+        _ value: Binding<Bool>,
+        to write: @escaping @MainActor (Bool) async -> Void
+    ) -> Binding<Bool> {
+        Binding(
+            get: { value.wrappedValue },
+            set: { newValue in
+                guard isReady else { return }
+                value.wrappedValue = newValue
+                reloadEpoch += 1
+                Task { await write(newValue) }
+            }
+        )
+    }
+
     private func reloadFromPreferences() async {
-        notificationsEnabled = await model.notificationsEnabled()
-        integrationIntervals = await model.refreshIntervalsByIntegration()
+        reloadSerial += 1
+        let serial = reloadSerial
+        let epoch = reloadEpoch
+        let notifications = await model.notificationsEnabled()
+        let intervals = await model.refreshIntervalsByIntegration()
         var suggestions: [String: TimeInterval] = [:]
         for listing in connectedIntegrations {
             if let suggested = await model.suggestedRefreshIntervalSeconds(for: listing.id) {
                 suggestions[listing.id] = suggested
             }
         }
+        let automatic = await model.automaticUpdateChecksEnabled()
+        guard serial == reloadSerial, epoch == reloadEpoch else {
+            isReady = true
+            return
+        }
+        notificationsEnabled = notifications
+        integrationIntervals = intervals
         suggestedIntervals = suggestions
-        automaticUpdateChecksEnabled = await model.automaticUpdateChecksEnabled()
+        automaticUpdateChecksEnabled = automatic
+        isReady = true
     }
 
     private var connectedIntegrations: [ProviderListing] {
@@ -332,6 +358,7 @@ struct SettingsView: View {
             },
             set: { selection in
                 guard isReady else { return }
+                reloadEpoch += 1
                 switch selection {
                 case .integrationDefault:
                     integrationIntervals[integrationID] = nil

@@ -78,7 +78,9 @@ struct MainPopover: View {
                         }
                     }
                 }
-                .frame(maxHeight: min(
+                // Fixed height: in a MenuBarExtra, maxHeight lets ScrollView
+                // collapse to zero. Short content already skips this branch.
+                .frame(height: min(
                     LayoutMetrics.popoverScrollMaximumHeight,
                     (NSScreen.main?.visibleFrame.height ?? LayoutMetrics.popoverScrollFallbackScreenHeight)
                         * LayoutMetrics.popoverScrollScreenFraction
