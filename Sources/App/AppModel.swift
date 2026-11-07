@@ -177,8 +177,9 @@ final class AppModel {
                       !presentations.contains(where: {
                           $0.summary.quota.providerID == providerID && $0.accountLabel == account
                       }) else { continue }
-                unplanned.append(unplannedIntegrations.first { $0.integrationID == listing.id && $0.accountLabel == account }
-                    ?? UnplannedIntegration(integrationID: listing.id, accountLabel: account))
+                unplanned
+                    .append(unplannedIntegrations.first { $0.integrationID == listing.id && $0.accountLabel == account }
+                        ?? UnplannedIntegration(integrationID: listing.id, accountLabel: account))
             }
             unplannedIntegrations = unplanned
             unplannedAttempts = unplannedAttempts.filter { key, _ in unplanned.contains { $0.orderKey == key } }
