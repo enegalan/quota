@@ -17,11 +17,7 @@ struct SettingsView: View {
     @State private var suggestedIntervals: [String: TimeInterval] = [:]
     @State private var automaticUpdateChecksEnabled =
         PreferenceConstants.defaultAutomaticUpdateChecksEnabled
-    @State private var isReady = false
-    /// Bumped on user edits so an in-flight reload cannot replace them.
-    @State private var reloadEpoch = 0
-    /// Bumped when a reload starts so an older reload cannot finish later.
-    @State private var reloadSerial = 0
+    @State private var reload = SettingsReloadCoordinator()
     @State private var loginItemStatus = SMAppService.mainApp.status
     @State private var loginItemError: String?
     @Environment(\.scenePhase) private var scenePhase
@@ -301,18 +297,16 @@ struct SettingsView: View {
         Binding(
             get: { value.wrappedValue },
             set: { newValue in
-                guard isReady else { return }
+                guard reload.isReady else { return }
                 value.wrappedValue = newValue
-                reloadEpoch += 1
+                reload.noteUserEdit()
                 Task { await write(newValue) }
             }
         )
     }
 
     private func reloadFromPreferences() async {
-        reloadSerial += 1
-        let serial = reloadSerial
-        let epoch = reloadEpoch
+        let ticket = reload.begin()
         let notifications = await model.notificationsEnabled()
         let intervals = await model.refreshIntervalsByIntegration()
         var suggestions: [String: TimeInterval] = [:]
@@ -322,15 +316,17 @@ struct SettingsView: View {
             }
         }
         let automatic = await model.automaticUpdateChecksEnabled()
-        guard serial == reloadSerial, epoch == reloadEpoch else {
-            isReady = true
+        switch reload.finish(ticket) {
+        case .ignore:
             return
+        case .discard:
+            return
+        case .apply:
+            notificationsEnabled = notifications
+            integrationIntervals = intervals
+            suggestedIntervals = suggestions
+            automaticUpdateChecksEnabled = automatic
         }
-        notificationsEnabled = notifications
-        integrationIntervals = intervals
-        suggestedIntervals = suggestions
-        automaticUpdateChecksEnabled = automatic
-        isReady = true
     }
 
     private var connectedIntegrations: [ProviderListing] {
@@ -357,8 +353,8 @@ struct SettingsView: View {
                 return .interval(Self.nearestChoice(seconds))
             },
             set: { selection in
-                guard isReady else { return }
-                reloadEpoch += 1
+                guard reload.isReady else { return }
+                reload.noteUserEdit()
                 switch selection {
                 case .integrationDefault:
                     integrationIntervals[integrationID] = nil
