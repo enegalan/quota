@@ -3,7 +3,6 @@ import AppKit
 import Core
 import Platform
 import SwiftUI
-import UniformTypeIdentifiers
 
 // swiftlint:disable type_body_length
 /// A glanceable overview of every quota and the limits reported by its integration.
@@ -12,7 +11,14 @@ struct MainPopover: View {
     let launchFailure: String?
 
     @Environment(\.openWindow) private var openWindow
+    /// Active local drag. System `onDrag`/`onDrop` does not deliver drops in a
+    /// MenuBarExtra window, so reordering uses a gesture and this session.
     @State private var draggedItem: PopoverDrag?
+    /// Order while dragging. Written to preferences only when the drag ends, so
+    /// mid-drag preference saves cannot cancel the gesture.
+    @State private var draftItemOrder: [String: [String]] = [:]
+    @State private var draftIntegrationOrder: [String]?
+    @State private var rowFrames: [String: CGRect] = [:]
     private let formatter = PercentageFormatter()
 
     var body: some View {
@@ -34,13 +40,15 @@ struct MainPopover: View {
         }
         .padding(LayoutMetrics.inset)
         .frame(width: LayoutMetrics.popoverWidth)
+        .coordinateSpace(name: PopoverReorder.space)
+        .onPreferenceChange(PopoverReorder.FrameKey.self) { rowFrames = $0 }
     }
 
     private var groups: [PopoverIntegrationGroup] {
         let groups = PopoverIntegrationGroup.group(model.presentations, unplanned: model.unplannedIntegrations)
         let ids = PopoverOrder.arranged(
             groups.map(\.orderKey),
-            accordingTo: model.menuBarPreferences.popoverIntegrationOrder
+            accordingTo: draftIntegrationOrder ?? model.menuBarPreferences.popoverIntegrationOrder
         )
         return ids.compactMap { id in groups.first { $0.orderKey == id } }
     }
@@ -53,10 +61,10 @@ struct MainPopover: View {
             group.unplanned == nil || $0.period.end > model.reference
         }
         let items = buckets.map(PopoverItem.bucket) + group.unmatchedQuotas.map(PopoverItem.quota)
-        let ids = PopoverOrder.arranged(
-            items.map(\.id),
-            accordingTo: model.menuBarPreferences.popoverItemOrder[group.orderKey] ?? []
-        )
+        let saved = draftItemOrder[group.orderKey]
+            ?? model.menuBarPreferences.popoverItemOrder[group.orderKey]
+            ?? []
+        let ids = PopoverOrder.arranged(items.map(\.id), accordingTo: saved)
         return ids.compactMap { id in items.first { $0.id == id } }
     }
 
@@ -158,10 +166,6 @@ struct MainPopover: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
-        .onDrop(
-            of: [PopoverDrag.type],
-            delegate: dropDelegate(target: group.orderKey, ids: groups.map(\.orderKey), scope: nil)
-        )
     }
 
     /// A limit's name, bar, and reset caption.
@@ -259,41 +263,111 @@ struct MainPopover: View {
         }
     }
 
-    /// Drag, drop, and move-up/down for one row in a shared order list.
+    /// Drag and move-up/down for one row in a shared order list.
     private func reorderable(
         _ content: some View, id: String, ids: [String], scope: String?
     ) -> some View {
         let index = ids.firstIndex(of: id) ?? 0
+        let frameID = PopoverReorder.frameID(id: id, scope: scope)
         return content
             .contentShape(Rectangle())
+            .opacity(draggedItem?.id == id && draggedItem?.scope == scope ? 0.55 : 1)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: PopoverReorder.FrameKey.self,
+                        value: [frameID: geometry.frame(in: .named(PopoverReorder.space))]
+                    )
+                }
+            }
             .help("Drag to reorder, or right-click to move up or down")
             .contextMenu {
                 if index > 0 {
-                    Button("Move up") { move(id, to: ids[index - 1], ids: ids, scope: scope) }
+                    Button("Move up") { commitMove(id, to: ids[index - 1], ids: ids, scope: scope) }
                 }
                 if index + 1 < ids.count {
-                    Button("Move down") { move(id, to: ids[index + 1], ids: ids, scope: scope) }
+                    Button("Move down") { commitMove(id, to: ids[index + 1], ids: ids, scope: scope) }
                 }
             }
             .accessibilityAction(named: Text("Move up")) {
                 if index > 0 {
-                    move(id, to: ids[index - 1], ids: ids, scope: scope)
+                    commitMove(id, to: ids[index - 1], ids: ids, scope: scope)
                 }
             }
             .accessibilityAction(named: Text("Move down")) {
                 if index + 1 < ids.count {
-                    move(id, to: ids[index + 1], ids: ids, scope: scope)
+                    commitMove(id, to: ids[index + 1], ids: ids, scope: scope)
                 }
             }
-            .onDrag {
-                draggedItem = PopoverDrag(id: id, scope: scope)
-                return NSItemProvider(object: id as NSString)
-            }
-            .onDrop(of: [PopoverDrag.type], delegate: dropDelegate(target: id, ids: ids, scope: scope))
+            .gesture(reorderGesture(id: id, ids: ids, scope: scope))
     }
 
-    /// Writes a reordered list into the matching menu-bar preference scope.
-    private func move(_ id: String, to target: String, ids: [String], scope: String?) {
+    /// Long-press then drag so a ScrollView can still scroll on a short flick.
+    private func reorderGesture(id: String, ids: [String], scope: String?) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.15)
+            .sequenced(
+                before: DragGesture(minimumDistance: 1, coordinateSpace: .named(PopoverReorder.space))
+            )
+            .onChanged { value in
+                guard case .second(true, let drag?) = value else { return }
+                if draggedItem == nil {
+                    draggedItem = PopoverDrag(id: id, scope: scope)
+                }
+                guard draggedItem?.id == id, draggedItem?.scope == scope else { return }
+                let order = liveOrder(ids: ids, scope: scope)
+                guard let target = hitTarget(at: drag.location, dragging: id, scope: scope, ids: order),
+                      target != id
+                else { return }
+                draftMove(id, to: target, ids: order, scope: scope)
+            }
+            .onEnded { _ in
+                guard draggedItem?.id == id, draggedItem?.scope == scope else { return }
+                commitDraft()
+            }
+    }
+
+    /// Current order for a scope, preferring an in-flight draft.
+    private func liveOrder(ids: [String], scope: String?) -> [String] {
+        if let scope {
+            return PopoverOrder.arranged(
+                ids,
+                accordingTo: draftItemOrder[scope] ?? model.menuBarPreferences.popoverItemOrder[scope] ?? []
+            )
+        }
+        return PopoverOrder.arranged(
+            ids,
+            accordingTo: draftIntegrationOrder ?? model.menuBarPreferences.popoverIntegrationOrder
+        )
+    }
+
+    /// Row under the pointer in the same reorder scope, if any.
+    private func hitTarget(at point: CGPoint, dragging: String, scope: String?, ids: [String]) -> String? {
+        let available = Set(ids)
+        for (frameID, frame) in rowFrames {
+            guard frame.contains(point),
+                  let parsed = PopoverReorder.parse(frameID),
+                  parsed.scope == scope,
+                  parsed.id != dragging,
+                  available.contains(parsed.id)
+            else { continue }
+            return parsed.id
+        }
+        return nil
+    }
+
+    /// Updates only the draft order while a drag is live.
+    private func draftMove(_ id: String, to target: String, ids: [String], scope: String?) {
+        let updated = PopoverOrder.moving(id, to: target, in: ids)
+        guard updated != ids else { return }
+        if let scope {
+            draftItemOrder[scope] = updated
+        } else {
+            draftIntegrationOrder = updated
+        }
+    }
+
+    /// Writes a reordered list into preferences immediately (context menu).
+    private func commitMove(_ id: String, to target: String, ids: [String], scope: String?) {
         let updated = PopoverOrder.moving(id, to: target, in: ids)
         model.updateMenuBarPreferences { preferences in
             if let scope {
@@ -304,10 +378,21 @@ struct MainPopover: View {
         }
     }
 
-    /// Drop target that reorders only within the same integration or overview list.
-    private func dropDelegate(target: String, ids: [String], scope: String?) -> PopoverDropDelegate {
-        PopoverDropDelegate(draggedItem: $draggedItem, target: target, scope: scope) { source in
-            move(source, to: target, ids: ids, scope: scope)
+    /// Persists the draft built during a drag, then clears the session.
+    private func commitDraft() {
+        let integrationOrder = draftIntegrationOrder
+        let itemOrder = draftItemOrder
+        draggedItem = nil
+        draftIntegrationOrder = nil
+        draftItemOrder = [:]
+        guard integrationOrder != nil || !itemOrder.isEmpty else { return }
+        model.updateMenuBarPreferences { preferences in
+            if let integrationOrder {
+                preferences.popoverIntegrationOrder = integrationOrder
+            }
+            for (scope, order) in itemOrder {
+                preferences.popoverItemOrder[scope] = order
+            }
         }
     }
 
@@ -349,38 +434,36 @@ struct MainPopover: View {
 // swiftlint:enable type_body_length
 
 private struct PopoverDrag {
-    static let type = UTType.plainText
     let id: String
     let scope: String?
 }
 
-private struct PopoverDropDelegate: DropDelegate {
-    @Binding var draggedItem: PopoverDrag?
-    let target: String
-    let scope: String?
-    let move: (String) -> Void
+/// Local reorder hit-testing for the menu-bar popover.
+private enum PopoverReorder {
+    static let space = "popoverReorder"
+    private static let separator = "\u{1e}"
 
-    /// Accepts a drag only from the same scope and not onto itself.
-    func validateDrop(info: DropInfo) -> Bool {
-        draggedItem?.scope == scope && draggedItem?.id != target && draggedItem != nil
+    static func frameID(id: String, scope: String?) -> String {
+        (scope ?? "") + separator + id
     }
 
-    /// Keeps the insertion cursor on a move operation while the drag is over this row.
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
+    static func parse(_ frameID: String) -> (id: String, scope: String?)? {
+        let parts = frameID.split(
+            separator: "\u{1e}",
+            maxSplits: 1,
+            omittingEmptySubsequences: false
+        )
+        guard parts.count == 2 else { return nil }
+        let scope = String(parts[0])
+        return (String(parts[1]), scope.isEmpty ? nil : scope)
     }
 
-    /// Reorders as the pointer crosses a row, so the list follows the drag.
-    func dropEntered(info: DropInfo) {
-        guard let item = draggedItem, item.scope == scope, item.id != target else { return }
-        move(item.id)
-    }
+    struct FrameKey: PreferenceKey {
+        static let defaultValue: [String: CGRect] = [:]
 
-    /// Clears the drag; the move already happened on entry.
-    func performDrop(info: DropInfo) -> Bool {
-        guard let item = draggedItem, item.scope == scope, item.id != target else { return false }
-        draggedItem = nil
-        return true
+        static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+            value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+        }
     }
 }
 
