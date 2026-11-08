@@ -89,7 +89,8 @@ enum SyncFixture {
         now: Date,
         periodStart: Date? = nil,
         connected: Bool = true,
-        providerID: String = "mock"
+        providerID: String = "mock",
+        usePreferences: Bool = true
     ) async throws -> Harness {
         let store = CodableStore.inMemory()
         let repositories = Repositories(store: store)
@@ -109,7 +110,7 @@ enum SyncFixture {
             fetcher: fetcher,
             calendar: calendar,
             now: { now },
-            preferences: repositories.preferences
+            preferences: usePreferences ? repositories.preferences : nil
         )
         return Harness(
             store: store,

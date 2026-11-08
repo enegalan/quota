@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Core
 import Foundation
 import Observation
@@ -20,6 +21,8 @@ import Platform
 final class AppModel {
     /// Every quota the app knows about, ready to render.
     private(set) var presentations: [QuotaPresentation] = []
+    private(set) var unplannedIntegrations: [UnplannedIntegration] = []
+    @ObservationIgnored private var unplannedAttempts: [String: Date] = [:]
     private(set) var menuBarPreferences = MenuBarPreferences()
     /// The preferences save in flight, and which save is the latest.
     ///
@@ -167,6 +170,19 @@ final class AppModel {
             sections = try await environment.manager.sections(preferences: preferences)
             presentations = try await environment.presenter(at: reference).presentations()
             presentations = await enrich(presentations)
+            var unplanned: [UnplannedIntegration] = []
+            for listing in sections.connected where listing.state == .connected || listing.state == .synchronizing {
+                guard let providerID = try? ProviderID(listing.id),
+                      let account = try await environment.providers.provider(providerID)?.authenticatedAccountLabel,
+                      !presentations.contains(where: {
+                          $0.summary.quota.providerID == providerID && $0.accountLabel == account
+                      }) else { continue }
+                unplanned
+                    .append(unplannedIntegrations.first { $0.integrationID == listing.id && $0.accountLabel == account }
+                        ?? UnplannedIntegration(integrationID: listing.id, accountLabel: account))
+            }
+            unplannedIntegrations = unplanned
+            unplannedAttempts = unplannedAttempts.filter { key, _ in unplanned.contains { $0.orderKey == key } }
             lastError = nil
         } catch {
             report(error)
@@ -241,9 +257,9 @@ final class AppModel {
         case .disabled:
             "This integration was disabled. Last known data is still shown."
         case .missing:
-            "This provider is no longer installed. Last known data is still shown."
+            "This integration is no longer installed. Last known data is still shown."
         case .notInstalled:
-            "Unable to synchronise. The provider is not installed."
+            "Unable to synchronise. The integration is not installed."
         default:
             "Unable to synchronise. Last known data is still shown."
         }
@@ -269,6 +285,11 @@ final class AppModel {
         await runRefresh(trigger: .popoverOpened)
     }
 
+    /// Reads connected integrations that have no quota yet, so the menu bar has figures after launch.
+    func refreshUnplannedIfNeeded() async {
+        await refreshUnplanned(trigger: .launch)
+    }
+
     /// Plans, executes, and finishes a refresh for one trigger.
     func runRefresh(trigger: RefreshTrigger) async {
         guard !isRefreshing else { return }
@@ -278,18 +299,49 @@ final class AppModel {
         do {
             let quotaIDs = try await environment.planner.plan(for: trigger)
             await environment.planner.begin(quotaIDs)
-            for quotaID in quotaIDs {
-                _ = try? await environment.coordinator.refresh(quotaID: quotaID)
-            }
+            _ = try? await environment.coordinator.refresh(quotaIDs: quotaIDs)
             await environment.planner.finish(quotaIDs)
         } catch {
             failure = error
         }
         await load()
+        await refreshUnplanned(trigger: trigger)
         // After the reload, for the same reason `perform` puts its failure
         // there: the reload clears the error, and a refresh that failed with no
         // reason shown is a refresh that failed silently.
         lastError = failure?.localizedDescription
+    }
+
+    /// Reads each visible connected integration that still has no quota.
+    private func refreshUnplanned(trigger: RefreshTrigger) async {
+        for integration in unplannedIntegrations where isIntegrationShownInMenuBar(integration.integrationID) {
+            // Every read launches the provider's plugin, so no trigger reads without a
+            // floor: an explicit refresh waits out the minimum poll interval, and
+            // anything automatic (opening the popover included) the configured one.
+            let interval = trigger == .manual
+                ? RefreshConstants.minimumPollInterval
+                : await refreshIntervalSeconds(for: integration.integrationID)
+            let now = environment.now()
+            if let last = unplannedAttempts[integration.orderKey], now.timeIntervalSince(last) < interval {
+                continue
+            }
+            guard let id = try? ProviderID(integration.integrationID) else { continue }
+            unplannedAttempts[integration.orderKey] = now
+            let outcome = await environment.fetcher.fetchUsage(
+                providerID: id,
+                accountLabel: integration.accountLabel,
+                localDate: LocalDate(date: now, calendar: userCalendar)
+            )
+            guard let index = unplannedIntegrations.firstIndex(where: { $0.orderKey == integration.orderKey })
+            else { continue }
+            switch outcome.result {
+            case .success(let snapshot):
+                unplannedIntegrations[index].snapshot = snapshot
+                unplannedIntegrations[index].failed = false
+            case .failure:
+                unplannedIntegrations[index].failed = true
+            }
+        }
     }
 
     /// A calendar over one quota, at the instant the last load used.

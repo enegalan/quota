@@ -144,6 +144,21 @@ struct RefreshPlannerTests {
         #expect(next.timeIntervalSince(instant) > RefreshConstants.minimumPollInterval / 2)
     }
 
+    @Test("Scheduled refresh selects every quota of a provider when due")
+    func refreshesAllProviderQuotasWhenDue() async throws {
+        let instant = Self.start
+        let (planner, quotas) = try await makePlanner(now: { instant })
+        await planner.finish(quotas.map(\.id))
+
+        let dueAt = try #require(await planner.due(for: try ProviderID("mock")))
+        let before = try await planner.due(at: dueAt.addingTimeInterval(-1))
+        let due = try await planner.due(at: dueAt)
+        #expect(!before.contains(quotas[0].id))
+        #expect(!before.contains(quotas[1].id))
+        #expect(due.contains(quotas[0].id))
+        #expect(due.contains(quotas[1].id))
+    }
+
     @Test("Launching online is treated as a restoration")
     func launchOnlineIsRestoration() {
         #expect(RefreshPlanner.launch(isConnected: true).justRestored)

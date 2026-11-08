@@ -1,38 +1,37 @@
+// swiftlint:disable file_length
 import AppKit
 import Core
 import Platform
 import SwiftUI
 
-/// Compact menu-bar preview: every quota, and a door into the window.
-///
-/// Editing (providers, create, calendar, custom policy) lives in `MainWindow`.
-/// The popover only answers "how am I doing" and how to open the rest.
-///
-/// Every quota is listed, not just the one the menu bar item speaks for, because
-/// the item shows a single number and the question that number raises — "which of
-/// my quotas is that?" — is unanswerable from a list that hides the rest. The
-/// chosen quota gets the full card and the others a row, so the popover answers
-/// for all of them without growing a full card per quota into something taller
-/// than the screen it is opened on.
+// swiftlint:disable type_body_length
+/// A glanceable overview of every quota and the limits reported by its integration.
 struct MainPopover: View {
     let model: AppModel
     let launchFailure: String?
 
     @Environment(\.openWindow) private var openWindow
-
-    /// The row the pointer is over, so only that row offers itself as pressable.
-    @State private var hoveredQuotaID: UUID?
-
+    /// Active local drag. System `onDrag`/`onDrop` does not deliver drops in a
+    /// MenuBarExtra window, so reordering uses a gesture and this session.
+    @State private var draggedItem: PopoverDrag?
+    /// Order while dragging. Written to preferences only when the drag ends, so
+    /// mid-drag preference saves cannot cancel the gesture.
+    @State private var draftItemOrder: [String: [String]] = [:]
+    @State private var draftIntegrationOrder: [String]?
+    @State private var rowFrames: [String: CGRect] = [:]
     private let formatter = PercentageFormatter()
 
     var body: some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
             if let launchFailure {
                 LaunchFailureView(message: launchFailure)
-            } else if model.isEmpty {
-                emptyState
+            } else if model.isEmpty, model.unplannedIntegrations.isEmpty {
+                NoticeCard(
+                    title: "Welcome to Quota",
+                    message: "Connect an integration to start tracking usage."
+                )
             } else {
-                quotas
+                overview
             }
             if let lastError = model.lastError {
                 ErrorBanner(message: lastError)
@@ -41,154 +40,371 @@ struct MainPopover: View {
         }
         .padding(LayoutMetrics.inset)
         .frame(width: LayoutMetrics.popoverWidth)
-        .onReceive(NotificationCenter.default.publisher(for: .openMainWindow)) { _ in
-            MainWindowOpener.open(using: openWindow)
-        }
+        .coordinateSpace(name: PopoverReorder.space)
+        .onPreferenceChange(PopoverReorder.FrameKey.self) { rowFrames = $0 }
     }
 
-    /// The chosen quota in full, then the rest in a row each.
+    private var groups: [PopoverIntegrationGroup] {
+        let groups = PopoverIntegrationGroup.group(model.presentations, unplanned: model.unplannedIntegrations)
+        let ids = PopoverOrder.arranged(
+            groups.map(\.orderKey),
+            accordingTo: draftIntegrationOrder ?? model.menuBarPreferences.popoverIntegrationOrder
+        )
+        return ids.compactMap { id in groups.first { $0.orderKey == id } }
+    }
+
+    /// Limits, with the quotas that watch each one nested under it.
     ///
-    /// Split out of `body` so the ordering is a statement about what the popover
-    /// leads with: the number the menu bar item is showing, spelled out, and the
-    /// rest of them underneath where a click can promote one.
-    ///
-    /// Not a scrolling list. One full card plus a row per other quota is one card
-    /// and a few lines — a provider can back one quota per bucket, and the rows
-    /// are what a user scans to pick one, so a panel they have to scroll to read
-    /// is worse than a tall one. A `ScrollView` here would also be the one part
-    /// of the popover the rendered snapshots cannot photograph.
-    private var quotas: some View {
+    /// A quota whose limit is no longer in the reading stays as its own row.
+    private func items(for group: PopoverIntegrationGroup) -> [PopoverItem] {
+        let buckets = (group.snapshot?.buckets ?? []).filter {
+            group.unplanned == nil || $0.period.end > model.reference
+        }
+        let items = buckets.map(PopoverItem.bucket) + group.unmatchedQuotas.map(PopoverItem.quota)
+        let saved = draftItemOrder[group.orderKey]
+            ?? model.menuBarPreferences.popoverItemOrder[group.orderKey]
+            ?? []
+        let ids = PopoverOrder.arranged(items.map(\.id), accordingTo: saved)
+        return ids.compactMap { id in items.first { $0.id == id } }
+    }
+
+    private var overview: some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.rowSpacing) {
-            if let primary = model.primaryPresentation {
-                preview(for: primary)
+            HStack {
+                Text("Usage overview")
+                    .font(.system(size: LayoutMetrics.bodySize + 3, weight: .bold))
+                Spacer()
+                Text(integrationCount)
+                    .font(.system(size: LayoutMetrics.footnoteSize))
+                    .foregroundStyle(.secondary)
             }
-            otherRows
+            if scrollsOverview {
+                ScrollView {
+                    VStack(spacing: LayoutMetrics.rowSpacing) {
+                        ForEach(groups) { group in
+                            integrationCard(group)
+                        }
+                    }
+                }
+                // Fixed height: in a MenuBarExtra, maxHeight lets ScrollView
+                // collapse to zero. Short content already skips this branch.
+                .frame(height: min(
+                    LayoutMetrics.popoverScrollMaximumHeight,
+                    (NSScreen.main?.visibleFrame.height ?? LayoutMetrics.popoverScrollFallbackScreenHeight)
+                        * LayoutMetrics.popoverScrollScreenFraction
+                ))
+            } else if let group = groups.first {
+                integrationCard(group)
+            }
         }
     }
 
-    /// Every quota the menu bar item is not speaking for, as a clickable row each.
-    @ViewBuilder
-    private var otherRows: some View {
-        let others = model.presentations.filter { $0.id != model.primaryPresentation?.id }
-        if !others.isEmpty {
-            VStack(alignment: .leading, spacing: LayoutMetrics.sectionSpacing) {
-                SectionTitle(model.presentations.count > 1 ? "Other quotas" : "Quota")
-                ForEach(others) { presentation in
-                    row(for: presentation)
-                }
-            }
-            .padding(.horizontal, LayoutMetrics.unit)
-        }
+    private var integrationCount: String {
+        groups.count == 1 ? "1 integration" : "\(groups.count) integrations"
     }
 
-    /// The full card for the quota the menu bar item speaks for.
-    private func preview(for presentation: QuotaPresentation) -> some View {
-        VStack(alignment: .leading, spacing: LayoutMetrics.rowSpacing) {
-            HStack(alignment: .center, spacing: LayoutMetrics.rowSpacing) {
-                VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
-                    HStack(spacing: LayoutMetrics.lineSpacing) {
-                        Text(presentation.summary.quota.name)
-                            .font(.system(size: LayoutMetrics.bodySize + 3, weight: .bold))
-                            .lineLimit(1)
-                            .padding(2)
-                        MenuBarMarker()
+    /// One short card stays put. Several integrations, or several rows, scroll.
+    private var scrollsOverview: Bool {
+        guard groups.count == 1, let group = groups.first else { return true }
+        return items(for: group).count + group.presentations.count
+            > LayoutMetrics.popoverScrollRowThreshold
+    }
+
+    /// One integration's limits and quotas, with drag handles for reordering.
+    private func integrationCard( // swiftlint:disable:this function_body_length
+        _ group: PopoverIntegrationGroup
+    ) -> some View {
+        let rows = items(for: group)
+        return VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
+            reorderable(HStack(spacing: LayoutMetrics.rowSpacing) {
+                ProviderMark(providerID: group.integrationID, size: 20)
+                Text(model.sections.all.first { $0.id == group.integrationID }?.displayName ?? group.integrationID)
+                    .font(.system(size: LayoutMetrics.bodySize, weight: .semibold))
+                Spacer()
+                Caption(text: group.accountLabel ?? QuotaPresentation.disconnectedAccountCaption)
+                    .lineLimit(1)
+            }, id: group.orderKey, ids: groups.map(\.orderKey), scope: nil)
+
+            if rows.isEmpty {
+                Caption(text: "No usage reading available.")
+            }
+            ForEach(rows) { item in
+                let ids = rows.map(\.id)
+                reorderable(VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
+                    switch item {
+                    case .bucket(let bucket):
+                        bucketRow(bucket)
+                        ForEach(group.quotas(for: bucket.id)) { presentation in
+                            quotaDetails(presentation, in: group)
+                        }
+                    case .quota(let presentation):
+                        quotaDetails(presentation, in: group)
                     }
-                    if let limitName = presentation.limitName {
-                        Caption(text: limitName)
-                    }
-                    Caption(presentation.accountCaption)
-                }
-                Spacer(minLength: 0)
-                UsageRing(
-                    fraction: (presentation.usagePercentage ?? 0) / 100.0,
-                    label: formatter.string(presentation.usagePercentage)
+                }, id: item.id, ids: ids, scope: group.orderKey)
+            }
+            if let latest = group.latestPresentation {
+                Caption(
+                    text: latest.syncCaption(asOf: model.reference, calendar: model.userCalendar),
+                    isWarning: latest.syncIsWarning(asOf: model.reference)
                 )
+            } else if let provider = group.unplanned {
+                if provider.failed {
+                    Caption(
+                        text: provider
+                            .snapshot == nil ? "Unable to refresh usage." :
+                            "Refresh failed. Showing the last available reading.",
+                        isWarning: true
+                    )
+                } else if let snapshot = provider.snapshot {
+                    Caption(
+                        text: "Updated \(RelativeTime(calendar: model.userCalendar).describe(since: snapshot.updatedAt, now: model.reference))."
+                    )
+                }
             }
-            TodayAllowanceView(presentation: presentation)
-            OutlookRow(
-                presentation: presentation,
-                reference: model.reference,
-                calendar: model.userCalendar
-            )
-            if let reset = presentation.resetCaption(asOf: model.reference, calendar: model.userCalendar) {
-                Caption(text: reset)
-            }
-            Caption(
-                text: presentation.syncCaption(asOf: model.reference, calendar: model.userCalendar),
-                isWarning: presentation.syncIsWarning(asOf: model.reference)
-            )
         }
         .padding(LayoutMetrics.inset)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
-        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 
-    /// Empty popover: one short pitch and the door into the window.
-    private var emptyState: some View {
-        NoticeCard(
-            title: "Welcome to Quota",
-            message: "Connect an integration and create a quota to start tracking usage."
+    /// A limit's name, bar, and reset caption.
+    private func bucketRow(_ bucket: UsageBucket) -> some View {
+        VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(bucket.displayName)
+                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
+                Spacer(minLength: LayoutMetrics.rowSpacing)
+                Text("\(formatter.string(bucket.usagePercentage)) used")
+                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
+                    .monospacedDigit()
+            }
+            UsageBar(
+                value: bucket.usagePercentage,
+                maximum: UsageConstants.percentageScale,
+                tint: ShareTint.color(for: bucket.usagePercentage, of: UsageConstants.percentageScale)
+            )
+            if let description = bucket.limitDescription {
+                Caption(text: description)
+            }
+            if let reset = ResetCaption.caption(
+                for: bucket.period,
+                asOf: model.reference,
+                calendar: model.userCalendar
+            ) {
+                Caption(text: reset)
+            } else {
+                Caption(text: "Reset time unavailable.")
+            }
+        }
+        .padding(.vertical, LayoutMetrics.lineSpacing)
+    }
+
+    /// One quota under its limit, with today's plan and a pin control.
+    private func quotaDetails(_ presentation: QuotaPresentation, in group: PopoverIntegrationGroup) -> some View {
+        VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Quota: \(presentation.summary.quota.name)")
+                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
+                if !isPinned(presentation) {
+                    Button("Show") {
+                        Task { await model.showInMenuBar(presentation) }
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                }
+                Spacer(minLength: LayoutMetrics.rowSpacing)
+                if let allowance = presentation.summary.todayAllowance {
+                    Text(todayFigures(allowance))
+                        .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
+                        .monospacedDigit()
+                }
+            }
+            todayAllowance(presentation)
+            if let bucketID = presentation.summary.quota.bucketID ?? presentation.summary.snapshot?.primaryBucket?.id,
+               let bucket = group.snapshot?.buckets.first(where: { $0.id == bucketID })
+            {
+                Caption(text: "Limit: \(bucket.displayName)")
+            }
+            if presentation.summary.usage == nil {
+                Caption(text: "This quota's limit is unavailable.", isWarning: true)
+            }
+        }
+        .padding(.vertical, LayoutMetrics.lineSpacing)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The quota the menu bar item currently speaks for.
+    private func isPinned(_ presentation: QuotaPresentation) -> Bool {
+        presentation.id == (model.menuBarQuotaID ?? model.primaryPresentation?.id)
+    }
+
+    /// Used over today's plan, for the trailing figure on a quota row.
+    private func todayFigures(_ allowance: TodayAllowance) -> String {
+        "\(formatter.preciseString(allowance.usedToday)) / \(formatter.preciseString(allowance.suggested)) today"
+    }
+
+    /// Today's bar and remaining caption when the plan is known.
+    @ViewBuilder
+    private func todayAllowance(_ presentation: QuotaPresentation) -> some View {
+        if let allowance = presentation.summary.todayAllowance {
+            if let used = allowance.usedToday {
+                UsageBar(
+                    value: used,
+                    maximum: allowance.suggested,
+                    tint: ShareTint.color(for: used, of: allowance.suggested)
+                )
+                Caption(text: "\(formatter.preciseString(max(0, allowance.suggested - used))) remaining today")
+            } else {
+                Caption(text: "Today's consumption unavailable.")
+            }
+        } else {
+            Caption(text: "No daily plan available.")
+        }
+    }
+
+    /// Drag and move-up/down for one row in a shared order list.
+    private func reorderable(
+        _ content: some View, id: String, ids: [String], scope: String?
+    ) -> some View {
+        let index = ids.firstIndex(of: id) ?? 0
+        let frameID = PopoverReorder.frameID(id: id, scope: scope)
+        return content
+            .contentShape(Rectangle())
+            .opacity(draggedItem?.id == id && draggedItem?.scope == scope ? 0.55 : 1)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: PopoverReorder.FrameKey.self,
+                        value: [frameID: geometry.frame(in: .named(PopoverReorder.space))]
+                    )
+                }
+            }
+            .help("Drag to reorder, or right-click to move up or down")
+            .contextMenu {
+                if index > 0 {
+                    Button("Move up") { commitMove(id, to: ids[index - 1], ids: ids, scope: scope) }
+                }
+                if index + 1 < ids.count {
+                    Button("Move down") { commitMove(id, to: ids[index + 1], ids: ids, scope: scope) }
+                }
+            }
+            .accessibilityAction(named: Text("Move up")) {
+                if index > 0 {
+                    commitMove(id, to: ids[index - 1], ids: ids, scope: scope)
+                }
+            }
+            .accessibilityAction(named: Text("Move down")) {
+                if index + 1 < ids.count {
+                    commitMove(id, to: ids[index + 1], ids: ids, scope: scope)
+                }
+            }
+            .gesture(reorderGesture(id: id, ids: ids, scope: scope))
+    }
+
+    /// Long-press then drag so a ScrollView can still scroll on a short flick.
+    private func reorderGesture(id: String, ids: [String], scope: String?) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.15)
+            .sequenced(
+                before: DragGesture(minimumDistance: 1, coordinateSpace: .named(PopoverReorder.space))
+            )
+            .onChanged { value in
+                guard case .second(true, let drag?) = value else { return }
+                if draggedItem == nil {
+                    draggedItem = PopoverDrag(id: id, scope: scope)
+                }
+                guard draggedItem?.id == id, draggedItem?.scope == scope else { return }
+                let order = liveOrder(ids: ids, scope: scope)
+                guard let target = hitTarget(at: drag.location, dragging: id, scope: scope, ids: order),
+                      target != id
+                else { return }
+                draftMove(id, to: target, ids: order, scope: scope)
+            }
+            .onEnded { _ in
+                guard draggedItem?.id == id, draggedItem?.scope == scope else { return }
+                commitDraft()
+            }
+    }
+
+    /// Current order for a scope, preferring an in-flight draft.
+    private func liveOrder(ids: [String], scope: String?) -> [String] {
+        if let scope {
+            return PopoverOrder.arranged(
+                ids,
+                accordingTo: draftItemOrder[scope] ?? model.menuBarPreferences.popoverItemOrder[scope] ?? []
+            )
+        }
+        return PopoverOrder.arranged(
+            ids,
+            accordingTo: draftIntegrationOrder ?? model.menuBarPreferences.popoverIntegrationOrder
         )
     }
 
-    /// One other quota, and the click that makes it the one in the menu bar.
+    /// Row under the pointer in the same reorder scope, if any.
     ///
-    /// A button rather than a plain row because the action is the reason the row
-    /// is there: with several quotas a user opening the popover is looking for
-    /// one of them, and the way to say "that one" is to click it. Shown on hover
-    /// so the row reads as something to press only while the pointer is on it,
-    /// and always for a row that already carries the choice.
-    private func row(for presentation: QuotaPresentation) -> some View {
-        Button {
-            Task { await model.showInMenuBar(presentation) }
-        } label: {
-            VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
-                HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.rowSpacing) {
-                    VStack(alignment: .leading, spacing: LayoutMetrics.lineSpacing) {
-                        Text(presentation.summary.quota.name)
-                            .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
-                            .lineLimit(1)
-                        Caption(text: presentation.identityCaption)
-                    }
-                    Spacer(minLength: 0)
-                    VStack(alignment: .trailing, spacing: LayoutMetrics.lineSpacing) {
-                        HStack(alignment: .firstTextBaseline, spacing: LayoutMetrics.lineSpacing) {
-                            Circle()
-                                .fill(ShareTint.color(for: presentation.usagePercentage, of: 100))
-                                .frame(width: 6, height: 6)
-                            Text(formatter.string(presentation.usagePercentage))
-                                .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-                        Text("Show")
-                            .font(.system(size: LayoutMetrics.captionSize))
-                            .foregroundStyle(Color.accentColor)
-                            .opacity(isHovered(presentation) ? 1 : 0)
-                    }
-                }
+    /// A target counts only after the pointer crosses that row's midpoint in the
+    /// reorder direction, so grazing the near edge does not flip the order.
+    private func hitTarget(at point: CGPoint, dragging: String, scope: String?, ids: [String]) -> String? {
+        let available = Set(ids)
+        guard let from = ids.firstIndex(of: dragging) else { return nil }
+        for (frameID, frame) in rowFrames {
+            guard frame.contains(point),
+                  let parsed = PopoverReorder.parse(frameID),
+                  parsed.scope == scope,
+                  parsed.id != dragging,
+                  available.contains(parsed.id),
+                  let to = ids.firstIndex(of: parsed.id)
+            else { continue }
+            let midpoint = frame.midY
+            if from < to {
+                guard point.y >= midpoint else { continue }
+            } else {
+                guard point.y <= midpoint else { continue }
             }
-            .padding(.vertical, LayoutMetrics.unit)
-            .padding(.horizontal, LayoutMetrics.unit)
-            .contentShape(Rectangle())
+            return parsed.id
         }
-        .buttonStyle(MenuBarRowButtonStyle(isHovered: isHovered(presentation)))
-        .onHover { hovering in
-            hoveredQuotaID = hovering ? presentation.id : (hoveredQuotaID == presentation.id ? nil : hoveredQuotaID)
-        }
-        .accessibilityLabel(Text(presentation.summary.quota.name))
-        .accessibilityHint("Show this quota in the menu bar")
+        return nil
     }
 
-    /// Whether the pointer is over this quota's row.
-    ///
-    /// One question asked in one place. The row's button style and its "Show"
-    /// affordance both need this answer, and reading the state directly at
-    /// each site would let the two disagree about which row is under the
-    /// pointer — leaving a row highlighted with nothing in it to press.
-    private func isHovered(_ presentation: QuotaPresentation) -> Bool {
-        hoveredQuotaID == presentation.id
+    /// Updates only the draft order while a drag is live.
+    private func draftMove(_ id: String, to target: String, ids: [String], scope: String?) {
+        let updated = PopoverOrder.moving(id, to: target, in: ids)
+        guard updated != ids else { return }
+        if let scope {
+            draftItemOrder[scope] = updated
+        } else {
+            draftIntegrationOrder = updated
+        }
+    }
+
+    /// Writes a reordered list into preferences immediately (context menu).
+    private func commitMove(_ id: String, to target: String, ids: [String], scope: String?) {
+        let updated = PopoverOrder.moving(id, to: target, in: ids)
+        model.updateMenuBarPreferences { preferences in
+            if let scope {
+                preferences.popoverItemOrder[scope] = updated
+            } else {
+                preferences.popoverIntegrationOrder = updated
+            }
+        }
+    }
+
+    /// Persists the draft built during a drag, then clears the session.
+    private func commitDraft() {
+        let integrationOrder = draftIntegrationOrder
+        let itemOrder = draftItemOrder
+        draggedItem = nil
+        draftIntegrationOrder = nil
+        draftItemOrder = [:]
+        guard integrationOrder != nil || !itemOrder.isEmpty else { return }
+        model.updateMenuBarPreferences { preferences in
+            if let integrationOrder {
+                preferences.popoverIntegrationOrder = integrationOrder
+            }
+            for (scope, order) in itemOrder {
+                preferences.popoverItemOrder[scope] = order
+            }
+        }
     }
 
     private var footer: some View {
@@ -221,12 +437,44 @@ struct MainPopover: View {
             .controlSize(.regular)
             .tint(.red)
             .foregroundStyle(.white)
-            .keyboardShortcut(
-                KeyEquivalent(Character(Shortcut.quitKeyEquivalent)),
-                modifiers: .command
-            )
         }
         .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
+    }
+}
+
+// swiftlint:enable type_body_length
+
+private struct PopoverDrag {
+    let id: String
+    let scope: String?
+}
+
+/// Local reorder hit-testing for the menu-bar popover.
+private enum PopoverReorder {
+    static let space = "popoverReorder"
+    private static let separator = "\u{1e}"
+
+    static func frameID(id: String, scope: String?) -> String {
+        (scope ?? "") + separator + id
+    }
+
+    static func parse(_ frameID: String) -> (id: String, scope: String?)? {
+        let parts = frameID.split(
+            separator: "\u{1e}",
+            maxSplits: 1,
+            omittingEmptySubsequences: false
+        )
+        guard parts.count == 2 else { return nil }
+        let scope = String(parts[0])
+        return (String(parts[1]), scope.isEmpty ? nil : scope)
+    }
+
+    struct FrameKey: PreferenceKey {
+        static let defaultValue: [String: CGRect] = [:]
+
+        static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+            value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+        }
     }
 }
 
@@ -261,22 +509,6 @@ struct UsageRing: View {
     }
 }
 
-/// Marks the quota the menu bar item is speaking for.
-///
-/// A dot and not the word "Menu bar": the card is the first thing read when the
-/// popover opens, and a line of text saying which of the user's quotas is the one
-/// in the menu bar is a worse answer than the mark next to its name. The word is
-/// still there for a screen reader, which is where "Show this quota in the menu
-/// bar" on the other rows makes sense.
-struct MenuBarMarker: View {
-    var body: some View {
-        Circle()
-            .fill(Color.accentColor)
-            .frame(width: LayoutMetrics.menuBarMarkerSize, height: LayoutMetrics.menuBarMarkerSize)
-            .accessibilityLabel("Shown in the menu bar")
-    }
-}
-
 /// A quota row that shows itself as pressable only under the pointer.
 ///
 /// No border and no fill at rest. A popover is a readout, and a column of rows
@@ -308,3 +540,5 @@ struct MenuBarRowButtonStyle: ButtonStyle {
         isHovered ? LayoutMetrics.hoverFillOpacity : 0
     }
 }
+
+// One provider account and the quotas that belong to its reported limits.

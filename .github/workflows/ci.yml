@@ -27,8 +27,17 @@ jobs:
       - name: Select Xcode
         run: Scripts/ci/select-xcode.sh --require-tests
 
+      - name: Cache SwiftFormat
+        uses: actions/cache@v4
+        with:
+          path: .build/tools/swiftformat
+          key: swiftformat-0.64.5-${{ runner.os }}-${{ runner.arch }}
+
       - name: Install toolchain
         run: make bootstrap
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
 
       # Network is disabled in this step so a test that reaches out fails loudly
       # rather than passing on a developer machine with connectivity.

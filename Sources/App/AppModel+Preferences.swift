@@ -9,10 +9,14 @@ extension AppModel {
     /// where that was allowed, or after the visible ones were deleted — so the
     /// quota the menu bar speaks for stands in rather than leaving the item blank.
     private var shownIntegrationIDs: Set<String> {
-        let visible = Set(presentations.map(\.summary.quota.providerID.rawValue))
-            .subtracting(menuBarPreferences.hiddenIntegrations)
+        let quotaIDs = Set(presentations.map(\.summary.quota.providerID.rawValue))
+        let connectedIDs = Set(unplannedIntegrations.map(\.integrationID))
+        let visible = quotaIDs.union(connectedIDs).subtracting(menuBarPreferences.hiddenIntegrations)
         if visible.isEmpty, let primary = primaryPresentation {
             return [primary.summary.quota.providerID.rawValue]
+        }
+        if visible.isEmpty, let integration = unplannedIntegrations.first {
+            return [integration.integrationID]
         }
         return visible
     }

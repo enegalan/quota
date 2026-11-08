@@ -13,9 +13,33 @@ enum MainWindowOpener {
     /// A notification rather than a direct call because the menu and the Dock
     /// both live in `AppDelegate`, which is created before the SwiftUI scene
     /// and so has no `OpenWindowAction` to hand.
+    ///
+    /// Existing management windows are revealed here: a Dock click must not
+    /// wait on SwiftUI when the window is only miniaturised or ordered out.
     @MainActor
     static func request() {
+        let existing = NSApp.windows.filter(isManagementWindow)
+        if !existing.isEmpty {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+            for window in existing {
+                window.makeKeyAndOrderFront(nil)
+            }
+            return
+        }
         NotificationCenter.default.post(name: .openMainWindow, object: nil)
+    }
+
+    /// Whether a titled management window is already on screen.
+    ///
+    /// Used instead of AppKit's `hasVisibleWindows`: that flag is true for the
+    /// MenuBarExtra panel alone, so a Dock click would otherwise only activate
+    /// the app and never reopen the dashboard.
+    @MainActor
+    static func hasVisibleManagementWindow() -> Bool {
+        NSApp.windows.contains { window in
+            isManagementWindow(window) && window.isVisible && !window.isMiniaturized
+        }
     }
 
     /// Opens the management window and puts it in front.
@@ -59,5 +83,23 @@ enum MainWindowOpener {
     private static func isManagementWindow(_ window: NSWindow) -> Bool {
         guard !(window is NSPanel), window.styleMask.contains(.titled) else { return false }
         return window.level == .normal
+    }
+}
+
+/// Forwards Dock / menu open requests from a view that stays mounted.
+///
+/// The MenuBarExtra label is always in the hierarchy; the popover content is
+/// not. Listening here is what makes `MainWindowOpener.request()` reach
+/// `openWindow` before the user has ever opened the status item.
+struct MainWindowOpenBridge: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+            .onReceive(NotificationCenter.default.publisher(for: .openMainWindow)) { _ in
+                MainWindowOpener.open(using: openWindow)
+            }
     }
 }

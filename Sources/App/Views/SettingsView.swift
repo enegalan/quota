@@ -1,7 +1,10 @@
+// swiftlint:disable file_length
 import Core
 import Platform
+import ServiceManagement
 import SwiftUI
 
+// swiftlint:disable type_body_length
 /// User-level settings: notifications, refresh interval, and update checks.
 ///
 /// Shared by the management-window sidebar and the macOS Settings window, so
@@ -10,23 +13,24 @@ struct SettingsView: View {
     let model: AppModel
 
     @State private var notificationsEnabled = PreferenceConstants.defaultNotificationsEnabled
-    @State private var refreshIntervalSeconds = RefreshConstants.defaultPollInterval
+    @State private var integrationIntervals: [String: TimeInterval] = [:]
+    @State private var suggestedIntervals: [String: TimeInterval] = [:]
     @State private var automaticUpdateChecksEnabled =
         PreferenceConstants.defaultAutomaticUpdateChecksEnabled
-    @State private var isReady = false
+    @State private var reload = SettingsReloadCoordinator()
+    @State private var loginItemStatus = SMAppService.mainApp.status
+    @State private var loginItemError: String?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Form {
+            launchSettings
             menuBarSettings
             MenuBarIntegrationSettings(model: model)
             Section {
                 HStack(alignment: .firstTextBaseline) {
-                    Toggle(isOn: $notificationsEnabled) {
+                    Toggle(isOn: writing($notificationsEnabled, to: model.setNotificationsEnabled)) {
                         Label("Enable notifications", systemImage: "bell")
-                    }
-                    .onChange(of: notificationsEnabled) { _, newValue in
-                        guard isReady else { return }
-                        Task { await model.setNotificationsEnabled(newValue) }
                     }
                     SettingInfoButton(
                         explanation: """
@@ -42,43 +46,39 @@ struct SettingsView: View {
             }
 
             Section {
-                HStack(alignment: .firstTextBaseline) {
-                    Picker(selection: $refreshIntervalSeconds) {
-                        ForEach(UpdateConstants.refreshIntervalChoices, id: \.self) { seconds in
-                            Text(Self.label(for: seconds)).tag(seconds)
+                ForEach(connectedIntegrations) { listing in
+                    HStack(alignment: .firstTextBaseline) {
+                        Picker(listing.displayName, selection: pollSelection(for: listing.id)) {
+                            Text(defaultLabel(for: listing.id)).tag(PollSelection.integrationDefault)
+                            ForEach(UpdateConstants.refreshIntervalChoices, id: \.self) { seconds in
+                                Text(Self.label(for: seconds)).tag(PollSelection.interval(seconds))
+                            }
                         }
-                    } label: {
-                        Label("Poll interval", systemImage: "arrow.clockwise")
+                        if listing.id == connectedIntegrations.first?.id {
+                            SettingInfoButton(explanation: Self.refreshExplanation)
+                        }
                     }
-                    .onChange(of: refreshIntervalSeconds) { _, newValue in
-                        guard isReady else { return }
-                        Task { await model.setRefreshInterval(newValue) }
-                    }
-                    SettingInfoButton(
-                        explanation: """
-                        How often Quota re-reads a connected provider when that \
-                        provider has not suggested a schedule of its own. A shorter \
-                        interval keeps figures fresher and sends more requests; a \
-                        longer one is quieter on the network and may show older data \
-                        between polls.
-                        """
-                    )
+                }
+                if connectedIntegrations.isEmpty {
+                    Text("Connect an integration to choose how often it is refreshed.")
+                        .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Providers Refresh")
+                Text("Refresh")
             }
 
             Section {
                 HStack(alignment: .firstTextBaseline) {
-                    Toggle(isOn: $automaticUpdateChecksEnabled) {
+                    Toggle(
+                        isOn: writing(
+                            $automaticUpdateChecksEnabled,
+                            to: model.setAutomaticUpdateChecksEnabled
+                        )
+                    ) {
                         Label(
                             "Check for updates automatically",
                             systemImage: "arrow.down.app"
                         )
-                    }
-                    .onChange(of: automaticUpdateChecksEnabled) { _, newValue in
-                        guard isReady else { return }
-                        Task { await model.setAutomaticUpdateChecksEnabled(newValue) }
                     }
                     SettingInfoButton(
                         explanation: """
@@ -117,14 +117,58 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(maxWidth: LayoutMetrics.providerListWidth, alignment: .leading)
-        .task {
-            await reloadFromPreferences()
-            isReady = true
+        .task { await reloadFromPreferences() }
+        .onChange(of: model.loadGeneration) { _, _ in Task { await reloadFromPreferences() } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                loginItemStatus = SMAppService.mainApp.status
+            }
         }
+    }
+
+    private var launchSettings: some View {
+        Section("Startup") {
+            Toggle("Open Quota at login", isOn: Binding(
+                get: { loginItemStatus == .enabled || loginItemStatus == .requiresApproval },
+                set: { enabled in
+                    do {
+                        if enabled {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                        loginItemError = nil
+                    } catch {
+                        loginItemError = error.localizedDescription
+                    }
+                    loginItemStatus = SMAppService.mainApp.status
+                }
+            ))
+            Text("Quota opens automatically when you sign in to your Mac.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if loginItemStatus == .requiresApproval {
+                Text("Allow Quota in Login Items in System Settings to finish setup.")
+                    .font(.caption)
+                Button("Open Login Items Settings") {
+                    SMAppService.openSystemSettingsLoginItems()
+                }
+            }
+            if let loginItemError {
+                Text(loginItemError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .onAppear { loginItemStatus = SMAppService.mainApp.status }
     }
 
     private var menuBarSettings: some View {
         Section {
+            Toggle("Keep Quota running in the menu bar when closed", isOn: menuBarBinding(\.keepRunningOnClose))
+            Text("Closing Quota hides its windows and Dock icon. Use Quit in the menu bar to exit completely.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline) {
                 Toggle("Show integration logos", isOn: menuBarBinding(\.showLogos))
                 SettingInfoButton(explanation: Self.logosExplanation)
@@ -155,8 +199,15 @@ struct SettingsView: View {
     }
 
     private static let logosExplanation = """
-    When on, each integration in the menu bar starts with its provider \
-    mark. When off, the integration name is shown instead.
+    When on, each integration in the menu bar starts with its logo. \
+    When off, the integration name is shown instead.
+    """
+
+    private static let refreshExplanation = """
+    How often Quota re-reads each connected integration. Each integration \
+    has its own default; choose another value to override it, or Default to \
+    return to ours. A shorter interval keeps figures fresher and sends more \
+    requests; a longer one is quieter on the network.
     """
 
     private static let dailyQuotaExplanation = """
@@ -238,12 +289,82 @@ struct SettingsView: View {
         }
     }
 
-    private func reloadFromPreferences() async {
-        notificationsEnabled = await model.notificationsEnabled()
-        refreshIntervalSeconds = await Self.nearestChoice(
-            model.effectiveRefreshIntervalSeconds()
+    /// Binding that persists only user edits, not values applied by a reload.
+    private func writing(
+        _ value: Binding<Bool>,
+        to write: @escaping @MainActor (Bool) async -> Void
+    ) -> Binding<Bool> {
+        Binding(
+            get: { value.wrappedValue },
+            set: { newValue in
+                guard reload.isReady else { return }
+                value.wrappedValue = newValue
+                reload.noteUserEdit()
+                Task { await write(newValue) }
+            }
         )
-        automaticUpdateChecksEnabled = await model.automaticUpdateChecksEnabled()
+    }
+
+    private func reloadFromPreferences() async {
+        let ticket = reload.begin()
+        let notifications = await model.notificationsEnabled()
+        let intervals = await model.refreshIntervalsByIntegration()
+        var suggestions: [String: TimeInterval] = [:]
+        for listing in connectedIntegrations {
+            if let suggested = await model.suggestedRefreshIntervalSeconds(for: listing.id) {
+                suggestions[listing.id] = suggested
+            }
+        }
+        let automatic = await model.automaticUpdateChecksEnabled()
+        switch reload.finish(ticket) {
+        case .ignore:
+            return
+        case .discard:
+            return
+        case .apply:
+            notificationsEnabled = notifications
+            integrationIntervals = intervals
+            suggestedIntervals = suggestions
+            automaticUpdateChecksEnabled = automatic
+        }
+    }
+
+    private var connectedIntegrations: [ProviderListing] {
+        model.sections.connected.sorted { $0.displayName < $1.displayName }
+    }
+
+    /// Suggested poll interval, or the app-wide default.
+    private func defaultInterval(for integrationID: String) -> TimeInterval {
+        suggestedIntervals[integrationID] ?? RefreshConstants.defaultPollInterval
+    }
+
+    /// Picker caption for the default interval choice.
+    private func defaultLabel(for integrationID: String) -> String {
+        "Default (\(Self.label(for: defaultInterval(for: integrationID))))"
+    }
+
+    /// Binding for a custom interval, or clearing it back to the default.
+    private func pollSelection(for integrationID: String) -> Binding<PollSelection> {
+        Binding(
+            get: {
+                guard let seconds = integrationIntervals[integrationID] else {
+                    return .integrationDefault
+                }
+                return .interval(Self.nearestChoice(seconds))
+            },
+            set: { selection in
+                guard reload.isReady else { return }
+                reload.noteUserEdit()
+                switch selection {
+                case .integrationDefault:
+                    integrationIntervals[integrationID] = nil
+                    Task { await model.setRefreshInterval(nil, for: integrationID) }
+                case .interval(let seconds):
+                    integrationIntervals[integrationID] = seconds
+                    Task { await model.setRefreshInterval(seconds, for: integrationID) }
+                }
+            }
+        )
     }
 
     /// The offered interval closest to a stored preference.
@@ -266,16 +387,21 @@ struct SettingsView: View {
     }
 }
 
+// swiftlint:enable type_body_length
+
+/// One integration's poll interval, or its shipped default.
+private enum PollSelection: Hashable {
+    case integrationDefault
+    case interval(TimeInterval)
+}
+
 /// A compact “i” that shows what changing a setting does.
 struct SettingInfoButton: View {
     let explanation: String
-
     @State private var isPresented = false
 
     var body: some View {
-        Button {
-            isPresented.toggle()
-        } label: {
+        Button { isPresented.toggle() } label: {
             Image(systemName: "info.circle")
                 .font(.body)
                 .foregroundStyle(.secondary)
