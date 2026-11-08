@@ -341,15 +341,26 @@ struct MainPopover: View {
     }
 
     /// Row under the pointer in the same reorder scope, if any.
+    ///
+    /// A target counts only after the pointer crosses that row's midpoint in the
+    /// reorder direction, so grazing the near edge does not flip the order.
     private func hitTarget(at point: CGPoint, dragging: String, scope: String?, ids: [String]) -> String? {
         let available = Set(ids)
+        guard let from = ids.firstIndex(of: dragging) else { return nil }
         for (frameID, frame) in rowFrames {
             guard frame.contains(point),
                   let parsed = PopoverReorder.parse(frameID),
                   parsed.scope == scope,
                   parsed.id != dragging,
-                  available.contains(parsed.id)
+                  available.contains(parsed.id),
+                  let to = ids.firstIndex(of: parsed.id)
             else { continue }
+            let midpoint = frame.midY
+            if from < to {
+                guard point.y >= midpoint else { continue }
+            } else {
+                guard point.y <= midpoint else { continue }
+            }
             return parsed.id
         }
         return nil
