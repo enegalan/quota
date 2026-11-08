@@ -190,7 +190,10 @@ jobs:
             echo "::error::no release assets downloaded" >&2
             exit 1
           fi
+          # No --verify-tag: this job has no checkout (write token must not sit
+          # beside a working tree). The tag already started the workflow, and
+          # the bundle job checked it against CFBundleShortVersionString.
           if ! gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release create "${TAG}" --verify-tag --title "Quota ${TAG}" --generate-notes
+            gh release create "${TAG}" --title "Quota ${TAG}" --generate-notes
           fi
           gh release upload "${TAG}" "${files[@]}" --clobber
