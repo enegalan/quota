@@ -56,8 +56,17 @@ jobs:
       - name: Select Xcode
         run: Scripts/ci/select-xcode.sh ${{ matrix.require_tests && '--require-tests' || '' }}
 
+      - name: Cache SwiftFormat
+        uses: actions/cache@v4
+        with:
+          path: .build/tools/swiftformat
+          key: swiftformat-0.64.5-${{ runner.os }}-${{ runner.arch }}
+
       - name: Install toolchain
         run: make bootstrap
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Resolve the tag and check it against the bundle's own version
         env:
