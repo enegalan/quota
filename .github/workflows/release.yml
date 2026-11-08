@@ -181,6 +181,8 @@ jobs:
       - name: Attach the bundles to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without a checkout, gh cannot discover the repository from git.
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
