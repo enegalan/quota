@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.13] - 2026-11-08
+
+### Changed
+
+- Claude and Codex integration logos.
+
+### Fixed
+
+- GitHub release creation no longer passes `--verify-tag`, which failed
+  because the release job does not check out the repository.
+
 ## [1.4.12] - 2026-11-08
 
 ### Added
