@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.12] - 2026-11-08
+
+### Added
+
+- Connected integrations can show their usage in the menu bar without opening
+  the popover.
+- Drag to reorder items in the usage overview popover.
+
 ### Fixed
 
 - A quota still named for a limit the provider renamed follows onto the new
@@ -15,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A packaged provider whose bytes changed without a version bump replaces the
   installed binary on launch, so a local rebuild no longer leaves yesterday's
   plugin answering under today's version number.
+- Stop leaking a plugin process on every usage read.
+- Integration overview, refresh, and close behaviour follow the current menu
+  settings.
 
 ### Changed
 
