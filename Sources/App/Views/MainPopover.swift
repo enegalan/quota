@@ -206,7 +206,7 @@ struct MainPopover: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Quota: \(presentation.summary.quota.name)")
                     .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
-                if !isPinned(presentation) {
+                if !isShownInMenuBar(presentation) {
                     Button("Show") {
                         Task { await model.showInMenuBar(presentation) }
                     }
@@ -234,9 +234,13 @@ struct MainPopover: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The quota the menu bar item currently speaks for.
-    private func isPinned(_ presentation: QuotaPresentation) -> Bool {
-        presentation.id == (model.menuBarQuotaID ?? model.primaryPresentation?.id)
+    /// Whether Show would leave the menu bar speaking for the same quota.
+    ///
+    /// Compared to `primaryPresentation`, not only the stored pin: with no pin
+    /// yet the first quota is already what the item draws, and offering Show
+    /// on it is a button that writes an id and changes nothing on screen.
+    private func isShownInMenuBar(_ presentation: QuotaPresentation) -> Bool {
+        presentation.id == model.primaryPresentation?.id
     }
 
     /// Used over today's plan, for the trailing figure on a quota row.
