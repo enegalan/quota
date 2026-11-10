@@ -130,15 +130,15 @@ struct MainPopover: View {
             }
             ForEach(rows) { item in
                 let ids = rows.map(\.id)
-                reorderable(VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
+                reorderable(VStack(alignment: .leading, spacing: LayoutMetrics.rowSpacing) {
                     switch item {
                     case .bucket(let bucket):
                         bucketRow(bucket)
                         ForEach(group.quotas(for: bucket.id)) { presentation in
-                            quotaDetails(presentation, in: group)
+                            quotaDetails(presentation, in: group, nestedUnderLimit: true)
                         }
                     case .quota(let presentation):
-                        quotaDetails(presentation, in: group)
+                        quotaDetails(presentation, in: group, nestedUnderLimit: false)
                     }
                 }, id: item.id, ids: ids, scope: group.orderKey)
             }
@@ -168,12 +168,12 @@ struct MainPopover: View {
         .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.cardRadius))
     }
 
-    /// A limit's name, bar, and reset caption.
+    /// A period limit's name, bar, and reset caption.
     private func bucketRow(_ bucket: UsageBucket) -> some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
             HStack(alignment: .firstTextBaseline) {
                 Text(bucket.displayName)
-                    .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
+                    .font(.system(size: LayoutMetrics.bodySize, weight: .semibold))
                 Spacer(minLength: LayoutMetrics.rowSpacing)
                 Text("\(formatter.string(bucket.usagePercentage)) used")
                     .font(.system(size: LayoutMetrics.footnoteSize, weight: .semibold))
@@ -200,12 +200,18 @@ struct MainPopover: View {
         .padding(.vertical, LayoutMetrics.lineSpacing)
     }
 
-    /// One quota under its limit, with today's plan and a pin control.
-    private func quotaDetails(_ presentation: QuotaPresentation, in group: PopoverIntegrationGroup) -> some View {
+    /// One day's plan for a quota, nested under its limit when that limit is known.
+    private func quotaDetails(
+        _ presentation: QuotaPresentation,
+        in group: PopoverIntegrationGroup,
+        nestedUnderLimit: Bool
+    ) -> some View {
         VStack(alignment: .leading, spacing: LayoutMetrics.unit) {
+            SectionTitle("Today")
             HStack(alignment: .firstTextBaseline) {
-                Text("Quota: \(presentation.summary.quota.name)")
+                Text(presentation.summary.quota.name)
                     .font(.system(size: LayoutMetrics.footnoteSize, weight: .medium))
+                    .foregroundStyle(.secondary)
                 if !isShownInMenuBar(presentation) {
                     Button("Show") {
                         Task { await model.showInMenuBar(presentation) }
@@ -221,7 +227,8 @@ struct MainPopover: View {
                 }
             }
             todayAllowance(presentation)
-            if let bucketID = presentation.summary.quota.bucketID ?? presentation.summary.snapshot?.primaryBucket?.id,
+            if !nestedUnderLimit,
+               let bucketID = presentation.summary.quota.bucketID ?? presentation.summary.snapshot?.primaryBucket?.id,
                let bucket = group.snapshot?.buckets.first(where: { $0.id == bucketID })
             {
                 Caption(text: "Limit: \(bucket.displayName)")
@@ -230,8 +237,13 @@ struct MainPopover: View {
                 Caption(text: "This quota's limit is unavailable.", isWarning: true)
             }
         }
-        .padding(.vertical, LayoutMetrics.lineSpacing)
+        .padding(.vertical, LayoutMetrics.unit)
+        .padding(.horizontal, LayoutMetrics.rowSpacing)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: LayoutMetrics.cornerRadius)
+                .fill(Color.primary.opacity(LayoutMetrics.barTrackOpacity))
+        )
     }
 
     /// Whether Show would leave the menu bar speaking for the same quota.
