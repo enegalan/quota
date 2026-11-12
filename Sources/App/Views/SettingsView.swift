@@ -231,9 +231,10 @@ struct SettingsView: View {
     """
 
     private static let valuesExplanation = """
-    The figures drawn beside each limit. Used and remaining shows both; \
-    used only and remaining only show one of them. A figure that has not \
-    been read yet is a dash.
+    The figures drawn for each limit and today's quota. For limits, used \
+    and remaining shows both sides of the period. For today's quota, used \
+    and remaining shows spend over the day's plan. Used only and remaining \
+    only show one figure. A figure that has not been read yet is a dash.
     """
 
     /// A binding that writes one menu-bar preference through the model.
