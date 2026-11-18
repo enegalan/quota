@@ -44,7 +44,7 @@ struct Main: App {
         .menuBarExtraStyle(.window)
 
         Window("Quota", id: QuotaWindowID.main) {
-            MainWindow(model: model, launchFailure: launchFailure)
+            MainWindow(model: model, launchFailure: launchFailure, delegate: delegate)
         }
         .defaultSize(
             width: LayoutMetrics.mainWindowWidth,
