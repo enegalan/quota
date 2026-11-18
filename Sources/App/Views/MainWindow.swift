@@ -21,6 +21,7 @@ enum QuotaWindowID {
 struct MainWindow: View {
     let model: AppModel
     let launchFailure: String?
+    let delegate: AppDelegate
 
     enum SidebarItem: Hashable {
         case quotas
@@ -84,7 +85,7 @@ struct MainWindow: View {
         .task {
             await model.load()
         }
-        .background(ManagementWindowCloseMonitor())
+        .background(ManagementWindowCloseMonitor(delegate: delegate))
     }
 
     @ViewBuilder
@@ -240,16 +241,32 @@ struct MainWindow: View {
 
 /// Hands the management window to the delegate, which hides the Dock icon when it closes.
 private struct ManagementWindowCloseMonitor: NSViewRepresentable {
+    let delegate: AppDelegate
+
     /// An empty host view whose window is the management window once mounted.
     func makeNSView(context: Context) -> NSView {
-        NSView()
+        WindowObserver(delegate: delegate)
     }
 
-    /// Passes the host's window to the app delegate whenever the view updates.
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            guard let window = nsView.window else { return }
-            (NSApp.delegate as? AppDelegate)?.noteManagementWindow(window)
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class WindowObserver: NSView {
+        weak var delegate: AppDelegate?
+
+        init(delegate: AppDelegate) {
+            self.delegate = delegate
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) {
+            nil
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let window {
+                delegate?.noteManagementWindow(window)
+            }
         }
     }
 }
