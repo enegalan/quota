@@ -26,7 +26,11 @@ struct Main: App {
 
     var body: some Scene {
         MenuBarExtra {
+            // menuBarQuotaID is read so the popover rebuilds after load/pin;
+            // MenuBarExtra otherwise keeps the first tree and leaves Show on
+            // the quota the item already speaks for.
             MainPopover(model: model, launchFailure: launchFailure)
+                .id(model.menuBarQuotaID)
                 .task {
                     await model.refreshOnAppear()
                 }

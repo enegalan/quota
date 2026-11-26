@@ -206,13 +206,27 @@ struct MenuBarLabel: View {
         }
         let named = ordered.count > 1 || ordered.first?.id != presentation.id
         return ordered.map { quota in
-            let allowance = quota.summary.todayAllowance
+            let figures = dailyValues(for: quota.summary.todayAllowance)
+            guard named else { return "Today \(figures)" }
+            return "Today \(quota.dailyMenuTitle(among: siblings)) \(figures)"
+        }
+    }
+
+    /// Today's spend against the day's plan — not against what remains.
+    ///
+    /// Limits use used/remaining because the period total is fixed at 100 and
+    /// remaining is the complement. Today's allowance is a budget: the second
+    /// figure has to be that budget (`suggested`), or "2% / 6%" is read as a
+    /// share of leftovers rather than of the day.
+    private func dailyValues(for allowance: TodayAllowance?) -> String {
+        switch options.valueMode {
+        case .both:
+            return Self.figures(for: allowance, formatter: formatter)
+        case .used, .remaining:
             let remaining = allowance.flatMap { value in
                 value.usedToday.map { max(0, value.suggested - $0) }
             }
-            let figures = values(used: allowance?.usedToday, remaining: remaining)
-            guard named else { return "Today \(figures)" }
-            return "Today \(quota.dailyMenuTitle(among: siblings)) \(figures)"
+            return values(used: allowance?.usedToday, remaining: remaining)
         }
     }
 

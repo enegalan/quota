@@ -271,7 +271,7 @@ struct QuotaCreationFlow: View {
         case .connected: "Connected"
         case .installed, .authRequired, .authExpired: "Installed"
         case .notInstalled: "Not installed"
-        default: listing.state.rawValue
+        default: listing.state.statusLabel
         }
     }
 
